@@ -1,1 +1,27 @@
-{"name": "homehost", "private": true, "version": "0.1.0", "workspaces": ["apps/*", "packages/*"], "scripts": {"dev:api": "bun --watch apps/api/src/server.ts", "test": "bun test packages/shared", "typecheck": "tsc --noEmit -p apps/api && tsc --noEmit -p packages/shared"}}
+{
+  "name": "homehost",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --parallel dev:api dev:web",
+    "dev:api": "bun --env-file=.env --watch apps/api/src/server.ts",
+    "dev:web": "bun run --cwd apps/web dev",
+    "db:migrate": "bun --env-file=.env apps/api/src/db/migrate.ts",
+    "db:up": "docker compose -f infra/compose.yml up -d --wait",
+    "db:down": "docker compose -f infra/compose.yml down",
+    "test": "bun test packages/shared",
+    "test:integration": "bun test apps/api/test",
+    "format": "prettier --write apps packages docs README.md package.json tsconfig.base.json infra/compose.yml",
+    "format:check": "prettier --check apps packages docs README.md package.json tsconfig.base.json infra/compose.yml",
+    "typecheck": "bun run --filter '*' typecheck",
+    "build": "bun run --filter '@homehost/api' --filter '@homehost/web' build"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "prettier": "^3.6.0"
+  }
+}

@@ -1,3 +1,4 @@
 export { PLANS } from "./plans.js";
 export type { Plan } from "./plans.js";
-export { toSubdomain, PortPool } from "./provisioning.js";
+export { toSubdomain } from "./provisioning.js";
+export * from "./control-plane.js";
