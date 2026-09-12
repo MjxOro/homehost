@@ -1,0 +1,1 @@
+{"name": "homehost", "private": true, "version": "0.1.0", "workspaces": ["apps/*", "packages/*"], "scripts": {"dev:api": "bun --watch apps/api/src/server.ts", "test": "bun test packages/shared", "typecheck": "tsc --noEmit -p apps/api && tsc --noEmit -p packages/shared"}}
