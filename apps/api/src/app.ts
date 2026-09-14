@@ -4,7 +4,7 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, inArray, lt, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   PLANS,
@@ -188,6 +188,37 @@ function toActivityEvent(e: EventRow): ActivityEvent {
     detail: e.detail,
   };
 }
+
+const ACTIVITY_PAGE_DEFAULT = 20;
+const ACTIVITY_PAGE_MAX = 100;
+
+function decodeActivityCursor(
+  cursor: string,
+): { createdAt: Date; id: string } | null {
+  try {
+    const raw = Buffer.from(cursor, "base64url").toString("utf8");
+    const sep = raw.lastIndexOf("|");
+    if (sep < 0) return null;
+    const createdAt = new Date(raw.slice(0, sep));
+    const id = raw.slice(sep + 1);
+    if (Number.isNaN(createdAt.getTime()) || id.length === 0) return null;
+    return { createdAt, id };
+  } catch {
+    return null;
+  }
+}
+
+const ActivityQuery = z
+  .object({
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(ACTIVITY_PAGE_MAX)
+      .default(ACTIVITY_PAGE_DEFAULT),
+    cursor: z.string().min(1).max(1000).optional(),
+  })
+  .strict();
 
 export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   // Showcase safety gates always apply, including smoke-injected instances.
@@ -509,7 +540,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         desc(schema.activityEvents.createdAt),
         desc(schema.activityEvents.id),
       )
-      .limit(50);
+      .limit(ACTIVITY_PAGE_DEFAULT);
     const events = eventRows.map((r) => r.event);
     const usage = { servers: 0, cpu: 0, memoryMb: 0, diskGb: 0 };
     for (const r of requests) {
@@ -532,6 +563,55 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       usage,
       requests: requests.map(toServerRequest),
       activity: events.map(toActivityEvent),
+    };
+  });
+  app.get("/api/activity", async (req, reply) => {
+    const session = await resolveSession(req);
+    if (!session)
+      return sendErr(reply, 401, "session required", "unauthorized");
+    const parsed = ActivityQuery.safeParse(req.query);
+    if (!parsed.success)
+      return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+    const conditions = [eq(schema.serverRequests.ownerId, session.user.id)];
+    if (parsed.data.cursor !== undefined) {
+      const decoded = decodeActivityCursor(parsed.data.cursor);
+      if (!decoded) return sendErr(reply, 400, "invalid cursor", "invalid");
+      conditions.push(
+        or(
+          lt(schema.activityEvents.createdAt, decoded.createdAt),
+          and(
+            eq(schema.activityEvents.createdAt, decoded.createdAt),
+            lt(schema.activityEvents.id, decoded.id),
+          ),
+        )!,
+      );
+    }
+    const rows = await db
+      .select({ event: schema.activityEvents })
+      .from(schema.activityEvents)
+      .innerJoin(
+        schema.serverRequests,
+        eq(schema.activityEvents.requestId, schema.serverRequests.id),
+      )
+      .where(and(...conditions))
+      .orderBy(
+        desc(schema.activityEvents.createdAt),
+        desc(schema.activityEvents.id),
+      )
+      .limit(parsed.data.limit + 1);
+    const hasMore = rows.length > parsed.data.limit;
+    const items = rows.slice(0, parsed.data.limit).map((r) => r.event);
+    const last = items[items.length - 1];
+    return {
+      activity: items.map(toActivityEvent),
+      hasMore,
+      nextCursor:
+        hasMore && last
+          ? Buffer.from(
+              `${last.createdAt.toISOString()}|${last.id}`,
+              "utf8",
+            ).toString("base64url")
+          : null,
     };
   });
 

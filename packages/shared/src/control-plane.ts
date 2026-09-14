@@ -99,6 +99,12 @@ export interface DashboardResponse {
   activity: ActivityEvent[];
 }
 
+export interface ActivityPageResponse {
+  activity: ActivityEvent[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
 export interface ApprovalResponse {
   requests: ServerRequest[];
 }
