@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-router";
 import { AppLayout } from "./components/AppLayout";
 import { ApprovalsPage } from "./routes/approvals";
+import { AdminPage } from "./pages/Admin";
 import { DashboardPage } from "./routes/dashboard";
 import { NewRequestPage } from "./routes/new-request";
 import { NotFoundPage } from "./routes/not-found";
@@ -32,10 +33,17 @@ const approvalsRoute = createRoute({
   component: ApprovalsPage,
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   newRequestRoute,
   approvalsRoute,
+  adminRoute,
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent" });

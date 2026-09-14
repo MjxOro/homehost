@@ -10,6 +10,7 @@ import {
   ServerIcon,
   SidebarIcon,
   Spinner,
+  UserIcon,
   XIcon,
 } from "./icons";
 import { PersonaMenu } from "./PersonaMenu";
@@ -97,6 +98,16 @@ function SidebarNav({
           onNavigate={onNavigate}
         />
       ) : null}
+      {isOperator ? (
+        <Link
+          to="/admin"
+          className={pathname.startsWith("/admin") ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE}
+          onClick={onNavigate}
+        >
+          <UserIcon className="size-[18px] shrink-0" />
+          <span>Administration</span>
+        </Link>
+      ) : null}
     </nav>
   );
 }
@@ -145,6 +156,10 @@ export function AppLayout() {
       }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        return;
+      }
       const active = document.activeElement as HTMLElement | null;
       if (event.shiftKey && (active === first || !sidebar.contains(active))) {
         event.preventDefault();
