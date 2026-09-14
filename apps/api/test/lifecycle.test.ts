@@ -7,7 +7,7 @@ import {
   test,
 } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import type { FastifyInstance } from "fastify";
@@ -33,11 +33,13 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       connection: { search_path: namespace },
       max: 8,
     });
-    const migration = await readFile(
-      new URL("../migrations/0001_init.sql", import.meta.url),
-      "utf8",
-    );
-    await client.unsafe(migration);
+    // Apply every checked-in migration in order so the scratch schema always
+    // matches the Drizzle schema, including provision_jobs and new columns.
+    const dir = new URL("../migrations/", import.meta.url);
+    const files = (await readdir(dir)).filter((f) => f.endsWith(".sql")).sort();
+    for (const f of files) {
+      await client.unsafe(await readFile(new URL(f, dir), "utf8"));
+    }
     app = buildApp({ db: drizzle(client, { schema }) });
     async function login(personaId: string) {
       const response = await app.inject({
@@ -56,7 +58,8 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
   });
 
   afterEach(async () => {
-    if (client) await client`TRUNCATE activity_events, server_requests`;
+    if (client)
+      await client`TRUNCATE provision_jobs, activity_events, server_requests`;
   });
 
   afterAll(async () => {
@@ -226,8 +229,10 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
   });
 
   test("aggregate resources and released rejections drive later admission", async () => {
+    // Technical quota (3 servers, 8 cpu, 8192 MB): two vm-mediums fill cpu
+    // and memory exactly; the third must fail on aggregates, not count.
     const trustedAttempts = await Promise.all(
-      Array.from({ length: 4 }, (_, i) =>
+      Array.from({ length: 2 }, (_, i) =>
         app.inject({
           method: "POST",
           url: "/api/requests",
@@ -268,5 +273,76 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       payload: { name: "Replacement slot", planId: "game-small" },
     });
     expect(replacement.statusCode).toBe(201);
+  });
+
+  test("ssh key persists at create; instance password reads exactly once", async () => {
+    const key =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIcfXKn/5G39jJ5beNyDe3WnorXY9oa5Cu2Cif8x5gWI alice@kitchen";
+    const keyed = await app.inject({
+      method: "POST",
+      url: "/api/requests",
+      headers: { cookie: bob },
+      payload: { name: "Keyed box", planId: "vm-medium", sshPubkey: key },
+    });
+    expect(keyed.statusCode).toBe(201);
+    expect(keyed.json<ServerRequest>().hasSshKey).toBe(true);
+    const unkeyed = await app.inject({
+      method: "POST",
+      url: "/api/requests",
+      headers: { cookie: bob },
+      payload: { name: "Plain box", planId: "game-small" },
+    });
+    expect(unkeyed.json<ServerRequest>().hasSshKey).toBe(false);
+    const bogus = await app.inject({
+      method: "POST",
+      url: "/api/requests",
+      headers: { cookie: bob },
+      payload: {
+        name: "Bogus key",
+        planId: "vm-medium",
+        sshPubkey: "not-a-key",
+      },
+    });
+    expect(bogus.statusCode).toBe(400);
+    const containerKey = await app.inject({
+      method: "POST",
+      url: "/api/requests",
+      headers: { cookie: bob },
+      payload: { name: "Container key", planId: "game-small", sshPubkey: key },
+    });
+    expect(containerKey.statusCode).toBe(201);
+    expect(containerKey.json<ServerRequest>().hasSshKey).toBe(true);
+    // The worker mints the secret at launch; seed a random stand-in here so
+    // no password-shaped literal ever lives in the repo.
+    const fixturePassword = randomUUID();
+    const id = keyed.json<ServerRequest>().id;
+    await client`UPDATE server_requests SET instance_password = ${fixturePassword} WHERE id = ${id}`;
+    const foreign = await app.inject({
+      method: "GET",
+      url: `/api/requests/${id}/credentials`,
+      headers: { cookie: alice },
+    });
+    expect(foreign.statusCode).toBe(404);
+    const first = await app.inject({
+      method: "GET",
+      url: `/api/requests/${id}/credentials`,
+      headers: { cookie: operator },
+    });
+    expect(first.statusCode).toBe(200);
+    expect(first.json<{ password: string | null }>().password).toBe(
+      fixturePassword,
+    );
+    const second = await app.inject({
+      method: "GET",
+      url: `/api/requests/${id}/credentials`,
+      headers: { cookie: bob },
+    });
+    expect(second.statusCode).toBe(200);
+    await client`UPDATE server_requests SET ssh_port = 22000 WHERE id = ${id}`;
+    const leased = (
+      await app.inject({ url: "/api/dashboard", headers: { cookie: bob } })
+    ).json<DashboardResponse>();
+    // v6-only contract: stale port values never surface to clients.
+    expect(leased.requests.find((r) => r.id === id)?.sshPort).toBeUndefined();
   });
 });
