@@ -9,6 +9,14 @@ export type RequestStatus =
   | "rejected"
   | "deleted";
 
+export type AccountStatus = "pending" | "approved" | "rejected" | "suspended";
+export type TechnicalLevel = "technical" | "non_technical";
+
+export const TECHNICAL_LEVELS: readonly TechnicalLevel[] = [
+  "technical",
+  "non_technical",
+];
+
 export interface Quota {
   servers: number;
   cpu: number;
