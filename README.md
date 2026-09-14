@@ -1,6 +1,6 @@
 # Homehost
 
-A TypeScript self-service homelab control panel: React + TanStack Router/Query + Tailwind CSS, Fastify + Effect + Zod, Drizzle + Postgres.
+[![ci](https://github.com/MjxOro/homehost/actions/workflows/ci.yml/badge.svg)](https://github.com/MjxOro/homehost/actions/workflows/ci.yml) · live at [homehost.risktozero.sh](https://homehost.risktozero.sh)
 
 **Current release: a working local request-and-approval showcase, not a VM host.** Requests, sessions, quota reservations and activity are persisted in Postgres. Approval reserves capacity; it does not create infrastructure. No payments, fake running instances or invented metrics.
 
