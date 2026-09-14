@@ -7,11 +7,14 @@ import {
   queryKeys,
   useApprovals,
   useDecide,
+  useInstances,
   usePlans,
+  useRetryProvision,
   useSession,
 } from "../lib/query";
 import { CheckIcon, Spinner, XIcon } from "../components/icons";
 import { SignInGate } from "../components/SignInGate";
+import { SshAccess } from "../components/RequestList";
 import {
   BUTTON_DANGER_SM,
   BUTTON_OUTLINE_SM,
@@ -25,6 +28,7 @@ import {
   FORM_ERROR,
   LiveRegion,
   PageLoading,
+  StatusPill,
 } from "../components/primitives";
 
 const REASON_MAX = 500;
@@ -61,7 +65,7 @@ function ApprovalRow({
           setRejecting(false);
           onDecided(
             decision === "approve"
-              ? `“${updated.name}” approved — capacity reserved for ${updated.ownerName}. Nothing was provisioned.`
+              ? `“${updated.name}” approved — the worker picks it up for provisioning.`
               : `“${updated.name}” rejected${updated.decisionReason ? ` — ${updated.decisionReason}` : ""}.`,
           );
         },
@@ -106,7 +110,7 @@ function ApprovalRow({
           </p>
         ) : null}
         {rejecting ? (
-          <div className="mt-3.5 flex max-w-[520px] flex-col gap-2">
+          <div className="mt-3.5 flex w-full max-w-[520px] flex-col gap-2">
             <label htmlFor={`reason-${request.id}`} className={FIELD_LABEL}>
               Reason for rejection{" "}
               <span className="font-normal text-text-3">(optional)</span>
@@ -121,7 +125,7 @@ function ApprovalRow({
               onChange={(event) => setReason(event.target.value)}
               placeholder="Shown to the owner on their dashboard."
             />
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
               <p className={FIELD_HINT}>
                 The owner sees this on their dashboard.
               </p>
@@ -136,10 +140,10 @@ function ApprovalRow({
                 {reason.length}/{REASON_MAX}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2.5">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
-                className={BUTTON_OUTLINE_SM}
+                className={`${BUTTON_OUTLINE_SM} w-full sm:w-auto`}
                 disabled={busy}
                 onClick={() => {
                   setRejecting(false);
@@ -150,7 +154,7 @@ function ApprovalRow({
               </button>
               <button
                 type="button"
-                className={BUTTON_DANGER_SM}
+                className={`${BUTTON_DANGER_SM} w-full sm:w-auto`}
                 disabled={busy || reasonTooLong}
                 onClick={() => act("reject")}
               >
@@ -161,11 +165,11 @@ function ApprovalRow({
           </div>
         ) : null}
       </div>
-      <div className="flex w-full items-center justify-between gap-2.5 sm:w-auto sm:flex-col sm:items-end">
-        <div className="flex flex-wrap gap-2.5">
+      <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:items-end">
+        <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            className={BUTTON_OUTLINE_SM}
+            className={`${BUTTON_OUTLINE_SM} w-full sm:w-auto`}
             disabled={busy || rejecting}
             onClick={() => act("approve")}
           >
@@ -174,7 +178,7 @@ function ApprovalRow({
           </button>
           <button
             type="button"
-            className={BUTTON_DANGER_SM}
+            className={`${BUTTON_DANGER_SM} w-full sm:w-auto`}
             disabled={busy || rejecting}
             onClick={() => setRejecting(true)}
           >
@@ -184,6 +188,94 @@ function ApprovalRow({
         </div>
       </div>
     </li>
+  );
+}
+
+function ProvisionedSection({ user }: { user: PortalUser }) {
+  const instances = useInstances(user);
+  const retry = useRetryProvision();
+  const [message, setMessage] = useState<string | null>(null);
+  if (instances.isPending) {
+    return (
+      <section className={CARD} aria-label="Provisioned servers loading">
+        <div className="skeleton skeleton-line w-40" aria-hidden="true" />
+        <div className="skeleton skeleton-row" aria-hidden="true" />
+      </section>
+    );
+  }
+  if (instances.isError) return null;
+  const rows = instances.data.requests;
+  return (
+    <section className={CARD} aria-labelledby="provisioned-heading">
+      <div className={CARD_HEAD}>
+        <div>
+          <h2 id="provisioned-heading" className={CARD_TITLE}>
+            Provisioned fleet
+          </h2>
+          <p className={CARD_SUB}>
+            Approved, provisioning, running and stopped servers across all
+            owners, newest first.
+          </p>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <EmptyState
+          title="Nothing provisioned"
+          copy="Approved requests appear here once the worker picks them up."
+        />
+      ) : (
+        <ul className="m-0 flex list-none flex-col divide-y divide-line">
+          {rows.map((request) => (
+            <li
+              key={request.id}
+              className="flex flex-col gap-2 px-0.5 py-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-[15px] font-[650]">{request.name}</span>
+                  <StatusPill status={request.status} />
+                </div>
+                <p className="mt-1 text-[13px] text-text-2">
+                  {request.ownerName}
+                  {request.ipv4 ? (
+                    <span className="font-mono"> · {request.ipv4}</span>
+                  ) : null}
+                </p>
+                <SshAccess
+                  request={request}
+                  onAnnounce={(announcement) => setMessage(announcement)}
+                  allowPassword={request.ownerId === user.id}
+                />
+              </div>
+              {request.status === "approved" ? (
+                <button
+                  type="button"
+                  className={`${BUTTON_OUTLINE_SM} w-full sm:w-auto`}
+                  disabled={retry.isPending}
+                  onClick={() =>
+                    retry.mutate(request.id, {
+                      onSuccess: () =>
+                        setMessage(
+                          `Provisioning re-queued for “${request.name}”.`,
+                        ),
+                      onError: (error) =>
+                        setMessage(
+                          error instanceof Error
+                            ? error.message
+                            : "Retry failed.",
+                        ),
+                    })
+                  }
+                >
+                  Retry provisioning
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <LiveRegion message={message} />
+    </section>
   );
 }
 
@@ -229,7 +321,7 @@ function ApprovalsQueue({ user }: { user: PortalUser }) {
       return (
         <EmptyState
           title="Operator role required"
-          copy="The approval queue is limited to operator personas. Switch persona from the topbar menu."
+          copy="The approval queue is limited to operators. Sign in with the operator account to decide requests."
         />
       );
     }
@@ -249,7 +341,7 @@ function ApprovalsQueue({ user }: { user: PortalUser }) {
             </h2>
             <p className={CARD_SUB}>
               Requests from every owner, newest first. Approving reserves quota
-              — it never starts a real server.
+              and queues provisioning — the worker builds the server.
             </p>
           </div>
           {requests.length > 0 ? (
@@ -276,6 +368,7 @@ function ApprovalsQueue({ user }: { user: PortalUser }) {
           </ul>
         )}
       </section>
+      <ProvisionedSection user={user} />
       <LiveRegion message={liveMessage} />
     </div>
   );
@@ -295,7 +388,7 @@ export function ApprovalsPage() {
     return (
       <EmptyState
         title="Operator role required"
-        copy="Approval actions are only visible to the operator persona. Your dashboard and requests are unaffected."
+        copy="Approval actions are only visible to the operator. Your dashboard and requests are unaffected."
       />
     );
   }
@@ -307,7 +400,7 @@ export function ApprovalsPage() {
             Approvals
           </h1>
           <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[14px] text-text-2">
-            Decide pending requests from every owner on the showcase.
+            Decide pending requests from every owner.
           </p>
         </div>
       </div>

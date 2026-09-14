@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Plan, PortalUser, ServerRequest } from "@homehost/shared";
+import { isValidSshPublicKey } from "@homehost/shared";
 import { isApiError } from "../lib/api";
 import { formatMemory } from "../lib/format";
 import {
@@ -39,7 +40,7 @@ function describeSubmitError(error: unknown): string {
       return `${error.message} Cancel an existing request or ask an operator to adjust your tier.`;
     }
     if (error.status === 403) {
-      return `${error.message} Locked plans need a trusted member tier.`;
+      return `${error.message} Locked plans need a technical friend tier.`;
     }
     if (error.status === 0) {
       return "Network error — the API did not respond.";
@@ -55,7 +56,7 @@ interface PlanChoice {
 }
 
 const PLAN_RADIO_GRID =
-  "grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3";
+  "grid grid-cols-[repeat(auto-fit,minmax(min(100%,230px),1fr))] gap-3";
 const PLAN_CARD_LABEL =
   "flex h-full cursor-pointer flex-col gap-1.5 rounded-control border border-line-strong bg-ink-2 p-3.5 transition-[border-color,box-shadow] duration-[0.15s] ease-[ease] hover:border-text-3 peer-checked:border-accent peer-checked:shadow-[inset_0_0_0_1px_var(--color-accent)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
 
@@ -89,11 +90,11 @@ function PlanCards({
                 onChange={() => onSelect(plan.id)}
               />
               <label htmlFor={inputId} className={PLAN_CARD_LABEL}>
-                <span className="flex items-center justify-between gap-2">
+                <span className="flex flex-wrap items-center justify-between gap-2 [&>*]:min-w-0">
                   <span className="text-[14.5px] font-[650]">{plan.name}</span>
                   {locked ? (
                     <Chip>
-                      <LockIcon className="size-3" /> trusted only
+                      <LockIcon className="size-3" /> technical only
                     </Chip>
                   ) : null}
                 </span>
@@ -103,7 +104,7 @@ function PlanCards({
                 </span>
                 <span className="text-[12.5px] leading-[1.5] text-text-3">
                   {locked
-                    ? "Locked for your tier — an untrusted member cannot request this plan."
+                    ? "Locked for your tier — technical friends can request this plan."
                     : "Resources reserve against your per-tier quota while pending or approved."}
                 </span>
               </label>
@@ -186,6 +187,7 @@ function RequestForm({ user }: { user: PortalUser }) {
   const createRequest = useCreateRequest();
   const [name, setName] = useState("");
   const [planId, setPlanId] = useState<string | null>(null);
+  const [sshKey, setSshKey] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [submitted, setSubmitted] = useState<ServerRequest | null>(null);
 
@@ -193,7 +195,7 @@ function RequestForm({ user }: { user: PortalUser }) {
     () =>
       (plansQuery.data ?? []).map((plan) => ({
         plan,
-        locked: plan.trustedOnly && user.tier !== "trusted",
+        locked: plan.technicalOnly && user.tier !== "technical",
       })),
     [plansQuery.data, user.tier],
   );
@@ -229,6 +231,11 @@ function RequestForm({ user }: { user: PortalUser }) {
   const planError = planId === null ? "Choose a plan." : null;
   const selectedPlan =
     choices.find((choice) => choice.plan.id === planId)?.plan ?? null;
+  const trimmedKey = sshKey.trim();
+  const keyError =
+    trimmedKey.length > 0 && !isValidSshPublicKey(trimmedKey)
+      ? "Paste a single-line public key: <type> <base64> [comment]."
+      : null;
 
   return (
     <form
@@ -237,9 +244,13 @@ function RequestForm({ user }: { user: PortalUser }) {
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);
-        if (nameError || planError || !planId) return;
+        if (nameError || planError || keyError || !planId) return;
         createRequest.mutate(
-          { name: trimmed, planId },
+          {
+            name: trimmed,
+            planId,
+            sshPubkey: trimmedKey || undefined,
+          },
           {
             onSuccess: (request) => setSubmitted(request),
           },
@@ -264,7 +275,7 @@ function RequestForm({ user }: { user: PortalUser }) {
           placeholder="e.g. valheim-weekend"
           autoComplete="off"
         />
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <p id="server-name-hint" className={FIELD_HINT}>
             1–{NAME_MAX} characters. The name seeds your subdomain label; the
             API trims whitespace and adds a unique suffix.
@@ -300,6 +311,37 @@ function RequestForm({ user }: { user: PortalUser }) {
       ) : null}
 
       {selectedPlan ? <QuotaHint userId={user.id} plan={selectedPlan} /> : null}
+
+      {selectedPlan ? (
+        <div className="flex flex-col gap-2">
+          <label htmlFor="ssh-key" className={FIELD_LABEL}>
+            SSH public key <span className={FIELD_HINT}>(optional)</span>
+          </label>
+          <textarea
+            id="ssh-key"
+            name="ssh-key"
+            rows={3}
+            className={`${INPUT_FIELD} font-mono`}
+            value={sshKey}
+            disabled={createRequest.isPending}
+            aria-invalid={attempted && keyError ? true : undefined}
+            aria-describedby="ssh-key-hint"
+            onChange={(event) => setSshKey(event.target.value)}
+            placeholder="ssh-ed25519 AAAA… you@machine"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <p id="ssh-key-hint" className={FIELD_HINT}>
+            Key-only root login when set. Empty means a generated password,
+            shown once on the dashboard after provisioning.
+          </p>
+          {attempted && keyError ? (
+            <p className={FORM_ERROR} role="alert">
+              {keyError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {createRequest.isError ? (
         <p className={FORM_ERROR} role="alert">
