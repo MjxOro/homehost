@@ -19,18 +19,18 @@ Keep one mainline, not a public-example fork and private-production fork. Showca
 
 ## Milestone 2: private friend pilot
 
-1. Confirm homelab topology and hardware: Incus availability/version, ZFS pool and usable capacity, CPU/RAM reservation, public IPv4 versus CGNAT, chosen domain, backup target, exposed port policy. Do not assume access or alter the host without these inputs.
+1. Confirm homelab topology and hardware: Incus availability/version, ZFS pool and usable capacity, CPU/RAM reservation, routed IPv6 /64, chosen domain, backup target. Do not assume access or alter the host without these inputs.
 2. Authentik OIDC authorization-code + PKCE login, server-side sessions, operator allowlist and invitations. Same-origin ingress, secure cookies, CSRF protection, login throttling. Provisioning privileges are never assigned by the browser.
 3. Durable jobs/outbox and worker with idempotent Incus instance names, retries for classified transient errors, failure state and reconciliation. Approval enqueues work atomically. Database state does not prove provider state.
 4. Incus projects/profiles per tenant, restricted networks, image allowlist, CPU/memory limits, ZFS quota/refquota. Untrusted users: one small workload, manual approval and expiry; Docker inside a tenant VM, never a host Docker socket.
-5. Cloudflare DNS-only wildcard plus Traefik DNS-01; flat server-owner labels, no per-request DNS record. Route only healthy provisioned web services. No Tailscale dependency for customer access. CGNAT requires ISP public IP or a later public frontend; do not promise public reachability before checking.
+5. Cloudflare DNS plus Traefik DNS-01 for the panel edge; flat server-owner labels with one AAAA per box published at provision and removed at teardown. Boxes are reached directly with `ssh root@<subdomain>` over IPv6, with no extra ports and no per-server Traefik routes. No Tailscale dependency for customer access.
 6. Backup/restore drill, provider reconciliation after crashes, rollback/runbook, encrypted secret storage, management-network isolation, global physical capacity reservations and operator emergency suspend.
 
-Exit gate: one friend can request an approved VM, receive a reachable endpoint, stop/delete it, and have capacity reclaimed safely across worker/API restarts. Verify real ZFS enforcement, egress isolation and restore before inviting more users.
+Exit gate: one friend can request an approved VM, receive its subdomain, reach it with `ssh root@<subdomain>`, stop/delete it, and have capacity reclaimed safely across worker/API restarts. Verify real ZFS enforcement, egress isolation and restore before inviting more users.
 
 ## Milestone 3: games and abuse controls
 
-- Pterodactyl API integration for game instances; allocate IP/port leases transactionally and release only after provider teardown. SRV records only for supported games and public ingress.
+- Pterodactyl API integration for game instances; allocate game addresses transactionally and release only after provider teardown. SRV records only for supported games and public ingress.
 - Expiry reminders, idle policy with explicit rules, suspend then cull grace period; transparent event history.
 - Operator trust promotion, invitations/rate limits, resource ceilings and a capacity dashboard. No arbitrary public signup before abuse controls.
 

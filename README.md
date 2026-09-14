@@ -36,7 +36,7 @@ Persona switching is an explicit showcase feature. Anyone using this demo can se
 - `packages/shared` — plan catalog and shared contracts.
 - `infra/compose.yml` — isolated local Postgres service.
 - `docs/roadmap.md` — staged production plan and acceptance gates.
-- `docs/networking.md` — future Cloudflare wildcard/Traefik ingress; not configured by this demo.
+- `docs/networking.md` — v6-only box access (`ssh root@<subdomain>`) and the Traefik panel edge; not configured by this demo.
 
 One mainline serves the portfolio example and eventual private installation. Keep deployment secrets, actual host addresses and customer records outside the repository. Use separate databases and networks for demo and production; do not maintain a drifting example fork.
 

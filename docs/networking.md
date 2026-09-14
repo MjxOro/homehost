@@ -1,16 +1,21 @@
-# Networking (Cloudflare wildcard, no per-user DNS)
+# Networking (v6-only boxes, Traefik panel edge)
 
-One-time manual DNS (Cloudflare Free, DNS-only grey cloud):
+Every box gets a stable IPv6 address inside the routed /64 (`IPV6_PREFIX`)
+and its own AAAA record, published at provision and removed at teardown.
+Reach any box directly with `ssh root@<subdomain>` over IPv6: default port
+22 with no extra flags or client config.
 
-```dns
-A  lab.yourdomain.com    <PUBLIC-IP>
-A  *.lab.yourdomain.com  <PUBLIC-IP>
-```
+The current showcase only reserves names under `lab.example.test`: it does
+not publish DNS or provision instances. The production worker publishes each
+box's AAAA, installs the requester's SSH key for root, and derives the
+address deterministically from the request ID so relaunches converge.
 
-That single wildcard record covers flat tenant hostnames. The current showcase
-only reserves names under `lab.example.test`: it does not create DNS, routes,
-ports or instances. The production worker will write Traefik `Host()` routes
-and allocate game IP/port leases after provider provisioning.
+Panel edge: Traefik serves the panel hostname with Let's Encrypt DNS-01
+(`CF_DNS_API_TOKEN`, `ACME_EMAIL` in `infra/private/traefik.env`, never
+committed; see `infra/traefik/compose.yml`). `infra/traefik/routes/panel.yml`
+is the only route file and stays checked in. The worker never writes
+per-server route files: boxes are reached directly over IPv6, never proxied
+through Traefik.
 
 Keep names flat (`<server>-<owner>-<id>.lab...`) so one Let's Encrypt
 certificate for `*.lab.yourdomain.com` covers them. Cloudflare Universal SSL
@@ -20,16 +25,13 @@ is not used at all for DNS-only traffic. Traefik must serve its own certificate.
 Certs: Traefik ACME DNS-01 via `CF_DNS_API_TOKEN` (template: Edit zone DNS,
 scoped to the zone). See `infra/traefik/compose.yml`.
 
-CGNAT check: compare router WAN IPv4 with the public address, and check whether
-WAN is in `100.64.0.0/10` or RFC1918 private space. A mismatch indicates upstream
-NAT but can also be a second router you control. Verify ISP inbound filtering
-and actual port reachability before promising public service. Resolve with an
-ISP public/static address or a later public frontend; no VPS is required for
+IPv4 CGNAT/port filtering affects only the v4 panel edge, never box SSH:
+compare router WAN IPv4 with the public address to diagnose panel
+reachability, but boxes only need the routed /64. No VPS is required for
 the localhost showcase.
 
 The existing Traefik compose is a deployment starting point, **not launched**
 by the showcase. Its Docker provider/socket is not the tenant isolation model:
-never attach the host Docker socket to tenant workloads, and replace discovery
-with controlled file-provider routes for Incus instances during the pilot.
+never attach the host Docker socket to tenant workloads.
 
 Reference: [Cloudflare Universal SSL limitations](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/).
