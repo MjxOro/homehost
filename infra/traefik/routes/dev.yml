@@ -1,0 +1,41 @@
+# Dev stack edge routes. Containers publish on host loopback; Traefik adds TLS.
+# NOTE: dev login via these hosts needs APP_ORIGIN to match (see .env.dev.example).
+http:
+  routers:
+    hhfrontdev:
+      rule: "Host(`hhfrontdev.homehost.risktozero.sh`)"
+      entryPoints:
+        - websecure
+      service: hhfrontdev
+      tls:
+        certResolver: letsencrypt
+    hhfrontdev-http:
+      rule: "Host(`hhfrontdev.homehost.risktozero.sh`)"
+      entryPoints:
+        - web
+      middlewares:
+        - https-redirect
+      service: hhfrontdev
+    hhbackdev:
+      rule: "Host(`hhbackdev.homehost.risktozero.sh`)"
+      entryPoints:
+        - websecure
+      service: hhbackdev
+      tls:
+        certResolver: letsencrypt
+    hhbackdev-http:
+      rule: "Host(`hhbackdev.homehost.risktozero.sh`)"
+      entryPoints:
+        - web
+      middlewares:
+        - https-redirect
+      service: hhbackdev
+  services:
+    hhfrontdev:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5174"
+    hhbackdev:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3001"
