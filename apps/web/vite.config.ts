@@ -19,6 +19,7 @@ export default defineConfig({
       "127.0.0.1",
       "192.168.1.16",
       "homehost.risktozero.sh",
+      "hhfrontdev.homehost.risktozero.sh",
     ],
     proxy: {
       "/api": {

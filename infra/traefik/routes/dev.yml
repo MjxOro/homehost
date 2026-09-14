@@ -34,8 +34,8 @@ http:
     hhfrontdev:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:5174"
+          - url: "http://homehost-dev-web-1:5174"
     hhbackdev:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:3001"
+          - url: "http://homehost-dev-api-1:3001"

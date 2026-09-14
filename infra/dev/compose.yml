@@ -39,6 +39,9 @@ services:
         required: false
     ports:
       - "127.0.0.1:3001:3001"
+    networks:
+      - default
+      - edge
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,8 +56,16 @@ services:
       API_PROXY_TARGET: http://api:3001
     ports:
       - "127.0.0.1:5174:5174"
+    networks:
+      - default
+      - edge
     depends_on:
       - api
+
+networks:
+  edge:
+    name: homehost-edge_default
+    external: true
 
 volumes:
   homehost-dev-postgres:
