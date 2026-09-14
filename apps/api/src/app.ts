@@ -4,12 +4,18 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, lt, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, ne } from "drizzle-orm";
 import { z } from "zod";
-import { PLANS, TIER_QUOTAS } from "@homehost/shared";
+import {
+  PLANS,
+  SSH_KEY_MAX,
+  TIER_QUOTAS,
+  isValidSshPublicKey,
+} from "@homehost/shared";
 import type {
   ActivityEvent,
   ApprovalResponse,
+  CredentialsResponse,
   DashboardResponse,
   DemoPersona,
   PortalUser,
@@ -26,23 +32,60 @@ import {
   cancelRequest,
   createRequest,
   decideRequest,
+  readInstancePassword,
+  retryProvision,
+  startInstance,
+  stopInstance,
 } from "./domain/requests.js";
 
-const SESSION_COOKIE = "hh_session";
-const SESSION_MAX_AGE_S = 30 * 24 * 60 * 60;
+import {
+  clearedSessionCookie,
+  sessionCookie,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_S,
+} from "./auth/cookies.js";
+import { registerOAuth } from "./auth/oauth.js";
 
 const DEMO_PERSONAS: DemoPersona[] = [
-  { id: "alice", name: "Alice Chen", tier: "untrusted", role: "member" },
-  { id: "bob", name: "Bob Martin", tier: "trusted", role: "member" },
-  { id: "operator", name: "Lab Operator", tier: "trusted", role: "operator" },
+  {
+    id: "alice",
+    name: "Alice Chen",
+    tier: "nontechnical",
+    role: "member",
+    email: null,
+  },
+  {
+    id: "bob",
+    name: "Bob Martin",
+    tier: "technical",
+    role: "member",
+    email: null,
+  },
+  {
+    id: "operator",
+    name: "Lab Operator",
+    tier: "technical",
+    role: "operator",
+    email: null,
+  },
 ];
 
 const DemoSessionBody = z
   .object({ personaId: z.enum(["alice", "bob", "operator"]) })
   .strict();
 const CreateRequestBody = z
-  .object({ name: z.string().trim().min(1).max(48), planId: z.string().min(1) })
-  .strict();
+  .object({
+    name: z.string().trim().min(1).max(48),
+    planId: z.string().min(1),
+    sshPubkey: z.string().trim().max(SSH_KEY_MAX).optional(),
+  })
+  .strict()
+  .refine(
+    (b) => b.sshPubkey === undefined || isValidSshPublicKey(b.sshPubkey),
+    {
+      message: "sshPubkey must be a single-line <type> <base64> [comment] key",
+    },
+  );
 const DecisionBody = z
   .object({
     decision: z.enum(["approve", "reject"]),
@@ -50,6 +93,12 @@ const DecisionBody = z
   })
   .strict();
 const IdParams = z.object({ id: z.string().uuid() }).strict();
+const InviteBody = z
+  .object({
+    email: z.string().trim().toLowerCase().email().max(254),
+    tier: z.enum(["technical", "nontechnical"]).default("nontechnical"),
+  })
+  .strict();
 
 export interface BuildAppOptions {
   db?: Database;
@@ -92,6 +141,8 @@ function sendDomainError(reply: FastifyReply, e: DomainError) {
       return sendErr(reply, 404, "request not found", "not_found");
     case "TransitionConflict":
       return sendErr(reply, 409, "request is no longer pending", "conflict");
+    case "InvalidTransition":
+      return sendErr(reply, 409, e.message, "conflict");
     case "DbFailure":
       throw e.cause;
     default: {
@@ -112,7 +163,11 @@ function toServerRequest(r: RequestRow): ServerRequest {
     name: r.name,
     planId: r.planId,
     status: r.status as ServerRequest["status"],
+    hasSshKey: r.sshPubkey !== null,
+    ipv6: r.ipv6,
     subdomain: r.subdomain,
+    instanceName: r.instanceName,
+    ipv4: r.ipv4,
     cpu: r.cpu,
     memoryMb: r.memoryMb,
     diskGb: r.diskGb,
@@ -186,6 +241,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         name: u.name,
         role: u.role as PortalUser["role"],
         tier: u.tier as PortalUser["tier"],
+        email: u.email,
       },
       tokenHash,
     };
@@ -265,19 +321,24 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     return sendErr(reply, status, message, "invalid");
   });
 
-  app.get("/api/health", async () => ({ ok: true, mode: "showcase" }));
+  app.get("/api/health", async () => ({
+    ok: true,
+    mode: env.showcase ? "showcase" : "live",
+  }));
 
   app.get("/api/session", async (req): Promise<SessionResponse> => {
     const session = await resolveSession(req);
     return {
-      mode: "showcase",
+      mode: env.showcase ? "showcase" : "live",
       user: session?.user ?? null,
-      personas: DEMO_PERSONAS,
+      personas: env.showcase ? DEMO_PERSONAS : [],
+      providers: { google: env.google !== null, github: env.github !== null },
     };
   });
 
   app.post("/api/demo/session", async (req, reply) => {
-    if (!requireJsonBody(req, reply)) return;
+    if (!env.showcase)
+      return sendErr(reply, 404, "demo logins are disabled", "not_found");
     const parsed = DemoSessionBody.safeParse(req.body);
     if (!parsed.success)
       return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
@@ -302,19 +363,18 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       userId: u.id,
       expiresAt: new Date(now.getTime() + SESSION_MAX_AGE_S * 1000),
     });
-    reply.header(
-      "Set-Cookie",
-      `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_S}`,
-    );
+    reply.header("Set-Cookie", sessionCookie(token));
     return {
-      mode: "showcase",
+      mode: env.showcase ? "showcase" : "live",
       user: {
         id: u.id,
         name: u.name,
         role: u.role as PortalUser["role"],
         tier: u.tier as PortalUser["tier"],
+        email: u.email,
       },
       personas: DEMO_PERSONAS,
+      providers: { google: env.google !== null, github: env.github !== null },
     };
   });
 
@@ -327,12 +387,96 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     }
     // Clearing lives in the successful handler, never in a global hook that also
     // fires for denied cross-site logout attempts.
-    reply.header(
-      "Set-Cookie",
-      `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-    );
+    reply.header("Set-Cookie", clearedSessionCookie());
     return { ok: true };
   });
+
+  registerOAuth(app, db, env);
+
+  app.post("/api/invites", async (req, reply) => {
+    const session = await resolveSession(req);
+    if (!session)
+      return sendErr(reply, 401, "session required", "unauthorized");
+    if (session.user.role !== "operator") {
+      return sendErr(reply, 403, "operator role required", "forbidden");
+    }
+    if (!requireJsonBody(req, reply)) return;
+    const parsed = InviteBody.safeParse(req.body);
+    if (!parsed.success)
+      return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+    try {
+      const inserted = await db
+        .insert(schema.invites)
+        .values({
+          email: parsed.data.email,
+          tier: parsed.data.tier,
+          createdBy: session.user.id,
+        })
+        .returning();
+      const row = inserted[0];
+      return reply.code(201).send({
+        id: row.id,
+        email: row.email,
+        tier: row.tier,
+        usedAt: row.usedAt ? row.usedAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+      });
+    } catch (e) {
+      if (
+        typeof e === "object" &&
+        e !== null &&
+        "code" in e &&
+        e.code === "23505"
+      ) {
+        return sendErr(reply, 409, "invite already exists", "conflict");
+      }
+      throw e;
+    }
+  });
+
+  app.get("/api/invites", async (req, reply) => {
+    const session = await resolveSession(req);
+    if (!session)
+      return sendErr(reply, 401, "session required", "unauthorized");
+    if (session.user.role !== "operator") {
+      return sendErr(reply, 403, "operator role required", "forbidden");
+    }
+    const rows = await db
+      .select()
+      .from(schema.invites)
+      .orderBy(desc(schema.invites.createdAt), desc(schema.invites.id));
+    return {
+      invites: rows.map((r) => ({
+        id: r.id,
+        email: r.email,
+        tier: r.tier,
+        usedAt: r.usedAt ? r.usedAt.toISOString() : null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
+  });
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/invites/:id",
+    async (req, reply) => {
+      const session = await resolveSession(req);
+      if (!session)
+        return sendErr(reply, 401, "session required", "unauthorized");
+      if (session.user.role !== "operator") {
+        return sendErr(reply, 403, "operator role required", "forbidden");
+      }
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const deleted = await db
+        .delete(schema.invites)
+        .where(eq(schema.invites.id, params.data.id))
+        .returning({ id: schema.invites.id });
+      if (deleted.length === 0)
+        return sendErr(reply, 404, "invite not found", "not_found");
+      return { ok: true };
+    },
+  );
 
   app.get("/api/plans", async () => PLANS);
 
@@ -369,7 +513,13 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     const events = eventRows.map((r) => r.event);
     const usage = { servers: 0, cpu: 0, memoryMb: 0, diskGb: 0 };
     for (const r of requests) {
-      if (r.status === "pending_approval" || r.status === "approved") {
+      if (
+        r.status === "pending_approval" ||
+        r.status === "approved" ||
+        r.status === "provisioning" ||
+        r.status === "running" ||
+        r.status === "stopped"
+      ) {
         usage.servers += 1;
         usage.cpu += r.cpu;
         usage.memoryMb += r.memoryMb;
@@ -395,9 +545,10 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
     const plan = PLANS.find((p) => p.id === parsed.data.planId);
     if (!plan) return sendErr(reply, 404, "unknown plan", "not_found");
-    if (plan.trustedOnly && session.user.tier !== "trusted") {
-      return sendErr(reply, 403, "plan requires trusted tier", "forbidden");
+    if (plan.technicalOnly && session.user.tier !== "technical") {
+      return sendErr(reply, 403, "plan requires technical tier", "forbidden");
     }
+    // The worker installs sshd on containers too, so all plans accept ssh keys.
     const created = await runtime.runPromise(
       Effect.either(
         createRequest({
@@ -405,6 +556,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
           name: parsed.data.name,
           plan,
           baseDomain,
+          sshPubkey: parsed.data.sshPubkey,
         }),
       ),
     );
@@ -455,6 +607,31 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     return { requests: rows.map(toServerRequest) };
   });
 
+  app.get("/api/instances", async (req, reply) => {
+    const session = await resolveSession(req);
+    if (!session)
+      return sendErr(reply, 401, "session required", "unauthorized");
+    if (session.user.role !== "operator") {
+      return sendErr(reply, 403, "operator role required", "forbidden");
+    }
+    const rows = await db
+      .select()
+      .from(schema.serverRequests)
+      .where(
+        inArray(schema.serverRequests.status, [
+          "approved",
+          "provisioning",
+          "running",
+          "stopped",
+        ]),
+      )
+      .orderBy(
+        desc(schema.serverRequests.createdAt),
+        desc(schema.serverRequests.id),
+      );
+    return { requests: rows.map(toServerRequest) };
+  });
+
   app.post<{ Params: { id: string } }>(
     "/api/requests/:id/decision",
     async (req, reply) => {
@@ -486,6 +663,89 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       return Either.match(decided, {
         onLeft: (e) => sendDomainError(reply, e),
         onRight: (row) => toServerRequest(row),
+      });
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/requests/:id/stop",
+    async (req, reply) => {
+      const session = await resolveSession(req);
+      if (!session)
+        return sendErr(reply, 401, "session required", "unauthorized");
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const stopped = await runtime.runPromise(
+        Effect.either(stopInstance({ id: params.data.id, user: session.user })),
+      );
+      return Either.match(stopped, {
+        onLeft: (e) => sendDomainError(reply, e),
+        onRight: (row) => toServerRequest(row),
+      });
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/requests/:id/start",
+    async (req, reply) => {
+      const session = await resolveSession(req);
+      if (!session)
+        return sendErr(reply, 401, "session required", "unauthorized");
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const started = await runtime.runPromise(
+        Effect.either(
+          startInstance({ id: params.data.id, user: session.user }),
+        ),
+      );
+      return Either.match(started, {
+        onLeft: (e) => sendDomainError(reply, e),
+        onRight: (row) => toServerRequest(row),
+      });
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/requests/:id/retry",
+    async (req, reply) => {
+      const session = await resolveSession(req);
+      if (!session)
+        return sendErr(reply, 401, "session required", "unauthorized");
+      if (session.user.role !== "operator") {
+        return sendErr(reply, 403, "operator role required", "forbidden");
+      }
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const retried = await runtime.runPromise(
+        Effect.either(retryProvision({ id: params.data.id })),
+      );
+      return Either.match(retried, {
+        onLeft: (e) => sendDomainError(reply, e),
+        onRight: (row) => toServerRequest(row),
+      });
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/requests/:id/credentials",
+    async (req, reply) => {
+      const session = await resolveSession(req);
+      if (!session)
+        return sendErr(reply, 401, "session required", "unauthorized");
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const credentials = await runtime.runPromise(
+        Effect.either(
+          readInstancePassword({ id: params.data.id, user: session.user }),
+        ),
+      );
+      return Either.match(credentials, {
+        onLeft: (e) => sendDomainError(reply, e),
+        onRight: ({ password }) => ({ password }) satisfies CredentialsResponse,
       });
     },
   );
