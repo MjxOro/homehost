@@ -1,0 +1,14 @@
+[Unit]
+Description=Homehost tenant bridge IPv6 address
+After=incus.service wg-quick@r64lan.service
+Wants=incus.service
+BindsTo=sys-subsystem-net-devices-incusbr0.device
+After=sys-subsystem-net-devices-incusbr0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/ip -6 addr replace 2a11:6c7:f35:ea::ffff/64 dev incusbr0
+
+[Install]
+WantedBy=multi-user.target

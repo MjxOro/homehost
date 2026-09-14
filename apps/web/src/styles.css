@@ -46,6 +46,7 @@
   html {
     color-scheme: dark;
     background-color: var(--color-ink-0);
+    overflow-x: clip;
   }
 
   body {
@@ -56,6 +57,7 @@
     font-size: 15px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
   }
 
   ::selection {

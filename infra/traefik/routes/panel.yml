@@ -1,0 +1,30 @@
+# Panel route. Tenant game/VM routes are added here later by the worker as
+# separate files (one per server), never by Docker discovery, and removed on
+# teardown. Pattern for later:
+#   rule: "Host(`<server>-<owner>-<id>.homehost.risktozero.sh`)"
+http:
+  routers:
+    panel:
+      rule: "Host(`homehost.risktozero.sh`)"
+      entryPoints:
+        - websecure
+      service: panel
+      tls:
+        certResolver: letsencrypt
+    panel-http:
+      rule: "Host(`homehost.risktozero.sh`)"
+      entryPoints:
+        - web
+      middlewares:
+        - https-redirect
+      service: panel
+  middlewares:
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+  services:
+    panel:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5173"

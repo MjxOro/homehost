@@ -1,0 +1,17 @@
+[Unit]
+Description=Homehost provisioning worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mjxoro
+Group=incus-admin
+WorkingDirectory=/home/mjxoro/projects/homehost
+EnvironmentFile=/home/mjxoro/projects/homehost/.env
+ExecStart=/home/mjxoro/.bun/bin/bun apps/worker/src/index.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

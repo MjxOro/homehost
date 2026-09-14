@@ -14,9 +14,14 @@ export class TransitionConflict extends Data.TaggedError(
   "TransitionConflict",
 )<{}> {}
 
+export class InvalidTransition extends Data.TaggedError("InvalidTransition")<{
+  readonly message: string;
+}> {}
+
 export type DomainError =
   | DbFailure
   | QuotaExceeded
   | SubdomainTaken
   | RequestNotFound
-  | TransitionConflict;
+  | TransitionConflict
+  | InvalidTransition;

@@ -4,8 +4,12 @@ export interface Plan {
   cpu: number;
   memoryMb: number;
   diskGb: number;
-  /** Requires a server-assigned trusted tier; every request still needs approval. */
-  trustedOnly: boolean;
+  /** Requires the technical friend tier; every request still needs approval. */
+  technicalOnly: boolean;
+  /** Tenant unit: shared-kernel container or full KVM virtual machine. */
+  kind: "container" | "vm";
+  /** Incus image alias, e.g. images:ubuntu/24.04. */
+  image: string;
 }
 
 export const PLANS: Plan[] = [
@@ -15,7 +19,9 @@ export const PLANS: Plan[] = [
     cpu: 2,
     memoryMb: 2048,
     diskGb: 20,
-    trustedOnly: false,
+    technicalOnly: false,
+    kind: "container",
+    image: "images:ubuntu/24.04",
   },
   {
     id: "vm-medium",
@@ -23,7 +29,9 @@ export const PLANS: Plan[] = [
     cpu: 4,
     memoryMb: 4096,
     diskGb: 40,
-    trustedOnly: true,
+    technicalOnly: true,
+    kind: "vm",
+    image: "images:ubuntu/24.04/cloud",
   },
   {
     id: "vm-large",
@@ -31,6 +39,8 @@ export const PLANS: Plan[] = [
     cpu: 8,
     memoryMb: 8192,
     diskGb: 80,
-    trustedOnly: true,
+    technicalOnly: true,
+    kind: "vm",
+    image: "images:ubuntu/24.04/cloud",
   },
 ];

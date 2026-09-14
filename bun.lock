@@ -46,6 +46,18 @@
         "vite": "^8.3.0",
       },
     },
+    "apps/worker": {
+      "name": "@homehost/worker",
+      "version": "0.1.0",
+      "dependencies": {
+        "@homehost/shared": "0.1.0",
+        "postgres": "^3.4.5",
+      },
+      "devDependencies": {
+        "@types/node": "^22.0.0",
+        "typescript": "^5.5.0",
+      },
+    },
     "packages/shared": {
       "name": "@homehost/shared",
       "version": "0.1.0",
@@ -73,6 +85,8 @@
     "@homehost/shared": ["@homehost/shared@workspace:packages/shared"],
 
     "@homehost/web": ["@homehost/web@workspace:apps/web"],
+
+    "@homehost/worker": ["@homehost/worker@workspace:apps/worker"],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 

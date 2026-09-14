@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { TIER_QUOTAS, toSubdomain } from "@homehost/shared";
-import type { Plan, PortalUser } from "@homehost/shared";
+import type { Plan, PortalUser, ProvisionAction } from "@homehost/shared";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
 import {
   DbFailure,
+  InvalidTransition,
   QuotaExceeded,
   RequestNotFound,
   SubdomainTaken,
@@ -28,6 +29,7 @@ export interface CreateInput {
   name: string;
   plan: Plan;
   baseDomain: string;
+  sshPubkey?: string;
 }
 
 type CreateOutcome =
@@ -91,6 +93,7 @@ export const createRequest = (
                 input.baseDomain,
                 id,
               ),
+              sshPubkey: input.sshPubkey ?? null,
               cpu: input.plan.cpu,
               memoryMb: input.plan.memoryMb,
               diskGb: input.plan.diskGb,
@@ -160,11 +163,84 @@ export const cancelRequest = (
             action: "deleted",
             serverName: row.name,
           });
+          // A live instance needs provider teardown; the worker owns the Incus side.
+          // The reservation is released now; the partial unique index keeps this to one job.
+          if (
+            row.instanceName &&
+            (row.status === "approved" ||
+              row.status === "provisioning" ||
+              row.status === "running" ||
+              row.status === "stopped")
+          ) {
+            await tx.insert(schema.provisionJobs).values({
+              requestId: row.id,
+              action: "teardown",
+            });
+          }
           return { ok: true as const };
         }),
       catch: (cause) => new DbFailure({ cause }),
     });
     if (!outcome.ok) return yield* new RequestNotFound();
+  });
+
+export interface CredentialsInput {
+  id: string;
+  user: PortalUser;
+}
+
+export const readInstancePassword = (
+  input: CredentialsInput,
+): Effect.Effect<
+  { password: string | null },
+  RequestNotFound | DbFailure,
+  DatabaseTag
+> =>
+  Effect.gen(function* () {
+    const db = yield* DatabaseTag;
+    // Owner or operator; anything else is 404 with no existence oracle.
+    // The row lock serializes concurrent readers: the first takes the secret
+    // and clears it, late readers get null exactly like never-set.
+    const outcome: { ok: boolean; password: string | null } =
+      yield* Effect.tryPromise({
+        try: () =>
+          db.transaction(async (tx) => {
+            const found = await tx
+              .select({
+                id: schema.serverRequests.id,
+                ownerId: schema.serverRequests.ownerId,
+              })
+              .from(schema.serverRequests)
+              .where(eq(schema.serverRequests.id, input.id))
+              .limit(1);
+            const row = found[0];
+            if (
+              !row ||
+              (row.ownerId !== input.user.id && input.user.role !== "operator")
+            ) {
+              return { ok: false as const, password: null as string | null };
+            }
+            await tx.execute(
+              sql`SELECT 1 FROM server_requests WHERE id = ${row.id} FOR UPDATE`,
+            );
+            const secret = await tx
+              .select({ password: schema.serverRequests.instancePassword })
+              .from(schema.serverRequests)
+              .where(eq(schema.serverRequests.id, row.id))
+              .limit(1);
+            const password = secret[0]?.password ?? null;
+            if (password !== null) {
+              await tx
+                .update(schema.serverRequests)
+                .set({ instancePassword: null, updatedAt: new Date() })
+                .where(eq(schema.serverRequests.id, row.id));
+            }
+            return { ok: true as const, password };
+          }),
+        catch: (cause) => new DbFailure({ cause }),
+      });
+    if (!outcome.ok) return yield* new RequestNotFound();
+    return { password: outcome.password };
   });
 
 export interface DecideInput {
@@ -220,6 +296,14 @@ export const decideRequest = (
             serverName: current.name,
             detail: input.reason,
           });
+          // Approval enqueues provisioning atomically: no approved request
+          // exists without a queued provision job, and no job without approval.
+          if (input.decision === "approve") {
+            await tx.insert(schema.provisionJobs).values({
+              requestId: current.id,
+              action: "provision",
+            });
+          }
           return { ok: true as const, row: updated[0] };
         }),
       catch: (cause) => new DbFailure({ cause }),
@@ -228,6 +312,141 @@ export const decideRequest = (
       return yield* outcome.reason === "missing"
         ? new RequestNotFound()
         : new TransitionConflict();
+    }
+    return outcome.row;
+  });
+
+export interface InstanceInput {
+  id: string;
+  user: PortalUser;
+}
+
+type PowerOutcome =
+  { ok: true; row: RequestRow } | { ok: false; reason: "missing" | "state" };
+
+function powerRequest(
+  input: InstanceInput,
+  from: "running" | "stopped",
+  action: ProvisionAction,
+  verb: "stop" | "start",
+  past: "stopped" | "started",
+): Effect.Effect<
+  RequestRow,
+  RequestNotFound | InvalidTransition | DbFailure,
+  DatabaseTag
+> {
+  return Effect.gen(function* () {
+    const db = yield* DatabaseTag;
+    const outcome: PowerOutcome = yield* Effect.tryPromise({
+      try: () =>
+        db.transaction(async (tx) => {
+          await tx.execute(
+            sql`SELECT 1 FROM server_requests WHERE id = ${input.id} FOR UPDATE`,
+          );
+          const found = await tx
+            .select()
+            .from(schema.serverRequests)
+            .where(eq(schema.serverRequests.id, input.id))
+            .limit(1);
+          const row = found[0];
+          if (
+            !row ||
+            row.ownerId !== input.user.id ||
+            row.status === "deleted"
+          ) {
+            return { ok: false as const, reason: "missing" as const };
+          }
+          if (row.status !== from) {
+            return { ok: false as const, reason: "state" as const };
+          }
+          await tx.insert(schema.provisionJobs).values({
+            requestId: row.id,
+            action,
+          });
+          return { ok: true as const, row };
+        }),
+      catch: (cause): InvalidTransition | DbFailure =>
+        isUniqueViolation(cause)
+          ? new InvalidTransition({
+              message: `a ${verb} job is already queued`,
+            })
+          : new DbFailure({ cause }),
+    });
+    if (!outcome.ok) {
+      return yield* outcome.reason === "missing"
+        ? new RequestNotFound()
+        : new InvalidTransition({
+            message: `only ${from} requests can be ${past}`,
+          });
+    }
+    return outcome.row;
+  });
+}
+
+export const stopInstance = (
+  input: InstanceInput,
+): Effect.Effect<
+  RequestRow,
+  RequestNotFound | InvalidTransition | DbFailure,
+  DatabaseTag
+> => powerRequest(input, "running", "stop", "stop", "stopped");
+
+export const startInstance = (
+  input: InstanceInput,
+): Effect.Effect<
+  RequestRow,
+  RequestNotFound | InvalidTransition | DbFailure,
+  DatabaseTag
+> => powerRequest(input, "stopped", "start", "start", "started");
+
+export const retryProvision = (input: {
+  id: string;
+}): Effect.Effect<
+  RequestRow,
+  RequestNotFound | InvalidTransition | DbFailure,
+  DatabaseTag
+> =>
+  Effect.gen(function* () {
+    const db = yield* DatabaseTag;
+    const outcome: PowerOutcome = yield* Effect.tryPromise({
+      try: () =>
+        db.transaction(async (tx) => {
+          await tx.execute(
+            sql`SELECT 1 FROM server_requests WHERE id = ${input.id} FOR UPDATE`,
+          );
+          const found = await tx
+            .select()
+            .from(schema.serverRequests)
+            .where(eq(schema.serverRequests.id, input.id))
+            .limit(1);
+          const row = found[0];
+          if (!row || row.status === "deleted") {
+            return { ok: false as const, reason: "missing" as const };
+          }
+          // Only failed-then-approved requests are retryable: anything else
+          // either has no failure to retry or already has provider state.
+          if (row.status !== "approved") {
+            return { ok: false as const, reason: "state" as const };
+          }
+          await tx.insert(schema.provisionJobs).values({
+            requestId: row.id,
+            action: "provision",
+          });
+          return { ok: true as const, row };
+        }),
+      catch: (cause): InvalidTransition | DbFailure =>
+        isUniqueViolation(cause)
+          ? new InvalidTransition({
+              message: "a provision job is already queued",
+            })
+          : new DbFailure({ cause }),
+    });
+    if (!outcome.ok) {
+      return yield* outcome.reason === "missing"
+        ? new RequestNotFound()
+        : new InvalidTransition({
+            message: "only approved requests can be retried",
+          });
     }
     return outcome.row;
   });

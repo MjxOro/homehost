@@ -21,6 +21,18 @@ const COPY: Record<
     title: "Release this reservation?",
     confirm: "Release reservation",
   },
+  provisioning: {
+    title: "Cancel while provisioning?",
+    confirm: "Tear down",
+  },
+  running: {
+    title: "Delete this running server?",
+    confirm: "Delete server",
+  },
+  stopped: {
+    title: "Delete this stopped server?",
+    confirm: "Delete server",
+  },
   rejected: {
     title: "Remove this rejected request?",
     confirm: "Remove request",
@@ -37,6 +49,12 @@ function bodyText(request: ServerRequest): string {
       return `“${request.name}” is still waiting for operator review. Withdrawing it releases the reserved capacity immediately.`;
     case "approved":
       return `“${request.name}” is approved but was never provisioned. Releasing it frees the reserved capacity — there is no running server to shut down.`;
+    case "provisioning":
+      return `“${request.name}” is being provisioned right now. Cancelling queues teardown of the partial instance and releases the reservation.`;
+    case "running":
+      return `“${request.name}” is running. Cancelling stops and deletes the server, tears down its instance, and releases the reserved capacity.`;
+    case "stopped":
+      return `“${request.name}” is stopped. Cancelling deletes the server and releases the reserved capacity.`;
     case "rejected":
       return `“${request.name}” holds no capacity. Removing it simply clears it from your list.`;
     default:

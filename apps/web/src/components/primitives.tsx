@@ -37,14 +37,15 @@ export const ICON_BTN_QUIET =
 export const FORM_ERROR =
   "m-0 rounded-control border border-[rgba(224,108,108,0.45)] bg-bad-dim px-3 py-2.5 text-[13.5px] leading-[1.5] text-[#f0a8a8]";
 
-export const CARD = "rounded-card border border-line bg-ink-1 p-5";
-export const CARD_HEAD = "mb-3.5 flex items-start justify-between gap-4";
+export const CARD = "rounded-card border border-line bg-ink-1 p-4 sm:p-5";
+export const CARD_HEAD =
+  "mb-3.5 flex flex-wrap items-start justify-between gap-4 [&>*]:min-w-0";
 export const CARD_TITLE = "text-[16px] font-[650] tracking-[-0.005em]";
 export const CARD_SUB =
   "mt-1 max-w-[72ch] text-[13.5px] leading-[1.5] text-text-3";
 
 const PILL_BASE =
-  "inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px] font-semibold";
+  "inline-flex items-center gap-2 text-balance rounded-full border px-2.5 py-1 text-[13px] font-semibold";
 const STATE_PANEL = "flex flex-col items-center gap-2.5 px-4 py-10 text-center";
 const STATE_TITLE = "text-[18px] font-bold";
 const STATE_COPY = "max-w-[54ch] text-[14px] leading-[1.6] text-text-2";
@@ -143,6 +144,18 @@ const STATUS_META: Record<RequestStatus, { label: string; className: string }> =
       label: "Approved · not provisioned",
       className: `${PILL_BASE} border-[rgba(94,201,143,0.4)] bg-ok-dim text-ok`,
     },
+    provisioning: {
+      label: "Provisioning…",
+      className: `${PILL_BASE} border-accent-line bg-accent-dim text-accent`,
+    },
+    running: {
+      label: "Running",
+      className: `${PILL_BASE} border-[rgba(94,201,143,0.4)] bg-ok-dim text-ok`,
+    },
+    stopped: {
+      label: "Stopped",
+      className: `${PILL_BASE} border-line-strong text-text-2`,
+    },
     rejected: {
       label: "Rejected",
       className: `${PILL_BASE} border-[rgba(224,108,108,0.4)] bg-bad-dim text-bad`,
@@ -195,9 +208,9 @@ export function QuotaBar({ label, used, max, format }: QuotaBarProps) {
   const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between gap-2 text-[13px]">
-        <span className="text-text-2">{label}</span>
-        <span className="whitespace-nowrap font-mono text-[12.5px] text-text-1">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 text-[13px] [&>*]:min-w-0">
+        <span className="min-w-0 text-text-2">{label}</span>
+        <span className="font-mono text-[12.5px] tabular-nums text-text-1">
           {render(used)} / {render(max)}
         </span>
       </div>

@@ -1,3 +1,4 @@
+name: homehost-edge
 services:
   traefik:
     image: traefik:v3
@@ -5,15 +6,21 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?set in .env}
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?set CF_DNS_API_TOKEN in infra/private/traefik.env}
+    env_file:
+      - ../private/traefik.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
-      - --providers.docker=true
+      - --providers.file.directory=/etc/traefik/routes
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=10
-      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set in .env}
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set ACME_EMAIL in infra/private/traefik.env}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --accesslog=true
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./routes:/etc/traefik/routes:ro
       - ./letsencrypt:/letsencrypt
