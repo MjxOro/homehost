@@ -1,5 +1,6 @@
 import type {
   ApprovalResponse,
+  CredentialsResponse,
   DashboardResponse,
   Plan,
   ServerRequest,
@@ -81,6 +82,7 @@ export const api = {
   createRequest: (input: {
     name: string;
     planId: string;
+    sshPubkey?: string;
   }): Promise<ServerRequest> =>
     request("/api/requests", {
       method: "POST",
@@ -90,6 +92,25 @@ export const api = {
 
   cancelRequest: (id: string): Promise<{ ok: true }> =>
     request(`/api/requests/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  stopInstance: (id: string): Promise<ServerRequest> =>
+    request(`/api/requests/${encodeURIComponent(id)}/stop`, {
+      method: "POST",
+    }),
+
+  startInstance: (id: string): Promise<ServerRequest> =>
+    request(`/api/requests/${encodeURIComponent(id)}/start`, {
+      method: "POST",
+    }),
+  retryProvision: (id: string): Promise<ServerRequest> =>
+    request(`/api/requests/${encodeURIComponent(id)}/retry`, {
+      method: "POST",
+    }),
+
+  getCredentials: (id: string): Promise<CredentialsResponse> =>
+    request(`/api/requests/${encodeURIComponent(id)}/credentials`),
+
+  getInstances: (): Promise<ApprovalResponse> => request("/api/instances"),
 
   getApprovals: (): Promise<ApprovalResponse> => request("/api/approvals"),
 

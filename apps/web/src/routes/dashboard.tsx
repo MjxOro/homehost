@@ -14,8 +14,8 @@ import { formatMemory } from "../lib/format";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { LockIcon } from "../components/icons";
 import { PersonaPicker } from "../components/PersonaPicker";
+import { OAuthButtons, SignInGate } from "../components/SignInGate";
 import { RequestList } from "../components/RequestList";
-import { SignInGate } from "../components/SignInGate";
 import {
   CARD,
   CARD_HEAD,
@@ -52,16 +52,16 @@ function PlanCatalog({ plans }: { plans: Plan[] }) {
           <li
             key={plan.id}
             className={
-              plan.trustedOnly
+              plan.technicalOnly
                 ? "rounded-control border border-line bg-ink-2 p-3.5 opacity-[0.78]"
                 : "rounded-control border border-line bg-ink-2 p-3.5"
             }
           >
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 [&>*]:min-w-0">
               <h3 className="text-[14.5px] font-[650]">{plan.name}</h3>
-              {plan.trustedOnly ? (
+              {plan.technicalOnly ? (
                 <Chip>
-                  <LockIcon className="size-3" /> trusted only
+                  <LockIcon className="size-3" /> technical only
                 </Chip>
               ) : null}
             </div>
@@ -81,6 +81,7 @@ function PlanCatalog({ plans }: { plans: Plan[] }) {
 }
 
 function SignedOutHome() {
+  const { data: session } = useSession();
   const plans = usePlans();
   return (
     <div className="flex flex-col gap-5">
@@ -89,15 +90,22 @@ function SignedOutHome() {
           Request a server from the homelab.
         </h1>
         <p className="m-0 max-w-[66ch] text-[15.5px] leading-[1.65] text-text-2">
-          Homehost is a small control plane for friends: pick a plan, request
-          it, and a lab operator approves or rejects. This running copy is an
-          honest showcase — requests only reserve capacity on paper, and no
-          server is ever created.
+          {session?.mode === "live"
+            ? "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. Approved servers are provisioned as real machines on the homelab."
+            : "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. This running copy is an honest showcase — requests only reserve capacity on paper, and no server is ever created."}
         </p>
         <h2 className="mb-0 mt-[30px] text-[12px] font-bold uppercase tracking-[0.07em] text-text-3">
-          Try a demo persona
+          Sign in
         </h2>
-        <PersonaPicker />
+        <OAuthButtons />
+        {(session?.personas ?? []).length > 0 ? (
+          <>
+            <h2 className="mb-0 mt-[30px] text-[12px] font-bold uppercase tracking-[0.07em] text-text-3">
+              Try a demo persona
+            </h2>
+            <PersonaPicker />
+          </>
+        ) : null}
       </section>
       {plans.isPending ? (
         <div className={CARD} aria-hidden="true">
@@ -194,7 +202,7 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
             ) : null}
           </p>
         </div>
-        <Link to="/new" className={LINK_PRIMARY}>
+        <Link to="/new" className={`${LINK_PRIMARY} w-full sm:w-auto`}>
           New request
         </Link>
       </div>
@@ -208,8 +216,8 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
               Your requests
             </h2>
             <p className={CARD_SUB}>
-              Pending and approved rows hold reserved quota. Rejected rows stay
-              visible but hold nothing.
+              Pending, approved, provisioning, running and stopped rows hold
+              reserved quota. Rejected rows stay visible but hold nothing.
             </p>
           </div>
         </div>

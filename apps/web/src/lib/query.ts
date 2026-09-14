@@ -12,6 +12,7 @@ export const queryKeys = {
   plans: ["plans"] as const,
   dashboard: ["dashboard"] as const,
   approvals: ["approvals"] as const,
+  instances: ["instances"] as const,
 };
 
 /** Transport-level failure (fetch threw). HTTP 4xx/5xx are NOT network errors. */
@@ -70,6 +71,9 @@ export function useDashboard(userId: string | undefined) {
     queryKey: [...queryKeys.dashboard, userId ?? "none"],
     queryFn: api.getDashboard,
     enabled: typeof userId === "string" && userId.length > 0,
+    // Worker-driven transitions (approved→provisioning→running, stop/start)
+    // land server-side; poll so rows converge without a manual refresh.
+    refetchInterval: 10_000,
   });
 }
 
@@ -79,6 +83,17 @@ export function useApprovals(user: PortalUser | null | undefined) {
   return useQuery({
     queryKey: [...queryKeys.approvals, user?.id ?? "none"],
     queryFn: api.getApprovals,
+    enabled: isOperator,
+    refetchInterval: isOperator ? 15_000 : false,
+  });
+}
+
+/** Operator-only provisioned fleet, same gating as the approval queue. */
+export function useInstances(user: PortalUser | null | undefined) {
+  const isOperator = user?.role === "operator";
+  return useQuery({
+    queryKey: [...queryKeys.instances, user?.id ?? "none"],
+    queryFn: api.getInstances,
     enabled: isOperator,
     refetchInterval: isOperator ? 15_000 : false,
   });
@@ -105,9 +120,10 @@ export function useLogout() {
       );
       await clearTenantData(queryClient);
       queryClient.setQueryData<SessionResponse>(queryKeys.session, {
-        mode: "showcase",
+        mode: current?.mode ?? "showcase",
         user: null,
         personas: current?.personas ?? [],
+        providers: current?.providers ?? { google: false, github: false },
       });
     },
   });
@@ -138,6 +154,40 @@ export function useCancelRequest() {
   return useMutation({
     mutationFn: api.cancelRequest,
     onSuccess: invalidate,
+  });
+}
+
+export function useStopInstance() {
+  const invalidate = useInvalidateAfterMutation();
+  return useMutation({
+    mutationFn: api.stopInstance,
+    onSuccess: invalidate,
+  });
+}
+
+export function useStartInstance() {
+  const invalidate = useInvalidateAfterMutation();
+  return useMutation({
+    mutationFn: api.startInstance,
+    onSuccess: invalidate,
+  });
+}
+
+export function useRetryProvision() {
+  const invalidate = useInvalidateAfterMutation();
+  return useMutation({
+    mutationFn: api.retryProvision,
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * One-time password fetch. Deliberately a bare mutation: the secret must
+ * never sit in the query cache, and success invalidates nothing.
+ */
+export function useCredentials() {
+  return useMutation({
+    mutationFn: (id: string) => api.getCredentials(id),
   });
 }
 
