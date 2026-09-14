@@ -1,0 +1,19 @@
+name: deploy
+
+# Continuous deployment: merge to main → the prod box pulls, rebuilds, migrates, restarts.
+# Requires a self-hosted runner on the prod host (see README "Continuous deployment").
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, homehost-prod]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun run prod:deploy
