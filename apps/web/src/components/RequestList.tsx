@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ServerRequest } from "@homehost/shared";
 import {
   useCredentials,
   usePlans,
   useStartInstance,
   useStopInstance,
+  queryKeys,
 } from "../lib/query";
 import { formatDateTime, formatMemory, formatRelative } from "../lib/format";
 import { CancelDialog } from "./CancelDialog";
@@ -14,10 +16,14 @@ import {
   ICON_BTN_QUIET,
   StatusPill,
 } from "./primitives";
-import { CheckIcon, CopyIcon, TrashIcon } from "./icons";
+import { CheckIcon, CopyIcon, Spinner, TrashIcon } from "./icons";
 
 const CODE_BADGE =
   "rounded-md border border-line bg-ink-2 px-1.5 py-0.5 font-mono text-[12.5px] text-accent [overflow-wrap:anywhere]";
+
+/** Small label chip for a copy box, mirroring the code badge's chip look. */
+const LABEL_CHIP =
+  "inline-block rounded border border-line bg-ink-2 px-1.5 py-0.5 text-[11px] font-semibold leading-[1.4] text-text-2";
 
 function resourceLine(request: ServerRequest): string {
   return `${request.cpu} CPU · ${formatMemory(request.memoryMb)} RAM · ${request.diskGb} GB disk`;
@@ -91,8 +97,9 @@ function Ipv6Badge({ value }: { value: string }) {
 }
 
 /**
- * Copyable command for a leased box. Rendered only when the lease exists:
- * the worker writes the DNAT rule before the row ever reports a port.
+ * Copyable command box. Rendered wherever a command is actionable; the copy
+ * button shares the badge pattern (1600 ms reset, inert when the clipboard
+ * is unavailable).
  */
 function SshCommand({ command }: { command: string }) {
   const [copied, setCopied] = useState(false);
@@ -125,48 +132,51 @@ function SshCommand({ command }: { command: string }) {
 
 /**
  * Revealed one-time password with focus management and a copy button, so
- * the secret never needs manual transcription.
+ * the secret never needs manual transcription. The label chip names the box;
+ * focus lands on the wrapper so the label, secret, and one-time note are all
+ * announced together.
  */
 function PasswordReveal({ password }: { password: string }) {
   const [copied, setCopied] = useState(false);
-  const revealedRef = useRef<HTMLParagraphElement>(null);
+  const revealedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     revealedRef.current?.focus();
   }, []);
   return (
-    <p
-      ref={revealedRef}
-      tabIndex={-1}
-      className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] leading-[1.55] text-text-2"
-    >
-      <span>One-time root password (now cleared server-side):</span>
-      <code className={`${CODE_BADGE} min-w-0 break-all`}>{password}</code>
-      <button
-        type="button"
-        className={ICON_BTN_QUIET}
-        aria-label={copied ? "Password copied" : "Copy one-time password"}
-        onClick={() => {
-          void navigator.clipboard
-            ?.writeText(password)
-            .then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1600);
-            })
-            .catch(() => {
-              /* clipboard unavailable — leave the button inert */
-            });
-        }}
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
-    </p>
+    <div ref={revealedRef} tabIndex={-1} className="mt-2.5">
+      <span className={LABEL_CHIP}>One-time password</span>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <code className={`${CODE_BADGE} min-w-0 break-all`}>{password}</code>
+        <button
+          type="button"
+          className={ICON_BTN_QUIET}
+          aria-label={copied ? "Password copied" : "Copy one-time password"}
+          onClick={() => {
+            void navigator.clipboard
+              ?.writeText(password)
+              .then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1600);
+              })
+              .catch(() => {
+                /* clipboard unavailable — leave the button inert */
+              });
+          }}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
+      </div>
+      <p className="mt-1 text-[13px] leading-[1.55] text-text-2">
+        Now cleared server-side — it will not be shown again.
+      </p>
+    </div>
   );
 }
 
 /**
- * Root access for a provisioned box: the bare `ssh root@<subdomain>` command
- * when running (dials over IPv6), then key status or the one-time password
- * flow.
+ * Root access for a provisioned box, top to bottom: the bare
+ * `ssh root@<subdomain>` command when running (dials over IPv6), then the
+ * key status note, then the one-time password flow.
  */
 export function SshAccess({
   request,
@@ -194,56 +204,62 @@ export function SshAccess({
   return (
     <>
       {request.status === "running" ? (
-        <SshCommand command={`ssh root@${request.subdomain}`} />
+        <div className="mt-2.5 flex flex-col items-start gap-1 [&>span]:mt-0">
+          <span className={LABEL_CHIP}>SSH</span>
+          <SshCommand command={`ssh root@${request.subdomain}`} />
+        </div>
       ) : null}
       {request.hasSshKey ? (
         <p className="mt-2.5 text-[13px] leading-[1.55] text-text-2">
           SSH key attached — root login by key.
         </p>
-      ) : !allowPassword ? null : password !== null ? (
-        <PasswordReveal password={password} />
-      ) : request.status === "provisioning" ? (
-        <p className="mt-2.5 text-[13px] leading-[1.55] text-text-2">
-          Root password appears here once provisioning finishes.
-        </p>
-      ) : (
-        <span className="mt-2.5 inline-flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={BUTTON_GHOST_SM}
-            disabled={credentials.isPending}
-            onClick={() => {
-              credentials.mutate(request.id, {
-                onSuccess: (data) => {
-                  if (data.password) {
-                    setPassword(data.password);
-                    onAnnounce(
-                      `One-time password for “${request.name}” shown. It will not be shown again.`,
-                    );
-                  } else {
-                    setConsumed(true);
-                    onAnnounce(
-                      `No password on file for “${request.name}” — already shown or never generated.`,
-                    );
-                  }
-                },
-              });
-            }}
-          >
-            Show one-time password
-          </button>
-          {consumed ? (
-            <span className="text-[13px] text-text-3">
-              No password on file — already shown or never generated.
-            </span>
-          ) : null}
-          {credentials.isError ? (
-            <span className={FORM_ERROR} role="alert">
-              Could not load the password.
-            </span>
-          ) : null}
-        </span>
-      )}
+      ) : null}
+      {!request.hasSshKey && allowPassword ? (
+        password !== null ? (
+          <PasswordReveal password={password} />
+        ) : request.status === "provisioning" ? (
+          <p className="mt-2.5 text-[13px] leading-[1.55] text-text-2">
+            Root password appears here once provisioning finishes.
+          </p>
+        ) : (
+          <span className="mt-2.5 inline-flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={BUTTON_GHOST_SM}
+              disabled={credentials.isPending}
+              onClick={() => {
+                credentials.mutate(request.id, {
+                  onSuccess: (data) => {
+                    if (data.password) {
+                      setPassword(data.password);
+                      onAnnounce(
+                        `One-time password for “${request.name}” shown. It will not be shown again.`,
+                      );
+                    } else {
+                      setConsumed(true);
+                      onAnnounce(
+                        `No password on file for “${request.name}” — already shown or never generated.`,
+                      );
+                    }
+                  },
+                });
+              }}
+            >
+              Show one-time password
+            </button>
+            {consumed ? (
+              <span className="text-[13px] text-text-3">
+                No password on file — already shown or never generated.
+              </span>
+            ) : null}
+            {credentials.isError ? (
+              <span className={FORM_ERROR} role="alert">
+                Could not load the password.
+              </span>
+            ) : null}
+          </span>
+        )
+      ) : null}
     </>
   );
 }
@@ -251,6 +267,51 @@ export function SshAccess({
 interface RequestListProps {
   requests: ServerRequest[];
   onAnnounce: (message: string) => void;
+}
+
+/** Rows in worker/operator-driven states that will flip on their own. */
+const NON_TERMINAL_STATUSES = new Set([
+  "pending_approval",
+  "approved",
+  "provisioning",
+]);
+
+const LIVE_PILL_BASE =
+  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-semibold";
+
+/**
+ * Live status for rows that are about to flip. Awaiting approval is static
+ * (an operator still has to decide); approved/provisioning animate with a
+ * spinner plus text. Turnover is driven by the short-interval dashboard
+ * refetch in RequestList, so it updates without a manual reload.
+ */
+function LiveStatusPill({ status }: { status: ServerRequest["status"] }) {
+  if (status === "pending_approval") {
+    return (
+      <span
+        className={`${LIVE_PILL_BASE} border-[rgba(217,169,78,0.4)] bg-pending-dim text-pending`}
+        role="status"
+      >
+        Awaiting approval
+      </span>
+    );
+  }
+  if (status !== "approved" && status !== "provisioning") {
+    return <StatusPill status={status} />;
+  }
+  return (
+    <span
+      className={
+        status === "provisioning"
+          ? `${LIVE_PILL_BASE} border-accent-line bg-accent-dim text-accent`
+          : `${LIVE_PILL_BASE} border-[rgba(217,169,78,0.4)] bg-pending-dim text-pending`
+      }
+      role="status"
+    >
+      <Spinner className="spinner-sm" />
+      Provisioning…
+    </span>
+  );
 }
 
 function focusRequestsHeading() {
@@ -275,6 +336,20 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
   const start = useStartInstance();
   const [powerError, setPowerError] = useState<string | null>(null);
   const busy = stop.isPending || start.isPending;
+  const queryClient = useQueryClient();
+  const awaitingFlip = requests.some((request) =>
+    NON_TERMINAL_STATUSES.has(request.status),
+  );
+  // Worker/operator-driven transitions land server-side; while any row can
+  // still flip, refetch faster than the base poll so the live pill and rows
+  // converge within seconds instead of up to the 10s interval.
+  useEffect(() => {
+    if (!awaitingFlip) return;
+    const id = window.setInterval(() => {
+      void queryClient.refetchQueries({ queryKey: queryKeys.dashboard });
+    }, 3_000);
+    return () => window.clearInterval(id);
+  }, [awaitingFlip, queryClient]);
   const power = (request: ServerRequest, verb: "stop" | "start") => {
     setPowerError(null);
     const mutation = verb === "stop" ? stop : start;
@@ -313,7 +388,7 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
                 <h3 className="text-[15.5px] font-[650]">{request.name}</h3>
-                <StatusPill status={request.status} />
+                <LiveStatusPill status={request.status} />
               </div>
               <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[13.5px] text-text-2">
                 <span>{planNames.get(request.planId) ?? request.planId}</span>
