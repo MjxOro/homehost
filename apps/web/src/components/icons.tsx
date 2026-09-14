@@ -103,6 +103,19 @@ export function LogoutIcon(props: IconProps) {
   );
 }
 
+export function SidebarIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path
+        d="M4 6a2 2 0 0 1 2-2h3.5v16H6a2 2 0 0 1-2-2z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  );
+}
+
 export function MenuIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
