@@ -14,6 +14,7 @@ services:
       POSTGRES_PASSWORD: homehost
     ports:
       - "127.0.0.1:55433:5432"
+    restart: unless-stopped
     volumes:
       - homehost-dev-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -24,6 +25,7 @@ services:
 
   api:
     image: oven/bun:1
+    user: "${UID:-1000}:${GID:-1000}"
     working_dir: /app
     volumes:
       - ../..:/app
@@ -42,12 +44,14 @@ services:
     networks:
       - default
       - edge
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
 
   web:
     image: oven/bun:1
+    user: "${UID:-1000}:${GID:-1000}"
     working_dir: /app/apps/web
     volumes:
       - ../..:/app
@@ -59,6 +63,7 @@ services:
     networks:
       - default
       - edge
+    restart: unless-stopped
     depends_on:
       - api
 
