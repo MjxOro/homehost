@@ -1,0 +1,52 @@
+name: homehost-prod
+
+# Production stack: built images, no mounts, no published db port.
+# Secrets in infra/private/prod.env (gitignored, never committed).
+#   bun run prod:build && bun run prod:up
+# Traefik cutover: point infra/traefik/routes/panel.yml at 127.0.0.1:5180.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: homehost
+      POSTGRES_USER: homehost
+      POSTGRES_PASSWORD: homehost
+    volumes:
+      - homehost-prod-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homehost -d homehost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: homehost-api:${TAG:-latest}
+    environment:
+      DATABASE_URL: postgres://homehost:homehost@postgres:5432/homehost
+      SHOWCASE_MODE: "false"
+    env_file:
+      - path: ../private/prod.env
+        required: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    image: homehost-web:${TAG:-latest}
+    ports:
+      - "127.0.0.1:5180:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  homehost-prod-postgres:

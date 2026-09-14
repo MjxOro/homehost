@@ -1,0 +1,12 @@
+# Same-origin static + /api reverse proxy. Traefik points at :80; the browser
+# never talks to the api container directly, so session cookies stay first-party.
+:80 {
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
