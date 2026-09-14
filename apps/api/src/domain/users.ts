@@ -39,7 +39,8 @@ function toUserRow(r: RawRow): UserRow {
     accountStatus: r["account_status"] as AccountStatus,
     technicalLevel: r["technical_level"] as TechnicalLevel | null,
     reviewedBy: r["reviewed_by"] as string | null,
-    reviewedAt: r["reviewed_at"] as Date | null,
+    reviewedAt:
+      r["reviewed_at"] == null ? null : new Date(r["reviewed_at"] as string | Date),
   };
 }
 
@@ -134,7 +135,7 @@ interface ModerateInput {
   /** Current statuses this transition may start from; anything else is illegal. */
   allowedFrom: readonly AccountStatus[];
   /** SET assignments fragment, e.g. status + reviewer stamp. */
-  assign: (now: Date) => SQL;
+  assign: (now: string) => SQL;
   illegalMessage: string;
   auditAction: string;
   auditDetail: string | null;
@@ -177,7 +178,7 @@ function moderateUser(
           ) {
             return { ok: false as const, reason: "state" as const };
           }
-          const now = new Date();
+          const now = new Date().toISOString();
           const updated = rowsOf(
             await tx.execute(sql`
               UPDATE users SET ${input.assign(now)}

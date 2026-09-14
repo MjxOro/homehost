@@ -8,7 +8,7 @@ COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 RUN bun install --frozen-lockfile
 COPY . .
-RUN bun --cwd apps/api run build
+RUN cd apps/api && bun run build
 
 # Runtime: compiled api + ledger-tracked migrations + shared source.
 FROM oven/bun:1

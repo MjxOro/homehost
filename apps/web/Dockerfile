@@ -5,7 +5,7 @@ COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 RUN bun install --frozen-lockfile
 COPY . .
-RUN bun --cwd apps/web run build
+RUN cd apps/web && bun run build
 
 FROM caddy:2-alpine
 COPY --from=build /app/apps/web/dist /srv
