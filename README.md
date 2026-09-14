@@ -76,11 +76,11 @@ Three stacks, three port sets, no overlap:
 | Dev (containers) | `127.0.0.1:55433` | `127.0.0.1:3001` | `127.0.0.1:5174` | `bun run dev:up` |
 | Host (legacy manual) | `127.0.0.1:55432` | `127.0.0.1:3000` | `127.0.0.1:5173` | `bun run dev` |
 
-Dev loop: `cp .env.dev.example .env.dev`, fill GitHub OAuth + `OPERATOR_EMAILS`, add `http://127.0.0.1:5174/api/auth/callback/github` to the OAuth app, then `bun run dev:up`. `dev:logs` follows, `dev:reset` wipes the dev database.
+Dev loop: `bun install`, `cp .env.dev.example .env.dev`, fill GitHub OAuth + `OPERATOR_EMAILS`, add the matching callback URL to the OAuth app (see `.env.dev.example` for local vs public origin), then `bun run dev:up`. Requires the edge network (`docker network create homehost-edge_default` if Traefik never ran here). `dev:logs` follows, `dev:reset` wipes the dev database.
 
-Prod: built images tagged by git SHA (`TAG=$(git rev-parse --short HEAD)`). Secrets live in `infra/private/prod.env` (gitignored): `GITHUB_CLIENT_ID/SECRET`, `OPERATOR_EMAILS`, `APP_ORIGIN=https://homehost.risktozero.sh`, `IPV6_PREFIX`. `bun run prod:build && bun run prod:up`. Caddy serves the static web app and reverse-proxies `/api` to the api container, so cookies stay first-party. Cutover: point `infra/traefik/routes/panel.yml` at `http://host.docker.internal:5180`.
+Prod: built images tagged by git SHA (`TAG=$(git rev-parse --short HEAD)`). Secrets live in `infra/private/prod.env` (gitignored): `GITHUB_CLIENT_ID/SECRET`, `OPERATOR_EMAILS`, `APP_ORIGIN=https://homehost.risktozero.sh`, `BASE_DOMAIN=homehost.risktozero.sh`, `IPV6_PREFIX`. `bun run prod:build && bun run prod:up` (`--wait` on the api healthcheck, so a bad image fails loud instead of 502ing). Caddy serves the static web app and reverse-proxies `/api` to the api container, so cookies stay first-party. Cutover: point `infra/traefik/routes/panel.yml` at `http://host.docker.internal:5180`.
 
-CI (`.github/workflows/ci.yml`) runs on every push: typecheck, shared tests, integration tests against a Postgres service, web build. CD (`deploy.yml`) runs `bun run prod:deploy` (pull → build → migrate → up) on push to `main`, and needs one self-hosted runner on the prod host:
+Public dev (`https://hhfrontdev…`, `https://hhbackdev…`) is intentional and unauthenticated at the edge — treat the dev stack as public: no real user data, dev-only OAuth creds where possible. CI (`.github/workflows/ci.yml`) runs on every push: typecheck, shared tests, integration tests against a Postgres service, web build, both image builds. CD (`deploy.yml`) runs `bun run prod:deploy` (checkout main → pull → build → migrate → up) on push to `main`, and needs one self-hosted runner on the prod host:
 
 ```bash
 # on the prod host, as the deploy user, in /opt/homehost-runner

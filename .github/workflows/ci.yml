@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test packages/shared
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run test:integration
 
@@ -50,6 +50,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun --cwd apps/web run build
+      - run: docker build -f apps/api/Dockerfile -t homehost-api:ci .
+      - run: docker build -f apps/web/Dockerfile -t homehost-web:ci .

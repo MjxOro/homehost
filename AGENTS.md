@@ -9,9 +9,8 @@ Read this before touching the repo. Violations get reverted.
 - No new dependencies without asking. Tailwind only for styling.
 
 ## Commands (repo root)
-
 - `bun run dev` — host-side dev loop (api `:3000` + web `:5173`, needs `db:up` + `.env`).
-- `bun run dev:up / dev:down / dev:logs / dev:reset` — containerized dev stack (pg `:55433`, api `:3001`, web `:5174`). Needs `.env.dev` (copy `.env.dev.example`).
+- `bun run dev:up / dev:down / dev:logs / dev:reset` — containerized dev stack (pg `:55433`, api `:3001`, web `:5174`). Needs `bun install`, `.env.dev` (copy `.env.dev.example`), and the edge network (comes with Traefik).
 - `bun run typecheck` — MUST be 0 errors before every commit and merge.
 - `bun test packages/shared` — unit tests. `bun run test:integration` — needs live DB (`TEST_DATABASE_URL`).
 - `bun run build` — api (`tsc`) + web (`vite build`).

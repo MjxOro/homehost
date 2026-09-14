@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.git/
+infra/private/
+.env
+.env.*
+!*.example
+letsencrypt/
+*.log
+coverage/

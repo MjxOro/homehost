@@ -14,7 +14,7 @@ http:
       entryPoints:
         - web
       middlewares:
-        - https-redirect
+        - dev-https-redirect
       service: hhfrontdev
     hhbackdev:
       rule: "Host(`hhbackdev.homehost.risktozero.sh`)"
@@ -28,8 +28,13 @@ http:
       entryPoints:
         - web
       middlewares:
-        - https-redirect
+        - dev-https-redirect
       service: hhbackdev
+  middlewares:
+    dev-https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
   services:
     hhfrontdev:
       loadBalancer:

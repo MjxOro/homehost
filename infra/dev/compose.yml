@@ -35,7 +35,6 @@ services:
       HOST: "0.0.0.0"
       PORT: "3001"
       SHOWCASE_MODE: "false"
-      APP_ORIGIN: http://127.0.0.1:5174
     env_file:
       - path: ../../.env.dev
         required: false
