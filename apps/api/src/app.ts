@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   PLANS,
   SSH_KEY_MAX,
+  TECHNICAL_LEVELS,
   TIER_QUOTAS,
   isValidSshPublicKey,
 } from "@homehost/shared";
@@ -21,6 +22,7 @@ import type {
   PortalUser,
   ServerRequest,
   SessionResponse,
+  TechnicalLevel,
 } from "@homehost/shared";
 import { createDb, type Database } from "./db/client.js";
 import * as schema from "./db/schema.js";
@@ -37,6 +39,16 @@ import {
   startInstance,
   stopInstance,
 } from "./domain/requests.js";
+import { ensureOperatorBootstrap } from "./domain/bootstrap.js";
+import {
+  approveUser,
+  listUsers,
+  rejectUser,
+  setClassification,
+  type UserNotFound,
+  type UserRow,
+} from "./domain/users.js";
+import { listActions, type AuditCursor } from "./domain/audit.js";
 
 import {
   clearedSessionCookie,
@@ -99,6 +111,67 @@ const InviteBody = z
     tier: z.enum(["technical", "nontechnical"]).default("nontechnical"),
   })
   .strict();
+
+const ADMIN_USERS_PAGE_DEFAULT = 20;
+const ADMIN_USERS_PAGE_MAX = 100;
+
+const AdminUsersQuery = z
+  .object({
+    status: z
+      .enum(["pending", "approved", "rejected", "suspended"])
+      .optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(ADMIN_USERS_PAGE_MAX)
+      .default(ADMIN_USERS_PAGE_DEFAULT),
+    cursor: z.string().min(1).max(1000).optional(),
+  })
+  .strict();
+const TechnicalLevelBody = z
+  .object({
+    technicalLevel: z.enum(
+      TECHNICAL_LEVELS as [TechnicalLevel, ...TechnicalLevel[]],
+    ),
+  })
+  .strict();
+const RejectUserBody = z
+  .object({ reason: z.string().max(500).optional() })
+  .strict();
+
+const AdminActionsQuery = z
+  .object({
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(ADMIN_USERS_PAGE_MAX)
+      .default(ADMIN_USERS_PAGE_DEFAULT),
+    cursor: z.string().min(1).max(1000).optional(),
+    targetUserId: z.string().min(1).max(128).optional(),
+  })
+  .strict();
+
+// User ids are opaque text (demo literals like "alice", OAuth "u-<hex>",
+// UUID fixtures) — not necessarily UUID-shaped, so IdParams must not apply here.
+const UserIdParams = z.object({ id: z.string().min(1).max(128) }).strict();
+
+// Opaque keyset cursor for the audit feed: base64url("<iso>|<id>"), the same
+// shape as /api/activity cursors.
+function decodeAuditCursor(cursor: string): AuditCursor | null {
+  try {
+    const raw = Buffer.from(cursor, "base64url").toString("utf8");
+    const sep = raw.lastIndexOf("|");
+    if (sep < 0) return null;
+    const createdAt = new Date(raw.slice(0, sep));
+    const id = raw.slice(sep + 1);
+    if (Number.isNaN(createdAt.getTime()) || id.length === 0) return null;
+    return { createdAt: createdAt.toISOString(), id };
+  } catch {
+    return null;
+  }
+}
 
 export interface BuildAppOptions {
   db?: Database;
@@ -186,6 +259,28 @@ function toActivityEvent(e: EventRow): ActivityEvent {
     serverName: e.serverName,
     createdAt: e.createdAt.toISOString(),
     detail: e.detail,
+  };
+}
+
+function sendAdminError(reply: FastifyReply, e: UserNotFound | DomainError) {
+  if (e._tag === "UserNotFound")
+    return sendErr(reply, 404, "user not found", "not_found");
+  if (e._tag === "InvalidTransition" && e.message === "invalid cursor")
+    return sendErr(reply, 400, "invalid cursor", "invalid");
+  return sendDomainError(reply, e);
+}
+
+function toAdminUser(r: UserRow) {
+  return {
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    role: r.role,
+    tier: r.tier,
+    accountStatus: r.accountStatus,
+    technicalLevel: r.technicalLevel,
+    reviewedBy: r.reviewedBy,
+    reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString() : null,
   };
 }
 
@@ -329,6 +424,46 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       return false;
     }
     return true;
+  }
+
+  async function requireOperator(
+    req: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<Session | null> {
+    const session = await resolveSession(req);
+    if (!session) {
+      sendErr(reply, 401, "session required", "unauthorized");
+      return null;
+    }
+    if (session.user.role !== "operator") {
+      sendErr(reply, 403, "operator role required", "forbidden");
+      return null;
+    }
+    return session;
+  }
+
+  // Provisioning write paths require an approved account. Operators are
+  // exempt; everyone else gets 403 AccountPending until an operator approves.
+  async function requireApprovedUser(
+    req: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<Session | null> {
+    const session = await resolveSession(req);
+    if (!session) {
+      sendErr(reply, 401, "session required", "unauthorized");
+      return null;
+    }
+    if (session.user.role === "operator") return session;
+    const rows = await db
+      .select({ accountStatus: schema.users.accountStatus })
+      .from(schema.users)
+      .where(eq(schema.users.id, session.user.id))
+      .limit(1);
+    if (rows.length === 0 || rows[0].accountStatus !== "approved") {
+      sendErr(reply, 403, "account pending approval", "AccountPending");
+      return null;
+    }
+    return session;
   }
 
   app.setNotFoundHandler((_req, reply) =>
@@ -509,6 +644,160 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   );
 
+  app.get("/api/admin/users", async (req, reply) => {
+    const operator = await requireOperator(req, reply);
+    if (!operator) return;
+    const parsed = AdminUsersQuery.safeParse(req.query);
+    if (!parsed.success)
+      return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+    const page = await runtime.runPromise(
+      Effect.either(
+        listUsers({
+          status: parsed.data.status,
+          limit: parsed.data.limit,
+          cursor: parsed.data.cursor,
+        }),
+      ),
+    );
+    return Either.match(page, {
+      onLeft: (e) => sendAdminError(reply, e),
+      onRight: (p) => ({
+        users: p.users.map(toAdminUser),
+        hasMore: p.hasMore,
+        nextCursor: p.nextCursor,
+      }),
+    });
+  });
+
+  app.post<{ Params: { id: string } }>(
+    "/api/admin/users/:id/approve",
+    async (req, reply) => {
+      const operator = await requireOperator(req, reply);
+      if (!operator) return;
+      if (!requireJsonBody(req, reply)) return;
+      const params = UserIdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const parsed = TechnicalLevelBody.safeParse(req.body);
+      if (!parsed.success)
+        return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+      const result = await runtime.runPromise(
+        Effect.either(
+          approveUser(
+            params.data.id,
+            operator.user.id,
+            parsed.data.technicalLevel,
+          ),
+        ),
+      );
+      return Either.match(result, {
+        onLeft: (e) => sendAdminError(reply, e),
+        onRight: (row) => toAdminUser(row),
+      });
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/admin/users/:id/reject",
+    async (req, reply) => {
+      const operator = await requireOperator(req, reply);
+      if (!operator) return;
+      if (!requireJsonBody(req, reply)) return;
+      const params = UserIdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const parsed = RejectUserBody.safeParse(req.body);
+      if (!parsed.success)
+        return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+      const trimmedReason = parsed.data.reason?.trim() ?? "";
+      const result = await runtime.runPromise(
+        Effect.either(
+          rejectUser(
+            params.data.id,
+            operator.user.id,
+            trimmedReason ? trimmedReason : undefined,
+          ),
+        ),
+      );
+      return Either.match(result, {
+        onLeft: (e) => sendAdminError(reply, e),
+        onRight: (row) => toAdminUser(row),
+      });
+    },
+  );
+
+  app.patch<{ Params: { id: string } }>(
+    "/api/admin/users/:id/classification",
+    async (req, reply) => {
+      const operator = await requireOperator(req, reply);
+      if (!operator) return;
+      if (!requireJsonBody(req, reply)) return;
+      const params = UserIdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const parsed = TechnicalLevelBody.safeParse(req.body);
+      if (!parsed.success)
+        return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+      const result = await runtime.runPromise(
+        Effect.either(
+          setClassification(
+            params.data.id,
+            operator.user.id,
+            parsed.data.technicalLevel,
+          ),
+        ),
+      );
+      return Either.match(result, {
+        onLeft: (e) => sendAdminError(reply, e),
+        onRight: (row) => toAdminUser(row),
+      });
+    },
+  );
+
+  app.get("/api/admin/actions", async (req, reply) => {
+    const operator = await requireOperator(req, reply);
+    if (!operator) return;
+    const parsed = AdminActionsQuery.safeParse(req.query);
+    if (!parsed.success)
+      return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+    let cursor: AuditCursor | undefined;
+    if (parsed.data.cursor !== undefined) {
+      const decoded = decodeAuditCursor(parsed.data.cursor);
+      if (!decoded) return sendErr(reply, 400, "invalid cursor", "invalid");
+      cursor = decoded;
+    }
+    const page = await runtime.runPromise(
+      Effect.either(
+        listActions({
+          targetUserId: parsed.data.targetUserId,
+          limit: parsed.data.limit,
+          cursor,
+        }),
+      ),
+    );
+    return Either.match(page, {
+      onLeft: (e) => sendDomainError(reply, e),
+      onRight: (p) => ({
+        actions: p.actions.map((a) => ({
+          id: a.id,
+          targetUserId: a.targetUserId,
+          actorId: a.actorId,
+          action: a.action,
+          detail: a.detail,
+          createdAt: a.createdAt.toISOString(),
+        })),
+        hasMore: p.hasMore,
+        nextCursor:
+          p.hasMore && p.nextCursor
+            ? Buffer.from(
+                `${p.nextCursor.createdAt}|${p.nextCursor.id}`,
+                "utf8",
+              ).toString("base64url")
+            : null,
+      }),
+    });
+  });
+
   app.get("/api/plans", async () => PLANS);
 
   app.get("/api/dashboard", async (req, reply) => {
@@ -616,9 +905,8 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   });
 
   app.post("/api/requests", async (req, reply) => {
-    const session = await resolveSession(req);
-    if (!session)
-      return sendErr(reply, 401, "session required", "unauthorized");
+    const session = await requireApprovedUser(req, reply);
+    if (!session) return;
     if (!requireJsonBody(req, reply)) return;
     const parsed = CreateRequestBody.safeParse(req.body);
     if (!parsed.success)
@@ -649,9 +937,8 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   app.delete<{ Params: { id: string } }>(
     "/api/requests/:id",
     async (req, reply) => {
-      const session = await resolveSession(req);
-      if (!session)
-        return sendErr(reply, 401, "session required", "unauthorized");
+      const session = await requireApprovedUser(req, reply);
+      if (!session) return;
       const params = IdParams.safeParse(req.params);
       if (!params.success)
         return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
@@ -750,9 +1037,8 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   app.post<{ Params: { id: string } }>(
     "/api/requests/:id/stop",
     async (req, reply) => {
-      const session = await resolveSession(req);
-      if (!session)
-        return sendErr(reply, 401, "session required", "unauthorized");
+      const session = await requireApprovedUser(req, reply);
+      if (!session) return;
       const params = IdParams.safeParse(req.params);
       if (!params.success)
         return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
@@ -769,9 +1055,8 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   app.post<{ Params: { id: string } }>(
     "/api/requests/:id/start",
     async (req, reply) => {
-      const session = await resolveSession(req);
-      if (!session)
-        return sendErr(reply, 401, "session required", "unauthorized");
+      const session = await requireApprovedUser(req, reply);
+      if (!session) return;
       const params = IdParams.safeParse(req.params);
       if (!params.success)
         return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
@@ -829,6 +1114,12 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       });
     },
   );
+
+  // Operator bootstrap converges operator rows at boot: UPDATE-only and
+  // idempotent, so allowlisted users always land approved/technical.
+  app.addHook("onReady", async () => {
+    await ensureOperatorBootstrap(db, env.operatorEmails);
+  });
 
   app.addHook("onClose", async () => {
     await runtime.dispose();
