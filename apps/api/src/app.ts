@@ -89,6 +89,7 @@ const CreateRequestBody = z
   .object({
     name: z.string().trim().min(1).max(48),
     planId: z.string().min(1),
+    desktopEnv: z.enum(["ubuntu-xfce", "omarchy"]).optional(),
     sshPubkey: z.string().trim().max(SSH_KEY_MAX).optional(),
   })
   .strict()
@@ -117,9 +118,7 @@ const ADMIN_USERS_PAGE_MAX = 100;
 
 const AdminUsersQuery = z
   .object({
-    status: z
-      .enum(["pending", "approved", "rejected", "suspended"])
-      .optional(),
+    status: z.enum(["pending", "approved", "rejected", "suspended"]).optional(),
     limit: z.coerce
       .number()
       .int()
@@ -227,7 +226,6 @@ function sendDomainError(reply: FastifyReply, e: DomainError) {
 
 type RequestRow = typeof schema.serverRequests.$inferSelect;
 type EventRow = typeof schema.activityEvents.$inferSelect;
-
 function toServerRequest(r: RequestRow): ServerRequest {
   return {
     id: r.id,
@@ -247,6 +245,9 @@ function toServerRequest(r: RequestRow): ServerRequest {
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
     decisionReason: r.decisionReason,
+    desktopEnv: r.desktopEnv as ServerRequest["desktopEnv"],
+    desktopHostname: r.desktopHostname,
+    desktopUrl: r.desktopHostname ? `https://${r.desktopHostname}` : null,
   };
 }
 
@@ -916,6 +917,26 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     if (plan.technicalOnly && session.user.tier !== "technical") {
       return sendErr(reply, 403, "plan requires technical tier", "forbidden");
     }
+    // Desktop env must match the plan's GUI stack; a headless plan with a
+    // desktopEnv (or a desktop plan with the wrong env) is a 403, mirroring
+    // the technicalOnly gate. Desktop plans may omit it (defaults to the
+    // plan's env).
+    const desktop = plan.desktop;
+    if (
+      desktop &&
+      parsed.data.desktopEnv !== undefined &&
+      parsed.data.desktopEnv !== desktop.env
+    ) {
+      return sendErr(
+        reply,
+        403,
+        "desktop env does not match plan",
+        "forbidden",
+      );
+    }
+    if (!desktop && parsed.data.desktopEnv !== undefined) {
+      return sendErr(reply, 403, "plan has no desktop", "forbidden");
+    }
     // The worker installs sshd on containers too, so all plans accept ssh keys.
     const created = await runtime.runPromise(
       Effect.either(
@@ -1094,6 +1115,8 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   );
 
+  // Credentials flow unchanged: the instance one-time password returned here
+  // doubles as the KasmVNC password for desktop VMs — no new secret surface.
   app.get<{ Params: { id: string } }>(
     "/api/requests/:id/credentials",
     async (req, reply) => {

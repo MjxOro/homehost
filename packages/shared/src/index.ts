@@ -1,10 +1,11 @@
 export { PLANS } from "./plans.js";
-export type { Plan } from "./plans.js";
+export type { DesktopConfig, DesktopEnv, Plan } from "./plans.js";
 export {
   SSH_PORT_MAX,
   SSH_PORT_MIN,
   ipv6ForInstance,
   pickFreePort,
+  toDesktopHostname,
   toSubdomain,
 } from "./provisioning.js";
 export * from "./control-plane.js";

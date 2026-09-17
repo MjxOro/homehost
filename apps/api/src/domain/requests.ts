@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import { TIER_QUOTAS, toSubdomain } from "@homehost/shared";
+import { TIER_QUOTAS, toDesktopHostname, toSubdomain } from "@homehost/shared";
 import type { Plan, PortalUser, ProvisionAction } from "@homehost/shared";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
@@ -78,6 +78,17 @@ export const createRequest = (
           }
           const id = randomUUID();
           const now = new Date();
+          const subdomain = toSubdomain(
+            input.name,
+            input.user.id,
+            input.baseDomain,
+            id,
+          );
+          // Desktop GUI plans carry their KasmVNC stack on the plan; headless
+          // plans store NULLs. desktopPort snapshots plan.desktop.kasmPort so
+          // the edge route template can target the backend without a lookup.
+          const desktop = input.plan.desktop;
+          const desktopHostname = desktop ? toDesktopHostname(subdomain) : null;
           const inserted = await tx
             .insert(schema.serverRequests)
             .values({
@@ -87,16 +98,14 @@ export const createRequest = (
               name: input.name,
               planId: input.plan.id,
               status: "pending_approval",
-              subdomain: toSubdomain(
-                input.name,
-                input.user.id,
-                input.baseDomain,
-                id,
-              ),
+              subdomain,
               sshPubkey: input.sshPubkey ?? null,
               cpu: input.plan.cpu,
               memoryMb: input.plan.memoryMb,
               diskGb: input.plan.diskGb,
+              desktopEnv: desktop ? desktop.env : null,
+              desktopHostname,
+              desktopPort: desktop ? desktop.kasmPort : null,
               createdAt: now,
               updatedAt: now,
             })

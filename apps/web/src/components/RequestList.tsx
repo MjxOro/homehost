@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ServerRequest } from "@homehost/shared";
+import type { ServerRequest, StreamTier } from "@homehost/shared";
+import { estimateDownlinkMbps, recommendStreamProfile } from "@homehost/shared";
 import {
   useCredentials,
   usePlans,
@@ -12,6 +13,8 @@ import { formatDateTime, formatMemory, formatRelative } from "../lib/format";
 import { CancelDialog } from "./CancelDialog";
 import {
   BUTTON_GHOST_SM,
+  BUTTON_OUTLINE_SM,
+  Chip,
   FORM_ERROR,
   ICON_BTN_QUIET,
   StatusPill,
@@ -166,9 +169,164 @@ function PasswordReveal({ password }: { password: string }) {
           {copied ? <CheckIcon /> : <CopyIcon />}
         </button>
       </div>
+
       <p className="mt-1 text-[13px] leading-[1.55] text-text-2">
         Now cleared server-side — it will not be shown again.
       </p>
+    </div>
+  );
+}
+
+/** Desktop request shape: reads the ratified desktop fields structurally so the
+ *  row renders against the current ServerRequest type and the landed contract
+ *  alike. desktopUrl is opaque (ratified: API composes https://hostname). */
+interface DesktopLink {
+  hostname: string | null;
+  url: string | null;
+  env: string | null;
+}
+
+function desktopOf(request: ServerRequest): DesktopLink {
+  let hostname: string | null = null;
+  let url: string | null = null;
+  let env: string | null = null;
+  if ("desktopHostname" in request) {
+    const value: unknown = request.desktopHostname;
+    if (typeof value === "string" && value.length > 0) hostname = value;
+  }
+  if ("desktopUrl" in request) {
+    const value: unknown = request.desktopUrl;
+    if (typeof value === "string" && value.length > 0) url = value;
+  }
+  if ("desktopEnv" in request) {
+    const value: unknown = request.desktopEnv;
+    if (typeof value === "string" && value.length > 0) env = value;
+  }
+  return { hostname, url, env };
+}
+
+function desktopHref(desktop: DesktopLink): string | null {
+  if (desktop.url) return desktop.url;
+  if (desktop.hostname) return `https://${desktop.hostname}`;
+  return null;
+}
+
+/** Human label for a desktop env slug; unknown slugs pass through verbatim. */
+const DESKTOP_ENV_LABELS: Record<string, string> = {
+  "ubuntu-xfce": "Ubuntu XFCE",
+  omarchy: "Omarchy",
+};
+
+/** Stream tier hint via a client-only timed same-origin /api/health fetch.
+ *  Never blocks the Open-desktop link; neutral fallback on any failure. */
+function StreamTierHint() {
+  const [tier, setTier] = useState<StreamTier | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const started =
+        typeof performance !== "undefined" && performance.now
+          ? performance.now()
+          : Date.now();
+      try {
+        const response = await fetch("/api/health", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const bytes = Number(response.headers.get("content-length") ?? 0);
+        await response.arrayBuffer();
+        const now =
+          typeof performance !== "undefined" && performance.now
+            ? performance.now()
+            : Date.now();
+        const downMbps =
+          bytes > 0 ? estimateDownlinkMbps(bytes, now - started) : null;
+        const recommendation = recommendStreamProfile({
+          downMbps: downMbps ?? NaN,
+        });
+        if (!cancelled) setTier(recommendation.tier);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (failed || tier === null) return <Chip>stream: auto</Chip>;
+  return <Chip>stream: {tier}</Chip>;
+}
+
+/**
+ * Browser GUI access for a desktop VM. The Open-desktop anchor goes straight
+ * to the ratified desktopUrl (fallback https://hostname); enabled only when
+ * the VM is running AND a hostname is present. A stopped VM serves Traefik
+ * 502, so rows below the link keep showing the existing state honestly.
+ */
+function DesktopAccess({ request }: { request: ServerRequest }) {
+  const desktop = desktopOf(request);
+  const href = desktopHref(desktop);
+  const live = request.status === "running" && href !== null;
+  if (
+    request.status !== "provisioning" &&
+    request.status !== "running" &&
+    request.status !== "stopped"
+  ) {
+    return null;
+  }
+  if (href === null && desktop.env === null) return null;
+  return (
+    <div className="mt-2.5 flex flex-col items-start gap-1.5">
+      <span className={LABEL_CHIP}>Desktop</span>
+      <span className="flex flex-wrap items-center gap-2">
+        {live && href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className={`${BUTTON_OUTLINE_SM} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+          >
+            Open desktop
+          </a>
+        ) : (
+          <span
+            aria-disabled="true"
+            className={`${BUTTON_OUTLINE_SM} pointer-events-none opacity-55`}
+          >
+            Open desktop
+          </span>
+        )}
+        {desktop.env ? (
+          <Chip tone="accent">
+            {DESKTOP_ENV_LABELS[desktop.env] ?? desktop.env}
+          </Chip>
+        ) : null}
+        {(request.status === "running" || request.status === "provisioning") &&
+        href !== null ? (
+          <StreamTierHint />
+        ) : null}
+      </span>
+      {request.status === "running" ? (
+        <span className="text-[13px] leading-[1.55] text-text-2">
+          {desktop.hostname ? (
+            <>
+              KasmVNC canvas at{" "}
+              <code className={CODE_BADGE}>{desktop.hostname}</code> — sign in
+              with the one-time password below.
+            </>
+          ) : (
+            <>KasmVNC canvas — sign in with the one-time password below.</>
+          )}
+        </span>
+      ) : null}
+      {request.status === "stopped" ? (
+        <span className="text-[13px] leading-[1.55] text-text-3">
+          Desktop is offline while the instance is stopped — start it to
+          reconnect.
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -399,6 +557,7 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
               {request.ipv4 ? <IpBadge value={request.ipv4} /> : null}
               {request.ipv6 ? <Ipv6Badge value={request.ipv6} /> : null}
               <SshAccess request={request} onAnnounce={onAnnounce} />
+              <DesktopAccess request={request} />
               {request.status === "rejected" && request.decisionReason ? (
                 <p className="mt-2.5 border-l-2 border-line-strong pl-2.5 text-[13px] leading-[1.55] text-text-2">
                   Reason: {request.decisionReason}

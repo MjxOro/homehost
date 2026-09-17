@@ -60,6 +60,11 @@ const PLAN_RADIO_GRID =
 const PLAN_CARD_LABEL =
   "flex h-full cursor-pointer flex-col gap-1.5 rounded-control border border-line-strong bg-ink-2 p-3.5 transition-[border-color,box-shadow] duration-[0.15s] ease-[ease] hover:border-text-3 peer-checked:border-accent peer-checked:shadow-[inset_0_0_0_1px_var(--color-accent)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
 
+const DESKTOP_LABEL: Record<NonNullable<Plan["desktop"]>["env"], string> = {
+  "ubuntu-xfce": "Ubuntu XFCE",
+  omarchy: "Omarchy",
+};
+
 function PlanCards({
   choices,
   selectedId,
@@ -77,6 +82,7 @@ function PlanCards({
       <div className={PLAN_RADIO_GRID}>
         {choices.map(({ plan, locked }) => {
           const inputId = `plan-${plan.id}`;
+          const env = plan.desktop?.env ?? null;
           return (
             <div key={plan.id} className="relative">
               <input
@@ -92,11 +98,16 @@ function PlanCards({
               <label htmlFor={inputId} className={PLAN_CARD_LABEL}>
                 <span className="flex flex-wrap items-center justify-between gap-2 [&>*]:min-w-0">
                   <span className="text-[14.5px] font-[650]">{plan.name}</span>
-                  {locked ? (
-                    <Chip>
-                      <LockIcon className="size-3" /> technical only
-                    </Chip>
-                  ) : null}
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    {env ? (
+                      <Chip tone="accent">{DESKTOP_LABEL[env]}</Chip>
+                    ) : null}
+                    {locked ? (
+                      <Chip>
+                        <LockIcon className="size-3" /> technical only
+                      </Chip>
+                    ) : null}
+                  </span>
                 </span>
                 <span className="text-[13.5px] text-text-2">
                   {plan.cpu} CPU · {formatMemory(plan.memoryMb)} RAM ·{" "}
@@ -105,7 +116,9 @@ function PlanCards({
                 <span className="text-[12.5px] leading-[1.5] text-text-3">
                   {locked
                     ? "Locked for your tier — technical friends can request this plan."
-                    : "Resources reserve against your per-tier quota while pending or approved."}
+                    : env
+                      ? "GUI desktop in the browser — opens from the dashboard once running."
+                      : "Resources reserve against your per-tier quota while pending or approved."}
                 </span>
               </label>
             </div>

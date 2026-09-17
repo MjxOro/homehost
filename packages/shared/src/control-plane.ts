@@ -1,3 +1,5 @@
+import type { DesktopEnv } from "./plans.js";
+
 export type TrustTier = "nontechnical" | "technical";
 export type UserRole = "member" | "operator";
 export type RequestStatus =
@@ -59,6 +61,12 @@ export interface ServerRequest {
   /** Public IPv6 of the box. Null on v4-only hosts or until addressed. */
   ipv6: string | null;
   subdomain: string;
+  /** Bare desktop host (<label>-vnc.<baseDomain>). Null for non-desktop plans. */
+  desktopHostname: string | null;
+  /** https://<desktopHostname>. Null for non-desktop plans. */
+  desktopUrl: string | null;
+  /** GUI desktop baked into the plan's VM. Null for non-desktop plans. */
+  desktopEnv: DesktopEnv | null;
   cpu: number;
   memoryMb: number;
   diskGb: number;

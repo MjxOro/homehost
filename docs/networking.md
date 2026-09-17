@@ -13,9 +13,10 @@ address deterministically from the request ID so relaunches converge.
 Panel edge: Traefik serves the panel hostname with Let's Encrypt DNS-01
 (`CF_DNS_API_TOKEN`, `ACME_EMAIL` in `infra/private/traefik.env`, never
 committed; see `infra/traefik/compose.yml`). `infra/traefik/routes/panel.yml`
-is the only route file and stays checked in. The worker never writes
-per-server route files: boxes are reached directly over IPv6, never proxied
-through Traefik.
+is the only hand-checked route file. The worker never writes
+per-server SSH route files: boxes are reached directly over IPv6, never
+proxied through Traefik. Desktop GUI VMs are the single exception (see
+below): the worker owns per-desktop `gui-<instanceName>.yml` files only.
 
 Keep names flat (`<server>-<owner>-<id>.lab...`) so one Let's Encrypt
 certificate for `*.lab.yourdomain.com` covers them. Cloudflare Universal SSL
@@ -34,4 +35,15 @@ The existing Traefik compose is a deployment starting point, **not launched**
 by the showcase. Its Docker provider/socket is not the tenant isolation model:
 never attach the host Docker socket to tenant workloads.
 
+## Desktop GUI exception (per-desktop HTTPS via Traefik)
+
+SSH stays direct-v6 (above). Desktop VMs add one proxied path: each
+`<label>-vnc.<base>` AAAA points at `EDGE_IPV6` (the edge public IP) and
+Traefik serves it with the same LE wildcard DNS-01 cert (flat names stay
+one level). `infra/traefik/routes/panel.yml` stays checked in; the worker
+owns per-desktop `infra/traefik/routes/gui-<instanceName>.yml`
+(written at provision, removed at teardown). Traefik proxies to KasmVNC
+over HTTPS with `insecureSkipVerify` (KasmVNC self-signed backend cert).
+Stopped desktop = Traefik 502; rows keep showing the real VM state.
+Full runbook: `docs/desktop-gui.md`.
 Reference: [Cloudflare Universal SSL limitations](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/).

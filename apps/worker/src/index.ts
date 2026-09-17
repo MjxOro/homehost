@@ -1,8 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import postgres from "postgres";
-import { PLANS, ipv6ForInstance } from "@homehost/shared";
+import { PLANS, ipv6ForInstance, toDesktopHostname } from "@homehost/shared";
 import type { Plan, ProvisionAction } from "@homehost/shared";
+import {
+  DESKTOP_USER,
+  appendDesktopToUserData,
+  omarchyUnavailable,
+  removeDesktopRoute,
+  writeDesktopRoute,
+} from "./desktop.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -16,6 +23,7 @@ const powerAttempts = Number(process.env.WORKER_POWER_ATTEMPTS ?? 5);
 const bootTimeoutMs = Number(process.env.WORKER_BOOT_TIMEOUT_MS ?? 240000);
 const ipv6Prefix = process.env.IPV6_PREFIX ?? "";
 const cfToken = process.env.CF_DNS_API_TOKEN ?? "";
+const edgeIpv6 = process.env.EDGE_IPV6 ?? "";
 
 const sql = postgres(databaseUrl, { max: 4 });
 let shuttingDown = false;
@@ -178,6 +186,37 @@ async function setIpv6(requestId: string, ipv6: string): Promise<void> {
     SET ipv6 = ${ipv6}, updated_at = now()
     WHERE id = ${requestId}
   `;
+}
+interface DesktopFields {
+  env: string | null;
+  hostname: string | null;
+  port: number | null;
+}
+
+/**
+ * Desktop row columns from migration 0010. Null-tolerant: pre-migration
+ * rows (or any select failure) fall back to plan-derived values so the
+ * worker stays up across the migration boundary.
+ */
+async function loadDesktopFields(
+  requestId: string,
+): Promise<DesktopFields | null> {
+  try {
+    const rows = await sql`
+      SELECT desktop_env, desktop_hostname, desktop_port
+      FROM server_requests WHERE id = ${requestId} LIMIT 1
+    `;
+    if (rows.length === 0) return null;
+    const r = rows[0] as Record<string, unknown>;
+    return {
+      env: typeof r.desktop_env === "string" ? r.desktop_env : null,
+      hostname:
+        typeof r.desktop_hostname === "string" ? r.desktop_hostname : null,
+      port: typeof r.desktop_port === "number" ? r.desktop_port : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 const IPV6_DNS = ["2606:4700:4700::1111", "2001:4860:4860::8888"];
@@ -486,6 +525,18 @@ async function handleProvision(job: Job): Promise<void> {
     await failProvision(req, job, `unknown plan ${req.planId}`);
     return;
   }
+  // Desktop plans are VM-only: containers ignore cloud-init, so a desktop
+  // bake could never boot there. Omarchy has no non-interactive installer
+  // (images:archlinux/cloud resolves; installer automation is the missing
+  // prerequisite), so both refuse the job closed with an actionable message.
+  if (plan.desktop && plan.kind !== "vm") {
+    await failProvision(req, job, `desktop plan ${plan.id} requires a vm`);
+    return;
+  }
+  if (plan.desktop?.env === "omarchy") {
+    await failProvision(req, job, omarchyUnavailable(plan.id, plan.image));
+    return;
+  }
   const project = projectOf(req.ownerId);
   const name = req.instanceName ?? instanceNameOf(req.id);
   try {
@@ -518,10 +569,28 @@ async function handleProvision(job: Job): Promise<void> {
     // requests never mint secrets. Password persists for its one
     // dashboard read.
     const isVm = plan.kind === "vm";
+    const desktop = plan.desktop ?? null;
+    // API stores desktop_env/hostname/port on the row (migration 0010);
+    // when the row lacks them (pre-migration), derive from the plan and
+    // toDesktopHostname the same way ApiDesktop does (first-label -vnc).
+    const stored = desktop ? await loadDesktopFields(req.id) : null;
+    const desktopEnv = stored?.env ?? desktop?.env ?? null;
+    const desktopHostname =
+      stored?.hostname ?? (desktop ? toDesktopHostname(req.subdomain) : null);
+    const desktopPort = stored?.port ?? desktop?.kasmPort ?? null;
     let ipv6: string | null = null;
     if (isVm) {
       const access = buildInstanceAccess(req.sshPubkey);
-      args.push("--config", `user.user-data=${access.userData}`);
+      const userData =
+        desktop && desktopEnv === "ubuntu-xfce"
+          ? appendDesktopToUserData(
+              access.userData,
+              desktop,
+              DESKTOP_USER,
+              access.password,
+            )
+          : access.userData;
+      args.push("--config", `user.user-data=${userData}`);
       // Static v6 from the routed prefix; skipped entirely on v4-only hosts.
       ipv6 = ipv6ForInstance(ipv6Prefix, req.id);
       if (ipv6) {
@@ -559,6 +628,29 @@ async function handleProvision(job: Job): Promise<void> {
       await setIpv6(req.id, ipv6);
       if (cfToken) await ensureAAAA(req.subdomain, ipv6);
       else console.error("CF_DNS_API_TOKEN unset: skipping AAAA");
+    }
+    if (
+      desktop &&
+      desktopEnv === "ubuntu-xfce" &&
+      desktopHostname &&
+      desktopPort !== null
+    ) {
+      // Backend is the guest IPv4 (edge net has no v6; ratified with
+      // EdgeDesktop). Route file still written when EDGE_IPV6 is empty:
+      // the AAAA is skipped but Traefik can serve the LE wildcard name
+      // over plain reachability once DNS exists elsewhere.
+      await writeDesktopRoute({
+        instanceName: name,
+        desktopHostname,
+        backendHost: ipv4,
+        kasmPort: desktopPort,
+      });
+      if (edgeIpv6) {
+        if (cfToken) await ensureAAAA(desktopHostname, edgeIpv6);
+        else console.error("CF_DNS_API_TOKEN unset: skipping desktop AAAA");
+      } else {
+        console.error("EDGE_IPV6 unset: skipping desktop AAAA, route written");
+      }
     }
     await setRequest(req.id, "running", { instanceName: name, ipv4 });
     await emit(req.id, "Homehost worker", "running", req.name, ipv4);
@@ -610,6 +702,24 @@ async function handleTeardown(job: Job): Promise<void> {
       if (out.includes(name)) throw e;
     }
     if (cfToken) await deleteAAAA(req.subdomain);
+    // Desktop VMs only: best-effort edge cleanup. Row columns may be gone
+    // pre-migration, so derive the same hostname the provisioner wrote.
+    const plan = PLANS.find((p) => p.id === req.planId);
+    const fields = plan?.desktop ? await loadDesktopFields(req.id) : null;
+    // Omarchy rows may exist from retries that failed closed after launch
+    // cleanup: remove any route file even though omarchy never writes one.
+    if (plan?.desktop || fields?.env) {
+      const desktopHostname =
+        fields?.hostname ?? toDesktopHostname(req.subdomain);
+      await removeDesktopRoute(name).catch((e: unknown) => {
+        console.error("desktop route remove failed", e);
+      });
+      if (cfToken) {
+        await deleteAAAA(desktopHostname).catch((e: unknown) => {
+          console.error("desktop AAAA delete failed", e);
+        });
+      }
+    }
     await finishJob(job.id, "done", null);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

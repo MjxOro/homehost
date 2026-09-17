@@ -79,6 +79,9 @@ export const serverRequests = pgTable(
     instancePassword: text("instance_password"),
     sshPort: integer("ssh_port"),
     ipv6: text("ipv6"),
+    desktopEnv: text("desktop_env"),
+    desktopHostname: text("desktop_hostname").unique(),
+    desktopPort: integer("desktop_port"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
