@@ -19,11 +19,17 @@ import type { DesktopConfig } from "@homehost/shared";
  * Omarchy path: fail-closed. `images:archlinux/cloud` resolves (VM variant
  * verified 2026-09-17, ~538 MiB), but Omarchy ships only an interactive
  * installer (https://omarchy.org/install runs an Arch walkthrough via
- * boot.sh, requiring a TTY), so there is no non-interactive bake. The
- * worker refuses the job with an actionable message instead of launching
- * a half-built box.
+ * boot.sh, requiring a TTY), so there is no proven non-interactive bake.
+ * The worker refuses the job with an actionable message instead of launching
+ * a half-built box. Pure builders for that future bake (`omarchyPackages`,
+ * `omarchyRunCommands`, plus the `desktop.env` branch in
+ * `appendDesktopToUserData`) exist behind the gate so flipping it later is
+ * one line (remove the gate in index.ts).
  */
 
+/** Legacy default guest user (ubuntu-xfce). New code takes the username
+ * from `plan.desktop.user` (per-env: ubuntu, omarchy); this stays exported
+ * for external importers. */
 export const DESKTOP_USER = "ubuntu";
 export const DESKTOP_SERVICE = "kasmvnc-desktop.service";
 
@@ -46,6 +52,20 @@ export function desktopPackages(): string[] {
 }
 
 /**
+ * Pacman base deps for the omarchy bake (behind the fail-closed gate in
+ * index.ts — never runs today). Omarchy is Hyprland-based, so there is no
+ * xfce4 here: the Hyprland stack belongs to the Omarchy installer itself
+ * (still interactive-only, see omarchyUnavailable), and this function
+ * covers only the non-interactive base the bake needs underneath it
+ * (build tooling for a future AUR step + KasmVNC runtime needs).
+ * Flipping the gate later is one line (remove the gate); the arch
+ * user-data path is already wired in appendDesktopToUserData.
+ */
+export function omarchyPackages(): string[] {
+  return ["base-devel", "git", "curl", "sudo", "xauth", "dbus"];
+}
+
+/**
  * Fail-closed message for desktop-omarchy. Names the missing prerequisite
  * (non-interactive installer automation), not the image, which resolves.
  */
@@ -59,7 +79,11 @@ export function omarchyUnavailable(planId: string, image: string): string {
   );
 }
 
-/** KasmVNC Xvnc flags from the sharp streaming profile (desk2 bakeoff). */
+/** KasmVNC Xvnc flags from the sharp streaming profile (desk2 bakeoff). IP
+   * blacklisting stays disabled: all edge traffic shares the Traefik
+   * container IP (X-Forwarded-For), so per-IP brute-force blacklisting
+   * locks out every client after 5 anon hits (page + favicon reloads).
+   * The OTP is 144-bit base64url; IP throttling adds no security here. */
 function kasmFlags(desktop: DesktopConfig): string {
   const s = STREAM_PROFILES.sharp;
   return (
@@ -67,7 +91,8 @@ function kasmFlags(desktop: DesktopConfig): string {
     `-FrameRate ${s.frameRate} -DynamicQualityMax ${s.dynamicQualityMax} ` +
     `-DynamicQualityMin ${s.dynamicQualityMin} -VideoTime ${s.videoTime} ` +
     `-VideoArea ${s.videoArea} -TreatLossless ${s.treatLossless} ` +
-    `-MaxVideoResolution ${s.maxVideoResolution} -VideoScaling ${s.videoScaling}`
+    `-MaxVideoResolution ${s.maxVideoResolution} -VideoScaling ${s.videoScaling} ` +
+    `-BlacklistThreshold 0`
   );
 }
 
@@ -100,6 +125,8 @@ exec dbus-launch --exit-with-session /usr/bin/startxfce4 --compositor=off
  * command: `-fg` so the server stays in the foreground under Type=simple
  * (daemonizing under simple would read as exit and restart-loop into
  * duplicate servers), plus Restart=always instead of the vnc-watchdog.
+ * Username comes from the plan config (ubuntu-xfce: ubuntu, omarchy:
+ * omarchy), never a hardcoded constant.
  */
 export function desktopSystemdUnit(desktop: DesktopConfig): string {
   return `[Unit]
@@ -108,9 +135,9 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=${DESKTOP_USER}
-Environment=HOME=/home/${DESKTOP_USER}
-ExecStart=/usr/bin/kasmvncserver ${desktop.display} -fg ${kasmFlags(desktop)}
+User=${desktop.user}
+Environment=HOME=/home/${desktop.user}
+ExecStart=/usr/bin/kasmvncserver ${desktop.display} -fg -select-de xfce ${kasmFlags(desktop)}
 Restart=always
 RestartSec=5
 
@@ -121,16 +148,19 @@ WantedBy=multi-user.target
 
 /**
  * cloud-init runcmd lines (run as root, after `packages:` and
- * `write_files:`). The Kasm password is the instance one-time password
- * (base64url, shell-safe): no new secret surface. Pre-answers, in order:
- * DE picker skipped via the `.de-was-selected` marker beside our own
- * xstartup; the write-permission picker skipped via a headless
- * `-u <user> -w` user created before the first server start
- * (kasmvncserver prompts only when users are missing, so a pre-created
- * write user silences both; prompting-off runs would exit(1) instead).
- * cloud-init runs `packages:` (with an apt update) before runcmd, so the
- * KasmVNC deb install below sees fresh lists. DEBIAN_FRONTEND is inline:
- * each runcmd line runs in its own shell, so an export would not persist.
+ * `write_files:`). The Kasm secret persists across refreshes, unlike
+ * the one-read root OTP, and is stored shell-safe in the desktop password
+ * column. `kasmvncpasswd` with an explicit file target writes headless
+ * with a 2-line pipe (proven on desk2: piped stdin yields a valid write
+ * user). The no-target form is unusable headless (reads /dev/tty even
+ * under a pipe, third view-only prompt, writes a 0-byte file). The
+ * pre-created write user silences the permission picker at
+ * first server start (kasmvncserver prompts only when no users exist);
+ * the `.de-was-selected` marker skips the DE picker beside our own
+ * xstartup. cloud-init runs `packages:` (with an apt update) before
+ * runcmd, so the KasmVNC deb install below sees fresh lists.
+ * DEBIAN_FRONTEND is inline: each runcmd line runs in its own shell, so
+ * an export would not persist.
  */
 export function desktopRunCommands(
   username: string,
@@ -138,11 +168,49 @@ export function desktopRunCommands(
 ): string[] {
   return [
     `id ${username} || useradd -m -s /bin/bash ${username}`,
+    `chown -R ${username}:${username} /home/${username} || true`,
+    `printf '%s\\n' '/var/log/syslog {' '  rotate 3' '  size 50M' '  missingok' '  notifempty' '  compress' '}' > /etc/logrotate.d/kasmvnc`,
     `usermod -a -G ssl-cert ${username}`,
     `curl -fsSL -o /tmp/${KASMVNC_DEB} ${KASMVNC_DEB_URL} && DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/${KASMVNC_DEB} && rm -f /tmp/${KASMVNC_DEB}`,
     `mkdir -p /home/${username}/.vnc && chown ${username}:${username} /home/${username}/.vnc`,
-    `printf '%s\\n%s\\n' '${password}' '${password}' | sudo -u ${username} -H kasmvncpasswd -u ${username} -w`,
-    `touch /home/${username}/.vnc/.de-was-selected && chown ${username}:${username} /home/${username}/.vnc/.de-was-selected`,
+    `printf '%s\\n%s\\n' '${password}' '${password}' | sudo -u ${username} -H kasmvncpasswd -u ${username} -w /home/${username}/.kasmpasswd && chown ${username}:${username} /home/${username}/.kasmpasswd && chmod 0600 /home/${username}/.kasmpasswd`,
+    `chown ${username}:${username} /home/${username}/.vnc/xstartup && chmod 0755 /home/${username}/.vnc/xstartup`,
+    `systemctl daemon-reload && systemctl enable --now ${DESKTOP_SERVICE}`,
+  ];
+}
+/**
+ * cloud-init runcmd lines for the omarchy bake (behind the fail-closed gate
+ * in index.ts — never runs today). Mirrors desktopRunCommands shape (user,
+ * logrotate, group, install, .vnc dir, headless passwd, xstartup perms,
+ * enable), with Arch deltas:
+ * - `pacman -Syu` replaces the apt path (cloud-init `packages:` already ran
+ *   with pacman underneath; this refreshes before the AUR step).
+ * - KasmVNC ships in the AUR only (`pacman -S kasmvnc` does not exist):
+ *   the build below clones + makepkg as the unprivileged guest user
+ *   (makepkg refuses root — hence `su <user> -c`), using base-devel from
+ *   omarchyPackages(). AUR package name + build flags are UNVERIFIED (no
+ *   non-interactive proof; yay/paru bootstrap is the same chicken-egg, so
+ *   this goes straight at makepkg with no helper). If the clone/build
+ *   fails, the box comes up headless and the job must fail closed.
+ * - `ssl-cert` is a Debian group; create it so the shared systemd unit's
+ *   snakeoil-cert read path keeps working if the cert lands there.
+ * - The Hyprland stack belongs to the Omarchy installer (still
+ *   interactive-only); xorg-server/xauth here are KasmVNC X runtime
+ *   prereqs only, not the DE.
+ */
+export function omarchyRunCommands(
+  username: string,
+  password: string,
+): string[] {
+  return [
+    `id ${username} || useradd -m -s /bin/bash ${username}`,
+    `chown -R ${username}:${username} /home/${username} || true`,
+    `printf '%s\\n' '/var/log/syslog {' '  rotate 3' '  size 50M' '  missingok' '  notifempty' '  compress' '}' > /etc/logrotate.d/kasmvnc`,
+    `getent group ssl-cert || groupadd -r ssl-cert; usermod -a -G ssl-cert ${username}`,
+    `pacman -Syu --noconfirm && pacman -S --noconfirm --needed xorg-server xorg-xauth`,
+    `su ${username} -c 'git clone https://aur.archlinux.org/kasmvnc.git /tmp/kasmvnc-aur && cd /tmp/kasmvnc-aur && makepkg -si --noconfirm' && rm -rf /tmp/kasmvnc-aur`,
+    `mkdir -p /home/${username}/.vnc && chown ${username}:${username} /home/${username}/.vnc`,
+    `printf '%s\\n%s\\n' '${password}' '${password}' | sudo -u ${username} -H kasmvncpasswd -u ${username} -w /home/${username}/.kasmpasswd && chown ${username}:${username} /home/${username}/.kasmpasswd && chmod 0600 /home/${username}/.kasmpasswd`,
     `chown ${username}:${username} /home/${username}/.vnc/xstartup && chmod 0755 /home/${username}/.vnc/xstartup`,
     `systemctl daemon-reload && systemctl enable --now ${DESKTOP_SERVICE}`,
   ];
@@ -158,10 +226,15 @@ function indentBlock(body: string, spaces: number): string {
 
 /**
  * Splice the desktop bake into the VM user-data built by
- * buildInstanceAccess: extra APT packages, the xstartup + systemd unit
- * write_files entries, and the bootstrap runcmd lines. Throws when an
- * anchor is missing so a template drift fails the job closed instead of
- * launching a headless box on a desktop plan.
+ * buildInstanceAccess: extra packages, the xstartup + systemd unit
+ * write_files entries, and the bootstrap runcmd lines. Branched by
+ * `desktop.env`: the ubuntu-xfce path is byte-identical to the original
+ * bake; the omarchy path swaps in omarchyPackages()/omarchyRunCommands()
+ * (pacman/AUR) and is behind the fail-closed gate in index.ts. The
+ * write_files entries (XFCE xstartup + shared systemd unit) stay common:
+ * the omarchy DE selection rides with the Omarchy installer itself.
+ * Throws when an anchor is missing so a template drift fails the job closed
+ * instead of launching a headless box on a desktop plan.
  */
 export function appendDesktopToUserData(
   base: string,
@@ -173,11 +246,11 @@ export function appendDesktopToUserData(
   if (!base.includes(pkgAnchor)) {
     throw new Error("desktop bake: packages anchor missing in user-data");
   }
+  const pkgs =
+    desktop.env === "omarchy" ? omarchyPackages() : desktopPackages();
   let out = base.replace(
     pkgAnchor,
-    `${pkgAnchor}${desktopPackages()
-      .map((p) => `  - ${p}\n`)
-      .join("")}`,
+    `${pkgAnchor}${pkgs.map((p) => `  - ${p}\n`).join("")}`,
   );
 
   const filesAnchor = "runcmd:\n";
@@ -198,9 +271,11 @@ export function appendDesktopToUserData(
   if (!out.includes(runAnchor)) {
     throw new Error("desktop bake: runcmd ssh anchor missing in user-data");
   }
-  const cmds = desktopRunCommands(username, password)
-    .map((c) => `  - ${c}\n`)
-    .join("");
+  const runCmds =
+    desktop.env === "omarchy"
+      ? omarchyRunCommands(username, password)
+      : desktopRunCommands(username, password);
+  const cmds = runCmds.map((c) => `  - ${c}\n`).join("");
   return out.replace(runAnchor, `${runAnchor}${cmds}`);
 }
 
@@ -218,6 +293,8 @@ export interface DesktopRouteSpec {
 }
 
 export function desktopRouteFileName(instanceName: string): string {
+  // Instance names are already env-scoped (dev rows mint dev-req-*), so
+  // gui-<instance>.yml never collides across envs sharing ./routes.
   return `gui-${instanceName}.yml`;
 }
 
@@ -235,6 +312,8 @@ function routesDir(): string {
  * Template ratified with EdgeDesktop; quoted verbatim in docs/desktop-gui.md.
  */
 export function buildDesktopRouteYaml(spec: DesktopRouteSpec): string {
+  // Router/service key mirrors the file name: gui-<instance> is unique
+  // across envs because dev instances are dev-req-* at the source.
   const name = spec.instanceName;
   return `http:
   routers:
@@ -268,7 +347,6 @@ export function buildDesktopRouteYaml(spec: DesktopRouteSpec): string {
       insecureSkipVerify: true
 `;
 }
-
 /** Write the route file (Traefik watches the dir, no restart needed). */
 export async function writeDesktopRoute(
   spec: DesktopRouteSpec,
