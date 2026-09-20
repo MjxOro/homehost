@@ -33,6 +33,11 @@ export interface ApiEnv {
    */
   appOrigin: string;
   /**
+   * Extra browser origins permitted to issue mutations (e.g. LAN IP when
+   * opening dev to 0.0.0.0). Canonical OAuth redirects still use appOrigin.
+   */
+  appExtraOrigins: string[];
+  /**
    * Exact origin of this API itself, derived as http://HOST:PORT, so
    * same-origin API calls are allowed alongside APP_ORIGIN.
    */
@@ -106,6 +111,11 @@ export function getEnv(): ApiEnv {
       process.env.APP_ORIGIN ?? "http://127.0.0.1:5173",
       "APP_ORIGIN",
     ),
+    appExtraOrigins: (process.env.APP_EXTRA_ORIGINS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map((s) => httpOrigin(s, "APP_EXTRA_ORIGINS")),
     apiOrigin: httpOrigin(`http://${host}:${port}`, "API_ORIGIN"),
     google,
     github,

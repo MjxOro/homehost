@@ -82,6 +82,10 @@ export const serverRequests = pgTable(
     desktopEnv: text("desktop_env"),
     desktopHostname: text("desktop_hostname").unique(),
     desktopPort: integer("desktop_port"),
+    // Persistent KasmVNC secret: the ONLY desktop credential. The panel never
+    // sees it (proxy injects Basic auth from this column). Survives refresh;
+    // never cleared on read (unlike instance_password, the one-read root OTP).
+    desktopPassword: text("desktop_password"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

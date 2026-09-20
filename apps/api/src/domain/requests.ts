@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import { TIER_QUOTAS, toDesktopHostname, toSubdomain } from "@homehost/shared";
+import { PLANS, TIER_QUOTAS, toDesktopHostname, toSubdomain } from "@homehost/shared";
 import type { Plan, PortalUser, ProvisionAction } from "@homehost/shared";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
@@ -198,6 +198,10 @@ export interface CredentialsInput {
   user: PortalUser;
 }
 
+export interface DesktopSessionInput {
+  id: string;
+  user: PortalUser;
+}
 export const readInstancePassword = (
   input: CredentialsInput,
 ): Effect.Effect<
@@ -252,6 +256,92 @@ export const readInstancePassword = (
     return { password: outcome.password };
   });
 
+/**
+ * Desktop session gate: owner/operator + running + desktop row present.
+ * Returns the guest backend coordinates for the same-origin VNC proxy.
+ * The secret itself never leaves this function — the proxy injects it as
+ * Basic auth toward the guest. No read-clear: refresh must keep working.
+ */
+export const readDesktopSession = (
+  input: DesktopSessionInput,
+): Effect.Effect<
+  {
+    desktopUser: string;
+    backendHost: string;
+    backendPort: number;
+    desktopPassword: string;
+  },
+  RequestNotFound | DbFailure,
+  DatabaseTag
+> =>
+  Effect.gen(function* () {
+    const db = yield* DatabaseTag;
+    const outcome: {
+      ok: boolean;
+      desktopUser: string;
+      backendHost: string;
+      backendPort: number;
+      desktopPassword: string;
+    } = yield* Effect.tryPromise({
+      try: () =>
+        db.transaction(async (tx) => {
+          const found = await tx
+            .select({
+              id: schema.serverRequests.id,
+              ownerId: schema.serverRequests.ownerId,
+              status: schema.serverRequests.status,
+              planId: schema.serverRequests.planId,
+              ipv4: schema.serverRequests.ipv4,
+              desktopPort: schema.serverRequests.desktopPort,
+              desktopPassword: schema.serverRequests.desktopPassword,
+            })
+            .from(schema.serverRequests)
+            .where(eq(schema.serverRequests.id, input.id))
+            .limit(1);
+          const row = found[0];
+          const bad = {
+            ok: false as const,
+            desktopUser: "",
+            backendHost: "",
+            backendPort: 0,
+            desktopPassword: "",
+          };
+          if (
+            !row ||
+            (row.ownerId !== input.user.id && input.user.role !== "operator")
+          ) {
+            return bad;
+          }
+          if (row.status !== "running") return bad;
+          const plan = PLANS.find((p) => p.id === row.planId);
+          const desktopUser = plan?.desktop?.user ?? null;
+          if (
+            !desktopUser ||
+            !row.ipv4 ||
+            row.desktopPort === null ||
+            !row.desktopPassword
+          ) {
+            return bad;
+          }
+          return {
+            ok: true as const,
+            desktopUser,
+            backendHost: row.ipv4,
+            backendPort: row.desktopPort,
+            desktopPassword: row.desktopPassword,
+          };
+        }),
+      catch: (cause) => new DbFailure({ cause }),
+    });
+    if (!outcome.ok) return yield* new RequestNotFound();
+    return {
+      desktopUser: outcome.desktopUser,
+      backendHost: outcome.backendHost,
+      backendPort: outcome.backendPort,
+      desktopPassword: outcome.desktopPassword,
+    };
+  });
+
 export interface DecideInput {
   id: string;
   actorName: string;
@@ -261,7 +351,6 @@ export interface DecideInput {
 
 type DecideOutcome =
   { ok: true; row: RequestRow } | { ok: false; reason: "missing" | "conflict" };
-
 export const decideRequest = (
   input: DecideInput,
 ): Effect.Effect<

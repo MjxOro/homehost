@@ -1,8 +1,12 @@
 export type DesktopEnv = "ubuntu-xfce" | "omarchy";
 
-/** KasmVNC desktop baked into a GUI VM plan. */
+/** KasmVNC desktop baked into a GUI VM plan. `user` is the guest login the
+ * Kasm password is minted for (ubuntu-xfce: `ubuntu`, omarchy: `omarchy`):
+ * the panel login page hardcodes it and asks only for the OTP. */
 export interface DesktopConfig {
   env: DesktopEnv;
+  /** Guest username owning the KasmVNC session (per-env, not always ubuntu). */
+  user: string;
   /** X display the VNC server binds, e.g. ":5". */
   display: string;
   /** KasmVNC websocket port serving the browser canvas. */
@@ -71,6 +75,7 @@ export const PLANS: Plan[] = [
     image: "images:ubuntu/24.04/cloud",
     desktop: {
       env: "ubuntu-xfce",
+      user: "ubuntu",
       display: ":5",
       kasmPort: 6090,
       vncPort: 5905,
@@ -88,6 +93,7 @@ export const PLANS: Plan[] = [
     image: "images:archlinux/cloud",
     desktop: {
       env: "omarchy",
+      user: "omarchy",
       display: ":5",
       kasmPort: 6090,
       vncPort: 5905,

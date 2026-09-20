@@ -67,6 +67,8 @@ export interface ServerRequest {
   desktopUrl: string | null;
   /** GUI desktop baked into the plan's VM. Null for non-desktop plans. */
   desktopEnv: DesktopEnv | null;
+  /** Guest username for the desktop login page (hardcoded, per-env). Null for headless. */
+  desktopUser: string | null;
   cpu: number;
   memoryMb: number;
   diskGb: number;
@@ -128,6 +130,20 @@ export interface ApprovalResponse {
 export interface CredentialsResponse {
   /** One-time instance password, or null when key-based, unset, or already shown. */
   password: string | null;
+}
+
+export interface DesktopSessionResponse {
+  /**
+   * Same-origin URL serving the guest KasmVNC canvas with the panel session
+   * cookie as the only gate (no per-request secret in the URL): the API
+   * injects Basic auth toward the guest from desktop_password, which never
+   * leaves the server. The URL carries Kasm's `?password=` query so the
+   * RFB layer autoconnects without a login form; Basic auth alone only
+   * unlocks the HTTP page, not the VNC session.
+   */
+  url: string;
+  /** Guest username owning the KasmVNC session (per-env display only). */
+  desktopUser: string;
 }
 
 export interface ApiError {

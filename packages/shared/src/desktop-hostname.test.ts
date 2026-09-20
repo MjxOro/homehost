@@ -50,6 +50,7 @@ describe("desktop plans", () => {
       image: "images:ubuntu/24.04/cloud",
       desktop: {
         env: "ubuntu-xfce",
+        user: "ubuntu",
         display: ":5",
         kasmPort: 6090,
         vncPort: 5905,
@@ -69,6 +70,7 @@ describe("desktop plans", () => {
       image: "images:archlinux/cloud",
       desktop: {
         env: "omarchy",
+        user: "omarchy",
         display: ":5",
         kasmPort: 6090,
         vncPort: 5905,
