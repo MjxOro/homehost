@@ -96,12 +96,14 @@ async function cleanDns(token: string): Promise<number> {
 
 async function main(): Promise<void> {
   // Inventory first so the confirm gate states exact blast radius.
+  // Env split: legacy tenant-* projects only. Dev VMs live in tenant-dev-*
+  // (instance names dev-req-*); this reset never touches them.
   const projects = (
     await sh(["incus", "project", "list", "--format", "csv"])
   ).out
     .split("\n")
     .map((l) => l.split(",")[0].replace(" (current)", "").trim())
-    .filter((p) => p.startsWith("tenant-"));
+    .filter((p) => p.startsWith("tenant-") && !p.startsWith("tenant-dev-"));
   const instances: string[] = [];
   for (const project of projects) {
     const listed = await sh([
