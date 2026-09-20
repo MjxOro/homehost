@@ -12,3 +12,5 @@ letsencrypt/
 coverage/
 playwright-report/
 test-results/
+# Worker-written per-desktop Traefik routes (one per VM, removed on teardown).
+infra/traefik/routes/gui-*.yml

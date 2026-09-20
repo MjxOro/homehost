@@ -1,9 +1,10 @@
 name: homehost-dev
 
-# Local dev loop: postgres + api (--watch) + web (vite). One command:
-#   cp .env.dev.example .env.dev   # fill GitHub OAuth + operator email
-#   bun run dev:up
-# Ports 55433/3001/5174 stay clear of prod (55432/3000/5173).
+# Local dev loop: postgres + api (--watch) + web (vite) + worker (incus).
+# One command: `bun run dev:up` (needs .env.dev; copy .env.dev.example).
+# Open http://127.0.0.1:5174 — no dev domains needed. SHOWCASE_MODE in
+# .env.dev picks the auth path: true = persona login (default, no OAuth),
+# false = real GitHub OAuth (fill OAuth + OPERATOR_EMAILS first).
 
 services:
   postgres:
@@ -34,12 +35,11 @@ services:
       DATABASE_URL: postgres://homehost:homehost@postgres:5432/homehost
       HOST: "0.0.0.0"
       PORT: "3001"
-      SHOWCASE_MODE: "false"
     env_file:
       - path: ../../.env.dev
-        required: false
+        required: true
     ports:
-      - "127.0.0.1:3001:3001"
+      - "3001:3001"
     networks:
       - default
       - edge
@@ -58,7 +58,7 @@ services:
     environment:
       API_PROXY_TARGET: http://api:3001
     ports:
-      - "127.0.0.1:5174:5174"
+      - "5174:5174"
     networks:
       - default
       - edge
@@ -66,6 +66,29 @@ services:
     depends_on:
       - api
 
+  worker:
+    image: oven/bun:1
+    user: "${UID:-1000}:${GID:-1000}"
+    group_add:
+      - "986"
+    working_dir: /app
+    volumes:
+      - ../..:/app
+      - /var/lib/incus/unix.socket:/var/lib/incus/unix.socket
+      - /usr/bin/incus:/usr/bin/incus:ro
+    command: ["bun", "apps/worker/src/index.ts"]
+    environment:
+      DATABASE_URL: postgres://homehost:homehost@postgres:5432/homehost
+      WORKER_POLL_MS: "2000"
+      WORKER_ENV: dev
+      WORKER_BASE_DOMAIN: dev.homehost.risktozero.sh
+    env_file:
+      - path: ../../.env.dev
+        required: true
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
 networks:
   edge:
     name: homehost-edge_default

@@ -9,6 +9,12 @@ User=mjxoro
 Group=incus-admin
 WorkingDirectory=/home/mjxoro/projects/homehost
 EnvironmentFile=/home/mjxoro/projects/homehost/.env
+# Env placement: the host unit owns prod/apex rows only. DATABASE_URL must
+# point at the prod DB (loopback 55434, published by infra/prod/compose.yml)
+# — never the dev DB (55433) or the retired showcase DB (55432, no listener).
+# WORKER_BASE_DOMAIN fences dev rows even if the DBs ever share a backend.
+Environment=WORKER_ENV=prod
+Environment=WORKER_BASE_DOMAIN=homehost.risktozero.sh
 ExecStart=/home/mjxoro/.bun/bin/bun apps/worker/src/index.ts
 Restart=always
 RestartSec=5

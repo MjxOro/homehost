@@ -1,7 +1,7 @@
-# Panel route. Tenant game/VM routes are added here later by the worker as
-# separate files (one per server), never by Docker discovery, and removed on
-# teardown. Pattern for later:
-#   rule: "Host(`<server>-<owner>-<id>.homehost.risktozero.sh`)"
+# Panel route. SSH is direct-v6 (never Traefik); per-desktop gui-*.yml files
+# live here too (one per VM, written by the worker, removed on teardown).
+# Pattern:
+#   rule: "Host(`<label>-vnc.<baseDomain>`)"
 http:
   routers:
     panel:
@@ -27,4 +27,4 @@ http:
     panel:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:5173"
+          - url: "http://homehost-prod-web-1:80"

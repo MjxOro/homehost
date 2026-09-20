@@ -47,23 +47,19 @@ printf 'info public IP as seen from internet: %s\n' "$pub"
 printf 'info if that is 100.64-127.x.x you are behind CGNAT: inbound ports die at the ISP\n'
 printf 'info compare it with your router WAN IP; a mismatch also means CGNAT/NAT\n'
 
-# --- Desktop GUI edge probe (additive, read-only) ---
-# Verifies the Traefik edge can serve per-desktop <label>-vnc hostnames:
-# route files present, EDGE_IPV6 set, desktop AAAA resolves to it.
-if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^homehost-edge-traefik-1$'; then
-  ok "edge traefik container running"
-  gui_count=$(ls infra/traefik/routes/gui-*.yml 2>/dev/null | wc -l)
-  printf 'info desktop route files (gui-*.yml): %s\n' "$gui_count"
-  if [ -n "${EDGE_IPV6:-}" ]; then
-    ok "EDGE_IPV6 set"
-  else
-    printf 'info EDGE_IPV6 unset (desktop AAAA writes skip; route files still written)\n'
-  fi
-  if command -v dig >/dev/null 2>&1 && [ -n "${BASE_DOMAIN:-}" ]; then
-    probe="probe-vnc.${BASE_DOMAIN}"
-    got=$(dig +short AAAA "$probe" @1.1.1.1 2>/dev/null | head -1)
-    printf 'info desktop wildcard probe %s -> %s (want EDGE_IPV6 when provisioned)\n' "$probe" "${got:-<none>}"
-  fi
+  # --- Desktop GUI edge probe (additive, read-only) ---
+  # Verifies the Traefik edge can serve per-desktop <label>-vnc hostnames:
+  # route files present, wildcard desktop DNS resolves to this edge host.
+  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^homehost-edge-traefik-1$'; then
+    ok "edge traefik container running"
+    gui_count=$(ls infra/traefik/routes/gui-*.yml 2>/dev/null | wc -l)
+    printf 'info desktop route files (gui-*.yml): %s\n' "$gui_count"
+    if command -v dig >/dev/null 2>&1 && [ -n "${BASE_DOMAIN:-}" ]; then
+      probe="probe-vnc.${BASE_DOMAIN}"
+      got=$(dig +short A "$probe" @1.1.1.1 2>/dev/null | head -1)
+      got6=$(dig +short AAAA "$probe" @1.1.1.1 2>/dev/null | head -1)
+      printf 'info desktop wildcard probe %s -> %s %s (want edge host A/AAAA)\n' "$probe" "${got:-<none>}" "${got6:-<none>}"
+    fi
 else
   printf 'info edge traefik not running here (desktop probe skipped)\n'
 fi
