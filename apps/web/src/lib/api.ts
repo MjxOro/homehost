@@ -2,6 +2,7 @@ import type {
   ApprovalResponse,
   CredentialsResponse,
   DashboardResponse,
+  DesktopSessionResponse,
   Plan,
   ServerRequest,
   SessionResponse,
@@ -110,6 +111,8 @@ export const api = {
   getCredentials: (id: string): Promise<CredentialsResponse> =>
     request(`/api/requests/${encodeURIComponent(id)}/credentials`),
 
+  getDesktopSession: (id: string): Promise<DesktopSessionResponse> =>
+    request(`/api/requests/${encodeURIComponent(id)}/desktop`),
   getInstances: (): Promise<ApprovalResponse> => request("/api/instances"),
 
   getApprovals: (): Promise<ApprovalResponse> => request("/api/approvals"),

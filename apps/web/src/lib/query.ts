@@ -191,6 +191,21 @@ export function useCredentials() {
   });
 }
 
+/**
+ * Desktop session URL: same-origin proxied KasmVNC canvas. A query (not a
+ * mutation): the secret never leaves the server, the URL carries only
+ * Kasm's `?password=` RFB autoconnect query, and refresh must re-fetch.
+ */
+export function useDesktopSession(id: string | undefined) {
+  return useQuery({
+    queryKey: ["desktop-session", id ?? "none"],
+    queryFn: () => api.getDesktopSession(id ?? ""),
+    enabled: typeof id === "string" && id.length > 0,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useDecide() {
   const invalidate = useInvalidateAfterMutation();
   return useMutation({

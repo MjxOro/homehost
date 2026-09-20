@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ServerRequest, StreamTier } from "@homehost/shared";
@@ -179,36 +180,24 @@ function PasswordReveal({ password }: { password: string }) {
 
 /** Desktop request shape: reads the ratified desktop fields structurally so the
  *  row renders against the current ServerRequest type and the landed contract
- *  alike. desktopUrl is opaque (ratified: API composes https://hostname). */
+ *  alike. */
 interface DesktopLink {
   hostname: string | null;
-  url: string | null;
   env: string | null;
 }
 
 function desktopOf(request: ServerRequest): DesktopLink {
   let hostname: string | null = null;
-  let url: string | null = null;
   let env: string | null = null;
   if ("desktopHostname" in request) {
     const value: unknown = request.desktopHostname;
     if (typeof value === "string" && value.length > 0) hostname = value;
   }
-  if ("desktopUrl" in request) {
-    const value: unknown = request.desktopUrl;
-    if (typeof value === "string" && value.length > 0) url = value;
-  }
   if ("desktopEnv" in request) {
     const value: unknown = request.desktopEnv;
     if (typeof value === "string" && value.length > 0) env = value;
   }
-  return { hostname, url, env };
-}
-
-function desktopHref(desktop: DesktopLink): string | null {
-  if (desktop.url) return desktop.url;
-  if (desktop.hostname) return `https://${desktop.hostname}`;
-  return null;
+  return { hostname, env };
 }
 
 /** Human label for a desktop env slug; unknown slugs pass through verbatim. */
@@ -260,15 +249,15 @@ function StreamTierHint() {
 }
 
 /**
- * Browser GUI access for a desktop VM. The Open-desktop anchor goes straight
- * to the ratified desktopUrl (fallback https://hostname); enabled only when
- * the VM is running AND a hostname is present. A stopped VM serves Traefik
- * 502, so rows below the link keep showing the existing state honestly.
+ * Browser GUI access for a desktop VM. The Open-desktop link navigates
+ * inside the SPA to `/desktop/:id`, where the panel-hosted canvas
+ * auto-connects over the same-origin session. A
+ * stopped VM keeps the link disabled until the instance starts again, and
+ * provisioning rows stay disabled with an honest waiting note.
  */
 function DesktopAccess({ request }: { request: ServerRequest }) {
   const desktop = desktopOf(request);
-  const href = desktopHref(desktop);
-  const live = request.status === "running" && href !== null;
+  const live = request.status === "running" && desktop.hostname !== null;
   if (
     request.status !== "provisioning" &&
     request.status !== "running" &&
@@ -276,20 +265,19 @@ function DesktopAccess({ request }: { request: ServerRequest }) {
   ) {
     return null;
   }
-  if (href === null && desktop.env === null) return null;
+  if (desktop.hostname === null && desktop.env === null) return null;
   return (
     <div className="mt-2.5 flex flex-col items-start gap-1.5">
       <span className={LABEL_CHIP}>Desktop</span>
       <span className="flex flex-wrap items-center gap-2">
-        {live && href ? (
-          <a
-            href={href}
-            target="_blank"
-            rel="noreferrer"
+        {live ? (
+          <Link
+            to="/desktop/$id"
+            params={{ id: request.id }}
             className={`${BUTTON_OUTLINE_SM} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
           >
             Open desktop
-          </a>
+          </Link>
         ) : (
           <span
             aria-disabled="true"
@@ -304,7 +292,7 @@ function DesktopAccess({ request }: { request: ServerRequest }) {
           </Chip>
         ) : null}
         {(request.status === "running" || request.status === "provisioning") &&
-        href !== null ? (
+        desktop.hostname !== null ? (
           <StreamTierHint />
         ) : null}
       </span>
@@ -312,13 +300,20 @@ function DesktopAccess({ request }: { request: ServerRequest }) {
         <span className="text-[13px] leading-[1.55] text-text-2">
           {desktop.hostname ? (
             <>
-              KasmVNC canvas at{" "}
-              <code className={CODE_BADGE}>{desktop.hostname}</code> — sign in
-              with the one-time password below.
+              Direct edge:{" "}
+              <code className={CODE_BADGE}>https://{desktop.hostname}</code>{" "}
+              (panel session still required) — opens here and connects
+              automatically.
             </>
           ) : (
-            <>KasmVNC canvas — sign in with the one-time password below.</>
+            <>KasmVNC canvas — opens here and connects automatically.</>
           )}
+        </span>
+      ) : null}
+      {request.status === "provisioning" ? (
+        <span className="text-[13px] leading-[1.55] text-text-3">
+          Desktop is provisioning — the link activates once the instance is
+          running.
         </span>
       ) : null}
       {request.status === "stopped" ? (

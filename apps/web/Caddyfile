@@ -2,7 +2,7 @@
 # never talks to the api container directly, so session cookies stay first-party.
 :80 {
 	handle /api/* {
-		reverse_proxy api:3000
+		reverse_proxy homehost-prod-api-1:3000
 	}
 	handle {
 		root * /srv
