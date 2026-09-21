@@ -19,6 +19,25 @@ export function toSubdomain(
   return `${slug(serverName, 20)}-${slug(owner, 9)}-${requestId.replaceAll("-", "")}.${baseDomain}`;
 }
 
+/**
+ * Desktop hostname for one request's GUI VM: `<label>-vnc.<baseDomain>`.
+ * Pure: appends `-vnc` to the first DNS label of a `toSubdomain` output.
+ * The suffix costs 4 chars, so the label is truncated to 59 chars to keep
+ * the desktop label within the 63-char DNS limit. Flat single level, so the
+ * existing LE wildcard DNS-01 cert covers it.
+ * Injective over distinct `toSubdomain` outputs up to the retained UUID
+ * prefix: truncation keeps the full server/owner slugs plus the first 28 of
+ * the 32 UUID hex chars, so two outputs collide only on a 112-bit
+ * UUID-prefix match.
+ */
+export function toDesktopHostname(subdomain: string): string {
+  const dot = subdomain.indexOf(".");
+  const label = dot === -1 ? subdomain : subdomain.slice(0, dot);
+  const rest = dot === -1 ? "" : subdomain.slice(dot);
+  const base = label.length === 0 ? "srv" : label.slice(0, 59);
+  return `${base}-vnc${rest}`;
+}
+
 /** Public TCP pool for per-box SSH DNAT. Single range keeps firewall rules auditable. */
 export const SSH_PORT_MIN = 22000;
 export const SSH_PORT_MAX = 22999;

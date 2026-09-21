@@ -1,3 +1,22 @@
+export type DesktopEnv = "ubuntu-xfce" | "omarchy";
+
+/** KasmVNC desktop baked into a GUI VM plan. `user` is the guest login the
+ * Kasm password is minted for (ubuntu-xfce: `ubuntu`, omarchy: `omarchy`):
+ * the panel login page hardcodes it and asks only for the OTP. */
+export interface DesktopConfig {
+  env: DesktopEnv;
+  /** Guest username owning the KasmVNC session (per-env, not always ubuntu). */
+  user: string;
+  /** X display the VNC server binds, e.g. ":5". */
+  display: string;
+  /** KasmVNC websocket port serving the browser canvas. */
+  kasmPort: number;
+  /** Raw VNC port (loopback-only, never routed). */
+  vncPort: number;
+  /** Public-facing web port on the guest (equals kasmPort). */
+  webPort: number;
+}
+
 export interface Plan {
   id: string;
   name: string;
@@ -10,6 +29,8 @@ export interface Plan {
   kind: "container" | "vm";
   /** Incus image alias, e.g. images:ubuntu/24.04. */
   image: string;
+  /** Present only on GUI desktop plans; controls the KasmVNC bake. */
+  desktop?: DesktopConfig;
 }
 
 export const PLANS: Plan[] = [
@@ -42,5 +63,41 @@ export const PLANS: Plan[] = [
     technicalOnly: true,
     kind: "vm",
     image: "images:ubuntu/24.04/cloud",
+  },
+  {
+    id: "desktop-ubuntu",
+    name: "Desktop Ubuntu",
+    cpu: 2,
+    memoryMb: 2048,
+    diskGb: 20,
+    technicalOnly: true,
+    kind: "vm",
+    image: "images:ubuntu/24.04/cloud",
+    desktop: {
+      env: "ubuntu-xfce",
+      user: "ubuntu",
+      display: ":5",
+      kasmPort: 6090,
+      vncPort: 5905,
+      webPort: 6090,
+    },
+  },
+  {
+    id: "desktop-omarchy",
+    name: "Desktop Omarchy",
+    cpu: 4,
+    memoryMb: 4096,
+    diskGb: 40,
+    technicalOnly: true,
+    kind: "vm",
+    image: "images:archlinux/cloud",
+    desktop: {
+      env: "omarchy",
+      user: "omarchy",
+      display: ":5",
+      kasmPort: 6090,
+      vncPort: 5905,
+      webPort: 6090,
+    },
   },
 ];

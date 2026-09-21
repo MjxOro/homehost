@@ -4,6 +4,7 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import { createHash, randomBytes } from "node:crypto";
+import * as tls from "node:tls";
 import { and, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -19,6 +20,7 @@ import type {
   CredentialsResponse,
   DashboardResponse,
   DemoPersona,
+  DesktopSessionResponse,
   PortalUser,
   ServerRequest,
   SessionResponse,
@@ -34,6 +36,7 @@ import {
   cancelRequest,
   createRequest,
   decideRequest,
+  readDesktopSession,
   readInstancePassword,
   retryProvision,
   startInstance,
@@ -89,6 +92,7 @@ const CreateRequestBody = z
   .object({
     name: z.string().trim().min(1).max(48),
     planId: z.string().min(1),
+    desktopEnv: z.enum(["ubuntu-xfce", "omarchy"]).optional(),
     sshPubkey: z.string().trim().max(SSH_KEY_MAX).optional(),
   })
   .strict()
@@ -105,6 +109,9 @@ const DecisionBody = z
   })
   .strict();
 const IdParams = z.object({ id: z.string().uuid() }).strict();
+const IdWildcardParams = z
+  .object({ id: z.string().uuid(), "*": z.string() })
+  .passthrough();
 const InviteBody = z
   .object({
     email: z.string().trim().toLowerCase().email().max(254),
@@ -117,9 +124,7 @@ const ADMIN_USERS_PAGE_MAX = 100;
 
 const AdminUsersQuery = z
   .object({
-    status: z
-      .enum(["pending", "approved", "rejected", "suspended"])
-      .optional(),
+    status: z.enum(["pending", "approved", "rejected", "suspended"]).optional(),
     limit: z.coerce
       .number()
       .int()
@@ -178,6 +183,7 @@ export interface BuildAppOptions {
   databaseUrl?: string;
   baseDomain?: string;
   appOrigin?: string;
+  appExtraOrigins?: string[];
 }
 
 interface Session {
@@ -227,8 +233,8 @@ function sendDomainError(reply: FastifyReply, e: DomainError) {
 
 type RequestRow = typeof schema.serverRequests.$inferSelect;
 type EventRow = typeof schema.activityEvents.$inferSelect;
-
 function toServerRequest(r: RequestRow): ServerRequest {
+  const plan = PLANS.find((p) => p.id === r.planId);
   return {
     id: r.id,
     ownerId: r.ownerId,
@@ -247,6 +253,10 @@ function toServerRequest(r: RequestRow): ServerRequest {
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
     decisionReason: r.decisionReason,
+    desktopEnv: r.desktopEnv as ServerRequest["desktopEnv"],
+    desktopHostname: r.desktopHostname,
+    desktopUrl: r.desktopHostname ? `https://${r.desktopHostname}` : null,
+    desktopUser: plan?.desktop?.user ?? null,
   };
 }
 
@@ -314,13 +324,15 @@ const ActivityQuery = z
     cursor: z.string().min(1).max(1000).optional(),
   })
   .strict();
-
 export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   // Showcase safety gates always apply, including smoke-injected instances.
   const env = getEnv();
   const baseDomain = opts?.baseDomain ?? env.baseDomain;
   const allowedOrigins = new Set([
     new URL(opts?.appOrigin ?? env.appOrigin).origin,
+    ...(opts?.appExtraOrigins ?? env.appExtraOrigins).map(
+      (o) => new URL(o).origin,
+    ),
     new URL(env.apiOrigin).origin,
   ]);
   const handle = opts?.db
@@ -331,19 +343,9 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
 
   const app = Fastify({ logger: true });
 
-  async function resolveSession(req: FastifyRequest): Promise<Session | null> {
-    const header = req.headers.cookie;
-    let token: string | null = null;
-    if (header) {
-      for (const part of header.split(";")) {
-        const idx = part.indexOf("=");
-        if (idx >= 0 && part.slice(0, idx).trim() === SESSION_COOKIE) {
-          // Minted tokens are 64 lowercase hex chars; never percent-decode untrusted input.
-          token = part.slice(idx + 1).trim();
-          break;
-        }
-      }
-    }
+  async function sessionFromToken(
+    token: string | null | undefined,
+  ): Promise<Session | null> {
     if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const rows = await db
@@ -373,7 +375,33 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     };
   }
 
-  // Deny cross-site mutations. Only the exact configured browser origin and the
+  async function resolveSessionCookie(
+    header: string | null | undefined,
+  ): Promise<Session | null> {
+    let token: string | null = null;
+    if (header) {
+      for (const part of header.split(";")) {
+        const idx = part.indexOf("=");
+        if (idx >= 0 && part.slice(0, idx).trim() === SESSION_COOKIE) {
+          // Minted tokens are 64 lowercase hex chars; never percent-decode untrusted input.
+          token = part.slice(idx + 1).trim();
+          break;
+        }
+      }
+    }
+    return sessionFromToken(token);
+  }
+
+  async function resolveSession(req: FastifyRequest): Promise<Session | null> {
+    return resolveSessionCookie(req.headers.cookie);
+  }
+
+  async function sha1Base64(input: string): Promise<string> {
+    const digest = createHash("sha1").update(input).digest();
+    return digest.toString("base64");
+  }
+
+  // Deny cross-site mutations. The configured browser origin(s) plus the
   // API's own origin pass; localhost ports are not wildcards, proxy headers untrusted.
   app.addHook("preHandler", async (req, reply) => {
     if (
@@ -916,6 +944,26 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     if (plan.technicalOnly && session.user.tier !== "technical") {
       return sendErr(reply, 403, "plan requires technical tier", "forbidden");
     }
+    // Desktop env must match the plan's GUI stack; a headless plan with a
+    // desktopEnv (or a desktop plan with the wrong env) is a 403, mirroring
+    // the technicalOnly gate. Desktop plans may omit it (defaults to the
+    // plan's env).
+    const desktop = plan.desktop;
+    if (
+      desktop &&
+      parsed.data.desktopEnv !== undefined &&
+      parsed.data.desktopEnv !== desktop.env
+    ) {
+      return sendErr(
+        reply,
+        403,
+        "desktop env does not match plan",
+        "forbidden",
+      );
+    }
+    if (!desktop && parsed.data.desktopEnv !== undefined) {
+      return sendErr(reply, 403, "plan has no desktop", "forbidden");
+    }
     // The worker installs sshd on containers too, so all plans accept ssh keys.
     const created = await runtime.runPromise(
       Effect.either(
@@ -1094,6 +1142,9 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   );
 
+  // Credentials flow: the instance one-time password for root SSH (read once,
+  // then cleared). Desktop VNC uses its own persistent desktop_password via
+  // the DesktopSession gate + same-origin proxy below — never this endpoint.
   app.get<{ Params: { id: string } }>(
     "/api/requests/:id/credentials",
     async (req, reply) => {
@@ -1115,10 +1166,266 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   );
 
-  // Operator bootstrap converges operator rows at boot: UPDATE-only and
-  // idempotent, so allowlisted users always land approved/technical.
-  app.addHook("onReady", async () => {
-    await ensureOperatorBootstrap(db, env.operatorEmails);
+  // Desktop session: same-origin KasmVNC canvas URL for the panel iframe.
+  // Panel session cookie is the only gate; the guest secret travels only in
+  // the URL hash fragment (never sent to the server, never logged). The
+  // proxy injects Basic auth toward the guest from desktop_password, and the
+  // hash carries Kasm's `password` (RFB autoconnect, no login form) plus the
+  // `path` override so the client WebSocket targets the same-origin proxy
+  // prefix instead of /websockify at the panel root. Basic auth alone would
+  // only unlock the HTTP page, not the VNC session. Owner/operator +
+  // running + desktop row present, else 404 (no oracle).
+  app.get<{ Params: { id: string } }>(
+    "/api/requests/:id/desktop",
+    async (req, reply) => {
+      const session = await resolveSession(req);
+      if (!session)
+        return sendErr(reply, 401, "session required", "unauthorized");
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const gated = await runtime.runPromise(
+        Effect.either(
+          readDesktopSession({ id: params.data.id, user: session.user }),
+        ),
+      );
+      return Either.match(gated, {
+        onLeft: (e) => sendDomainError(reply, e),
+        onRight: ({ desktopUser, desktopPassword }) => {
+          const base = `/api/requests/${params.data.id}/desktop/session/`;
+          const wsPath =
+            `api/requests/${params.data.id}/desktop/session/websockify`;
+          return {
+            url:
+              `${base}#password=${encodeURIComponent(desktopPassword)}` +
+              `&autoconnect=true&resize=scale&path=${encodeURIComponent(wsPath)}`,
+            desktopUser,
+          } satisfies DesktopSessionResponse;
+        },
+      });
+    },
+  );
+
+  // Desktop session proxy: same-origin KasmVNC canvas. Panel cookie gates;
+  // the server injects Basic auth toward the guest from desktop_password.
+  // One wildcard handler serves the page plus every asset: subpath (after
+  // /desktop/session/) maps 1:1 onto the guest root, query passes through.
+  // GET streams the guest response with COOP/COEP stripped (Kasm's
+  // require-corp + same-origin would blank the same-origin iframe). The
+  // canvas secret travels only in the page URL hash fragment (never sent
+  // to the server, never logged); the hash carries Kasm's `password` (RFB
+  // autoconnect, no login form) plus the `path` override so the client
+  // WebSocket targets this same prefix instead of /websockify at root.
+  // Basic auth alone would only unlock the HTTP page, not the VNC session.
+  app.get<{ Params: { id: string; "*": string } }>(
+    "/api/requests/:id/desktop/session/*",
+    async (req, reply) => {
+      const session = await resolveSession(req);
+      if (!session)
+        return sendErr(reply, 401, "session required", "unauthorized");
+      const params = IdWildcardParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const gated = await runtime.runPromise(
+        Effect.either(
+          readDesktopSession({ id: params.data.id, user: session.user }),
+        ),
+      );
+      if (Either.isLeft(gated)) return sendDomainError(reply, gated.left);
+      const { desktopUser, backendHost, backendPort, desktopPassword } =
+        gated.right;
+      const rawUrl = req.raw.url ?? "/";
+      const prefix = `/api/requests/${params.data.id}/desktop/session/`;
+      const pathStart = rawUrl.indexOf(prefix);
+      const after =
+        pathStart >= 0 ? rawUrl.slice(pathStart + prefix.length) : "";
+      const target = `https://${backendHost}:${backendPort}/${after}`;
+      let upstream: Response;
+      try {
+        upstream = await fetch(target, {
+          headers: {
+            Authorization:
+              "Basic " +
+              Buffer.from(`${desktopUser}:${desktopPassword}`).toString(
+                "base64",
+              ),
+          },
+          // Kasm serves a self-signed snakeoil cert; Traefik already uses
+          // insecureSkipVerify for the same backend.
+          // @ts-expect-error Bun-only TLS option (node types lack it).
+          tls: { rejectUnauthorized: false },
+        });
+      } catch {
+        return sendErr(reply, 502, "desktop unreachable", "internal");
+      }
+      const contentType = upstream.headers.get("content-type");
+      if (contentType) reply.header("content-type", contentType);
+      const cache = upstream.headers.get("cache-control");
+      if (cache) reply.header("cache-control", cache);
+      // COOP/COEP stripped by omission: Kasm's require-corp + same-origin
+      // would blank the same-origin iframe. No framing headers upstream.
+      const rawBody = Buffer.from(await upstream.arrayBuffer());
+      // Anchor relative Kasm asset URLs (dist/, vendor/, app/) to this
+      // prefix: without this the page resolves them against /desktop/ and
+      // every bundle 404s. Only for HTML; binaries pass through.
+      if (
+        upstream.status === 200 &&
+        (contentType ?? "").includes("text/html")
+      ) {
+        const html = rawBody
+          .toString("utf8")
+          .replace(
+            /<html([^>]*)>/,
+            `<html$1><head><base href="/api/requests/${params.data.id}/desktop/session/">`,
+          );
+        return reply.code(upstream.status).send(html);
+      }
+      return reply.code(upstream.status).send(rawBody);
+    },
+  );
+  // The browser opens wss://<panel>/api/requests/:id/desktop/session/
+  // websockify (per the `path` hash override); the panel cookie gates the
+  // upgrade and the server re-authenticates toward the guest with Basic
+  // auth from desktop_password over a TLS backend that skips verify
+  // (same snakeoil cert Traefik already trusts blindly). Frames relay
+  // both directions; either side closing tears the pair down.
+  // Node http server 'upgrade' args are (req, socket, head) — req first.
+  app.server.on("upgrade", (...rawArgs: unknown[]) => {
+      const upgradeReq = rawArgs[0] as {
+        url?: unknown;
+        headers: Record<string, unknown>;
+      };
+      const socket = rawArgs[1] as import("node:net").Socket;
+      const getHeader = (name: string): string | undefined => {
+        const value = upgradeReq?.headers?.[name];
+        return typeof value === "string" ? value : undefined;
+      };
+      if (!upgradeReq || typeof upgradeReq !== "object") {
+        socket.destroy();
+        return;
+      }
+      void (async () => {
+      try {
+        const rawUrl = typeof upgradeReq.url === "string" ? upgradeReq.url : "";
+        const match = rawUrl.match(
+          /^\/api\/requests\/([0-9a-f-]{36})\/desktop\/session\/(.*)$/,
+        );
+        if (!match?.[1]) {
+          socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+          socket.destroy();
+          return;
+        }
+        const requestId = match[1];
+        const after = match[2] ?? "";
+        const session = await resolveSessionCookie(getHeader("cookie"));
+        if (!session) {
+          socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+          socket.destroy();
+          return;
+        }
+        const gated = await runtime.runPromise(
+          Effect.either(
+            readDesktopSession({ id: requestId, user: session.user }),
+          ),
+        );
+        if (Either.isLeft(gated)) {
+          socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+          socket.destroy();
+          return;
+        }
+        const { desktopUser, backendHost, backendPort, desktopPassword } =
+          gated.right;
+        const { connect } = tls;
+        const basic = Buffer.from(
+          `${desktopUser}:${desktopPassword}`,
+        ).toString("base64");
+        const guestPath = `/${after}`;
+        const guest = connect({
+          host: backendHost,
+          port: backendPort,
+          rejectUnauthorized: false,
+        });
+        await new Promise<void>((resolve, reject) => {
+          guest.once("secureConnect", () => resolve());
+          guest.once("error", reject);
+        });
+        const incoming = getHeader("sec-websocket-protocol");
+        const protocols =
+          typeof incoming === "string" && incoming.length > 0
+            ? incoming
+            : "binary";
+        // KasmVNC's websocket check requires an Origin header (browser
+        // always sends one; raw sockets do not). Forward the client's or
+        // synthesize the panel origin — either satisfies the check.
+        const origin =
+          getHeader("origin") ?? getHeader("sec-websocket-origin") ?? "";
+        // The client dials the proxy subpath (/desktop/session/websockify);
+        // the guest serves the channel at its root — strip the prefix.
+        const proxyPrefix = `api/requests/${requestId}/desktop/session/`;
+        const guestWsPath = after.startsWith(proxyPrefix)
+          ? `/${after.slice(proxyPrefix.length)}`
+          : "/websockify";
+        guest.write(
+          `GET ${guestWsPath} HTTP/1.1\r\n` +
+            `Host: ${backendHost}:${backendPort}\r\n` +
+            "Upgrade: websocket\r\n" +
+            "Connection: Upgrade\r\n" +
+            `Sec-WebSocket-Key: ${getHeader("sec-websocket-key") ?? ""}\r\n` +
+            `Sec-WebSocket-Protocol: ${protocols}\r\n` +
+            `Sec-WebSocket-Version: ${getHeader("sec-websocket-version") ?? "13"}\r\n` +
+            (origin.length > 0 ? `Origin: ${origin}\r\n` : "") +
+            `Authorization: Basic ${basic}\r\n\r\n`,
+        );
+        let head2 = await new Promise<string>((resolve, reject) => {
+          let acc = "";
+          const onData = (chunk: Buffer) => {
+            acc += chunk.toString("latin1");
+            if (acc.includes("\r\n\r\n")) {
+              guest.off("data", onData);
+              resolve(acc);
+            }
+          };
+          guest.on("data", onData);
+          guest.once("error", reject);
+        });
+        if (!head2.startsWith("HTTP/1.1 101")) {
+          socket.write("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+          socket.destroy();
+          guest.destroy();
+          return;
+        }
+        const extraHeaderEnd = head2.indexOf("\r\n\r\n") + 4;
+        const extraLatin1 = head2.slice(extraHeaderEnd);
+        const acceptKey = await sha1Base64(
+          `${getHeader("sec-websocket-key") ?? ""}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`,
+        );
+        socket.write(
+          "HTTP/1.1 101 Switching Protocols\r\n" +
+            "Upgrade: websocket\r\n" +
+            "Connection: Upgrade\r\n" +
+            `Sec-WebSocket-Accept: ${acceptKey}\r\n` +
+            `Sec-WebSocket-Protocol: ${protocols.split(",")[0]?.trim() ?? "binary"}\r\n\r\n`,
+        );
+        // The guest's 101 and its first RFB frame arrive in one TLS packet:
+        // the header reader above already consumed those bytes into a JS
+        // string. Re-emit them as binary (latin1, not utf8) so the 0x82
+        // WS frame + "RFB 003.008" version survive the relay.
+        if (extraLatin1.length > 0) {
+          socket.write(Buffer.from(extraLatin1, "latin1"));
+        }
+        socket.pipe(guest);
+        guest.pipe(socket);
+        socket.once("close", () => guest.destroy());
+        guest.once("close", () => socket.destroy());
+      } catch {
+        try {
+          socket.write("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+        } catch {
+          // Socket already gone; nothing to report.
+        }
+        socket.destroy();
+      }
+      })();
   });
 
   app.addHook("onClose", async () => {

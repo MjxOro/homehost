@@ -78,6 +78,20 @@ Three stacks, three port sets, no overlap:
 
 Dev loop: `bun install`, `cp .env.dev.example .env.dev`, fill GitHub OAuth + `OPERATOR_EMAILS`, add the matching callback URL to the OAuth app (see `.env.dev.example` for local vs public origin), then `bun run dev:up`. Requires the edge network (`docker network create homehost-edge_default` if Traefik never ran here). `dev:logs` follows, `dev:reset` wipes the dev database.
 
+### Dev preflight
+
+Run the read-only readiness probe before `dev:up` — it checks Bun, Docker,
+the edge network, free ports (3001/5174/55433), `.env.dev` boot gates, host
+capacity, and WARNs-only items (incus socket, Cloudflare token, GID drift)
+that don't block web/API work:
+
+```bash
+bun run dev:check
+```
+
+`READY` means the stack should boot; `MISS` lines say exactly what to fix
+(`dev:reset` only wipes the dev database, never host state).
+
 Prod: built images tagged by git SHA (`TAG=$(git rev-parse --short HEAD)`). Secrets live in `infra/private/prod.env` (gitignored): `GITHUB_CLIENT_ID/SECRET`, `OPERATOR_EMAILS`, `APP_ORIGIN=https://homehost.risktozero.sh`, `BASE_DOMAIN=homehost.risktozero.sh`, `IPV6_PREFIX`. `bun run prod:build && bun run prod:up` (`--wait` on the api healthcheck, so a bad image fails loud instead of 502ing). Caddy serves the static web app and reverse-proxies `/api` to the api container, so cookies stay first-party. Cutover: point `infra/traefik/routes/panel.yml` at `http://host.docker.internal:5180`.
 
 Public dev (`https://hhfrontdev…`, `https://hhbackdev…`) is intentional and unauthenticated at the edge — treat the dev stack as public: no real user data, dev-only OAuth creds where possible. CI (`.github/workflows/ci.yml`) runs on every push: typecheck, shared tests, integration tests against a Postgres service, web build, both image builds. CD (`deploy.yml`) runs `bun run prod:deploy` (checkout main → pull → build → migrate → up) on push to `main`, and needs one self-hosted runner on the prod host:

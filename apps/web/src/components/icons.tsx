@@ -151,10 +151,28 @@ export function CopyIcon(props: IconProps) {
   );
 }
 
-export function ChevronDownIcon(props: IconProps) {
+export function ExpandIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="m6 9 6 6 6-6" />
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
+  );
+}
+
+export function EyeIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function CursorIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+      <path d="M13 13l6 6" />
     </svg>
   );
 }

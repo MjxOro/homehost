@@ -1,8 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import postgres from "postgres";
-import { PLANS, ipv6ForInstance } from "@homehost/shared";
+import { PLANS, ipv6ForInstance, toDesktopHostname } from "@homehost/shared";
 import type { Plan, ProvisionAction } from "@homehost/shared";
+import {
+  appendDesktopToUserData,
+  omarchyUnavailable,
+  removeDesktopRoute,
+  writeDesktopRoute,
+} from "./desktop.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -16,6 +22,8 @@ const powerAttempts = Number(process.env.WORKER_POWER_ATTEMPTS ?? 5);
 const bootTimeoutMs = Number(process.env.WORKER_BOOT_TIMEOUT_MS ?? 240000);
 const ipv6Prefix = process.env.IPV6_PREFIX ?? "";
 const cfToken = process.env.CF_DNS_API_TOKEN ?? "";
+const workerEnv = process.env.WORKER_ENV ?? "prod";
+const workerBaseDomain = process.env.WORKER_BASE_DOMAIN ?? "";
 
 const sql = postgres(databaseUrl, { max: 4 });
 let shuttingDown = false;
@@ -92,13 +100,62 @@ async function incus(args: string[]): Promise<string> {
     });
   });
 }
+// Env placement: dev rows (subdomain under dev.homehost.risktozero.sh,
+// the dev BASE_DOMAIN in .env.dev) live in tenant-dev-* projects; prod
+// and showcase rows keep the legacy tenant-* placement so existing VMs
+// never move. Derived from the request's own subdomain so every worker
+// agrees regardless of its WORKER_BASE_DOMAIN filter.
+function envOfSubdomain(subdomain: string): "dev" | "prod" {
+  return subdomain.endsWith(".dev.homehost.risktozero.sh") ? "dev" : "prod";
+}
 
-function projectOf(ownerId: string): string {
+function projectOf(ownerId: string, subdomain?: string): string {
+  if (subdomain && envOfSubdomain(subdomain) === "dev") {
+    return `tenant-dev-${ownerId}`;
+  }
   return `tenant-${ownerId}`;
 }
 
-function instanceNameOf(requestId: string): string {
-  return `req-${requestId.replace(/-/g, "").slice(0, 8)}`;
+/** Pre-namespacing location: every VM provisioned before the split. */
+function legacyProjectOf(ownerId: string): string {
+  return `tenant-${ownerId}`;
+}
+
+/**
+ * Project holding this request's instance. Stored dev-req-* names live in
+ * the dev project; stored legacy names (prod rows plus pre-split dev VMs
+ * like tenant-operator/req-1828ca5e) stay in the legacy project; fresh
+ * rows derive from their subdomain. Teardown/power must use this, never
+ * projectOf directly, or pre-split dev VMs become orphans.
+ */
+function projectForReq(req: RequestState): string {
+  if (req.instanceName?.startsWith("dev-req-")) {
+    return `tenant-dev-${req.ownerId}`;
+  }
+  if (req.instanceName) return legacyProjectOf(req.ownerId);
+  return projectOf(req.ownerId, req.subdomain);
+}
+
+// Env scoping: a worker with WORKER_BASE_DOMAIN set only handles requests
+// whose subdomain sits under that suffix. Empty = no filtering (host
+// systemd prod unit keeps legacy behavior).
+function envMatches(subdomain: string): boolean {
+  if (workerBaseDomain === "") return true;
+  return (
+    subdomain === workerBaseDomain ||
+    subdomain.endsWith(`.${workerBaseDomain}`)
+  );
+}
+
+function instanceNameOf(requestId: string, subdomain?: string): string {
+  const short = requestId.replace(/-/g, "").slice(0, 8);
+  // Dev VMs carry the env in the Incus name (visible in `incus list`
+  // across projects) so nothing in one daemon collides: dev rows mint
+  // dev-req-*, prod/showcase keep the legacy req-* shape.
+  if (subdomain && envOfSubdomain(subdomain) === "dev") {
+    return `dev-req-${short}`;
+  }
+  return `req-${short}`;
 }
 
 async function leaseJob(): Promise<Job | null> {
@@ -172,12 +229,54 @@ async function setInstancePassword(
   `;
 }
 
+async function setDesktopPassword(
+  requestId: string,
+  password: string | null,
+): Promise<void> {
+  await sql`
+    UPDATE server_requests
+    SET desktop_password = ${password}, updated_at = now()
+    WHERE id = ${requestId}
+  `;
+}
+
 async function setIpv6(requestId: string, ipv6: string): Promise<void> {
   await sql`
     UPDATE server_requests
     SET ipv6 = ${ipv6}, updated_at = now()
     WHERE id = ${requestId}
   `;
+}
+interface DesktopFields {
+  env: string | null;
+  hostname: string | null;
+  port: number | null;
+}
+
+/**
+ * Desktop row columns from migration 0010. Null-tolerant: pre-migration
+ * rows (or any select failure) fall back to plan-derived values so the
+ * worker stays up across the migration boundary.
+ */
+async function loadDesktopFields(
+  requestId: string,
+): Promise<DesktopFields | null> {
+  try {
+    const rows = await sql`
+      SELECT desktop_env, desktop_hostname, desktop_port
+      FROM server_requests WHERE id = ${requestId} LIMIT 1
+    `;
+    if (rows.length === 0) return null;
+    const r = rows[0] as Record<string, unknown>;
+    return {
+      env: typeof r.desktop_env === "string" ? r.desktop_env : null,
+      hostname:
+        typeof r.desktop_hostname === "string" ? r.desktop_hostname : null,
+      port: typeof r.desktop_port === "number" ? r.desktop_port : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 const IPV6_DNS = ["2606:4700:4700::1111", "2001:4860:4860::8888"];
@@ -200,27 +299,36 @@ ethernets:
 }
 
 const CF_API = "https://api.cloudflare.com/client/v4";
-let cfZoneId: string | null = null;
+const cfZoneIds: Record<string, string> = {};
 
-async function cfZones(): Promise<string> {
-  if (cfZoneId) return cfZoneId;
-  const response = await fetch(`${CF_API}/zones?name=risktozero.sh`, {
-    headers: { Authorization: `Bearer ${cfToken}` },
-  });
-  if (!response.ok) throw new Error(`cf zones failed: ${response.status}`);
-  const body = (await response.json()) as {
-    result?: Array<{ id?: unknown }>;
-  };
-  const id = body.result?.[0]?.id;
-  if (typeof id !== "string" || id.length === 0) {
-    throw new Error("cf zone not found");
+async function cfZones(subdomain: string): Promise<string> {
+  // Zone is the apex owning the name: probe CF from longest suffix down
+  // (dev.homehost.risktozero.sh -> homehost.risktozero.sh ->
+  // risktozero.sh). The API has no parent lookup, so try each candidate
+  // and cache the winning zone id by zone name.
+  const parts = subdomain.split(".").filter((p) => p.length > 0);
+  for (let i = 0; i <= parts.length - 2; i++) {
+    const candidate = parts.slice(i).join(".");
+    const cached = cfZoneIds[candidate];
+    if (cached) return cached;
+    const response = await fetch(`${CF_API}/zones?name=${candidate}`, {
+      headers: { Authorization: `Bearer ${cfToken}` },
+    });
+    if (!response.ok) throw new Error(`cf zones failed: ${response.status}`);
+    const body = (await response.json()) as {
+      result?: Array<{ id?: unknown; name?: unknown }>;
+    };
+    const hit = (body.result ?? []).find((r) => r.name === candidate);
+    if (hit && typeof hit.id === "string" && hit.id.length > 0) {
+      cfZoneIds[candidate] = hit.id;
+      return hit.id;
+    }
   }
-  cfZoneId = id;
-  return id;
+  throw new Error("cf zone not found");
 }
 
 async function ensureAAAA(subdomain: string, ipv6: string): Promise<void> {
-  const zone = await cfZones();
+  const zone = await cfZones(subdomain);
   const found = (await (
     await fetch(
       `${CF_API}/zones/${zone}/dns_records?type=AAAA&name=${subdomain}`,
@@ -248,7 +356,7 @@ async function ensureAAAA(subdomain: string, ipv6: string): Promise<void> {
 }
 
 async function deleteAAAA(subdomain: string): Promise<void> {
-  const zone = await cfZones();
+  const zone = await cfZones(subdomain);
   const found = (await (
     await fetch(
       `${CF_API}/zones/${zone}/dns_records?type=AAAA&name=${subdomain}`,
@@ -486,8 +594,20 @@ async function handleProvision(job: Job): Promise<void> {
     await failProvision(req, job, `unknown plan ${req.planId}`);
     return;
   }
-  const project = projectOf(req.ownerId);
-  const name = req.instanceName ?? instanceNameOf(req.id);
+  // Desktop plans are VM-only: containers ignore cloud-init, so a desktop
+  // bake could never boot there. Omarchy has no non-interactive installer
+  // (images:archlinux/cloud resolves; installer automation is the missing
+  // prerequisite), so both refuse the job closed with an actionable message.
+  if (plan.desktop && plan.kind !== "vm") {
+    await failProvision(req, job, `desktop plan ${plan.id} requires a vm`);
+    return;
+  }
+  if (plan.desktop?.env === "omarchy") {
+    await failProvision(req, job, omarchyUnavailable(plan.id, plan.image));
+    return;
+  }
+  const project = projectForReq(req);
+  const name = req.instanceName ?? instanceNameOf(req.id, req.subdomain);
   try {
     await ensureProject(project);
     if (req.status === "approved") {
@@ -518,10 +638,35 @@ async function handleProvision(job: Job): Promise<void> {
     // requests never mint secrets. Password persists for its one
     // dashboard read.
     const isVm = plan.kind === "vm";
+    const desktop = plan.desktop ?? null;
+    // API stores desktop_env/hostname/port on the row (migration 0010);
+    // when the row lacks them (pre-migration), derive from the plan and
+    // toDesktopHostname the same way ApiDesktop does (first-label -vnc).
+    const stored = desktop ? await loadDesktopFields(req.id) : null;
+    const desktopEnv = stored?.env ?? desktop?.env ?? null;
+    const desktopHostname =
+      stored?.hostname ?? (desktop ? toDesktopHostname(req.subdomain) : null);
+    const desktopPort = stored?.port ?? desktop?.kasmPort ?? null;
     let ipv6: string | null = null;
     if (isVm) {
       const access = buildInstanceAccess(req.sshPubkey);
-      args.push("--config", `user.user-data=${access.userData}`);
+      // Desktop KasmVNC gets its own persistent secret (desktop_password),
+      // independent of the one-read root OTP (instance_password). The panel
+      // proxy injects it as Basic auth; the browser never sees it.
+      const desktopPassword =
+        desktop && desktopEnv === "ubuntu-xfce"
+          ? randomBytes(18).toString("base64url")
+          : null;
+      const userData =
+        desktop && desktopEnv === "ubuntu-xfce" && desktopPassword !== null
+          ? appendDesktopToUserData(
+              access.userData,
+              desktop,
+              desktop.user,
+              desktopPassword,
+            )
+          : access.userData;
+      args.push("--config", `user.user-data=${userData}`);
       // Static v6 from the routed prefix; skipped entirely on v4-only hosts.
       ipv6 = ipv6ForInstance(ipv6Prefix, req.id);
       if (ipv6) {
@@ -532,6 +677,7 @@ async function handleProvision(job: Job): Promise<void> {
         );
       }
       await setInstancePassword(req.id, access.password);
+      await setDesktopPassword(req.id, desktopPassword);
     }
     await incus(args);
     const ipv4 = await waitForAddress(project, name);
@@ -559,6 +705,23 @@ async function handleProvision(job: Job): Promise<void> {
       await setIpv6(req.id, ipv6);
       if (cfToken) await ensureAAAA(req.subdomain, ipv6);
       else console.error("CF_DNS_API_TOKEN unset: skipping AAAA");
+    }
+    if (
+      desktop &&
+      desktopEnv === "ubuntu-xfce" &&
+      desktopHostname &&
+      desktopPort !== null
+    ) {
+      // Backend is the guest IPv4 (edge net has no v6; ratified with
+      // EdgeDesktop). Desktop DNS is wildcard-only (*.dev + *.homehost A/AAAA
+      // point at the edge host): no per-VM desktop record is written here.
+      // SSH AAAA above is still per-VM (guest v6, direct access).
+      await writeDesktopRoute({
+        instanceName: name,
+        desktopHostname,
+        backendHost: ipv4,
+        kasmPort: desktopPort,
+      });
     }
     await setRequest(req.id, "running", { instanceName: name, ipv4 });
     await emit(req.id, "Homehost worker", "running", req.name, ipv4);
@@ -594,7 +757,7 @@ async function handleTeardown(job: Job): Promise<void> {
     return;
   }
   try {
-    const project = projectOf(req.ownerId);
+    const project = projectForReq(req);
     try {
       await incus(["delete", name, "--project", project, "--force"]);
     } catch (e) {
@@ -610,6 +773,18 @@ async function handleTeardown(job: Job): Promise<void> {
       if (out.includes(name)) throw e;
     }
     if (cfToken) await deleteAAAA(req.subdomain);
+    // Desktop VMs only: best-effort route-file cleanup. Desktop DNS is
+    // wildcard-only (no per-VM desktop record exists to delete); SSH AAAA
+    // above is still per-VM.
+    const plan = PLANS.find((p) => p.id === req.planId);
+    const fields = plan?.desktop ? await loadDesktopFields(req.id) : null;
+    // Omarchy rows may exist from retries that failed closed after launch
+    // cleanup: remove any route file even though omarchy never writes one.
+    if (plan?.desktop || fields?.env) {
+      await removeDesktopRoute(name).catch((e: unknown) => {
+        console.error("desktop route remove failed", e);
+      });
+    }
     await finishJob(job.id, "done", null);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -653,7 +828,7 @@ async function handlePower(
     return;
   }
   try {
-    const project = projectOf(req.ownerId);
+    const project = projectForReq(req);
     // Idempotent verb: a retried job finds the instance already flipped and
     // proceeds to access refresh instead of failing on a redundant command.
     const state = await instancePowerState(project, req.instanceName);
@@ -701,11 +876,19 @@ async function main(): Promise<void> {
   // Instance names make relaunches idempotent.
   await sql`UPDATE provision_jobs SET status = 'queued', updated_at = now() WHERE status = 'leased'`;
 
-  console.log("worker up: polling provision_jobs");
+  console.log(`worker up (${workerEnv}): polling provision_jobs`);
   while (!shuttingDown) {
     try {
       const job = await leaseJob();
       if (!job) {
+        await new Promise<void>((r) => setTimeout(r, pollMs));
+        continue;
+      }
+      // Env scoping: leave other-env jobs queued for their own worker.
+      // No Incus/DB request state touched — just requeue the lease.
+      const req = await loadRequest(job.requestId);
+      if (req && !envMatches(req.subdomain)) {
+        await requeue(job.id, `wrong-env:${req.subdomain}`);
         await new Promise<void>((r) => setTimeout(r, pollMs));
         continue;
       }

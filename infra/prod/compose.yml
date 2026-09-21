@@ -4,6 +4,9 @@ name: homehost-prod
 # Secrets in infra/private/prod.env (gitignored, never committed).
 #   bun run prod:build && bun run prod:up
 # Traefik cutover: point infra/traefik/routes/panel.yml at 127.0.0.1:5180.
+# Worker env note: prod provisioning stays on the host systemd worker
+# (WORKER_ENV=prod, empty WORKER_BASE_DOMAIN = no filtering); do NOT add a
+# prod worker service here.
 
 services:
   postgres:
@@ -12,6 +15,11 @@ services:
       POSTGRES_DB: homehost
       POSTGRES_USER: homehost
       POSTGRES_PASSWORD: homehost
+    # Loopback-only publish so the host systemd worker (not in compose net)
+    # can reach the prod DB via 127.0.0.1:55434. Never expose wider: prod
+    # traffic stays inside the compose network.
+    ports:
+      - "127.0.0.1:55434:5432"
     volumes:
       - homehost-prod-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -52,7 +60,15 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      - default
+      - edge
     restart: unless-stopped
+
+networks:
+  edge:
+    name: homehost-edge_default
+    external: true
 
 volumes:
   homehost-prod-postgres:
