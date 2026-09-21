@@ -1,9 +1,10 @@
 # GUI desktops on Homehost — operator runbook
 
-Browser-native desktops (KasmVNC canvas, zero client installs).
-Request Ubuntu-XFCE or Omarchy from the panel, open
-`https://<desktop-hostname>`. One secret: the KasmVNC password is the
-instance one-time password (existing credentials endpoint, no new surface).
+Browser-native desktops (KasmVNC canvas, zero client installs). Request
+Ubuntu-XFCE or Omarchy from the panel, then open it from your dashboard —
+the panel serves a same-origin proxied canvas URL and injects the persistent
+`desktop_password` toward the guest (never leaves the server), so the canvas
+autoconnects with no login form.
 
 ## Naming
 
@@ -19,27 +20,16 @@ instance one-time password (existing credentials endpoint, no new surface).
   Universal SSL does **not** cover deeper names on a normal zone and is not
   used for DNS-only traffic (see `docs/networking.md`).
 
-## DNS pair (per desktop VM)
-
+## DNS: wildcard-only for desktops, per-VM for SSH
 | Record       | Name                 | Value                                   | Written by                          |
 | ------------ | -------------------- | --------------------------------------- | ----------------------------------- |
 | SSH AAAA     | `<subdomain>`        | guest IPv6 (static, from `IPV6_PREFIX`) | worker `ensureAAAA` (existing path) |
-| Desktop AAAA | `<label>-vnc.<base>` | `EDGE_IPV6` (edge public IP)            | worker at provision                 |
-
-`EDGE_IPV6` is the Traefik edge host's public IPv6 — the address clients
-must hit to reach the edge. Evidence (2026-09-17):
-
-```text
-$ dig +short AAAA hhfrontdev.homehost.risktozero.sh @1.1.1.1
-2a11:6c7:f35:ea::ffff
-$ curl -6 -k -o /dev/null -w '%{http_code}\n' \
-    -H 'Host: hhfrontdev.homehost.risktozero.sh' 'https://[2a11:6c7:f35:ea::ffff]/'
-200
-```
-
-So on this host `EDGE_IPV6=2a11:6c7:f35:ea::ffff`. Empty `EDGE_IPV6` =
-log-skip the desktop AAAA write but still write the route file (dev/CGNAT
-hosts keep working locally; public URL just won't resolve).
+| Desktop A/AAAA | `*-vnc.<base>`     | edge host (`*.dev` + `*.homehost` wildcards) | one-time Cloudflare wildcard records |
+No per-VM desktop record is written at provision or deleted at teardown:
+the two `*.dev.homehost.risktozero.sh` records (A → edge v4, AAAA → edge
+host v6) plus `*.homehost.risktozero.sh` cover every current and future
+desktop hostname. `EDGE_IPV6` is retired (was the per-VM desktop target;
+removed from worker env + compose + `.env.dev`).
 
 ## Traefik route lifecycle (ratified with WorkerDesktop, 2026-09-17)
 
@@ -147,6 +137,15 @@ Custom-image spike path if bake-in is wanted later: launch
 `images:archlinux/cloud` VM → install Omarchy → `incus publish` to a local
 `omarchy-baked` image → point the plan at it. Not done in this slice.
 
+Bake status (2026-09-18): pure builders for the future bake exist behind
+the fail-closed gate — `omarchyPackages`, `omarchyRunCommands`, plus the
+`desktop.env` branch in `appendDesktopToUserData`
+(`apps/worker/src/desktop.ts`; Ubuntu cloud-init output byte-identical).
+The Omarchy installer itself is still interactive-only (boot.sh needs a
+TTY), so `index.ts` still refuses desktop-omarchy jobs. Flip = remove the
+gate + take the arch user-data path. KasmVNC AUR package name and build
+flags are unverified — see the `omarchyRunCommands` comments.
+
 ## GPU sharing limits (single GTX 1070)
 
 - Host PCI: `42:00.0 GP104 [10de:1b81]` + `42:00.1` audio — one card, PCI
@@ -183,10 +182,9 @@ addr` shows only `fe80::/64` link-local; direct-v6 SSH to provisioned
    one guest name resolve to `192.168.1.16` locally, while authoritative
    DNS (`@1.1.1.1`) says apex A `38.62.47.122`, no apex AAAA. Always probe
    DNS with `@1.1.1.1`/`@8.8.8.8`.
-4. **Apex has no public AAAA; per-name desktop AAAA required.** Wildcard
-   answers: `dig A nonexistent-xyz123 @1.1.1.1 → 38.62.47.122`,
-   `dig AAAA hhfrontdev @1.1.1.1 → 2a11:6c7:f35:ea::ffff`. Each
-   `<label>-vnc` AAAA → `EDGE_IPV6` must be created at provision (worker).
+4. **Desktop DNS is wildcard-only (2026-09-17).** `*.dev.homehost.risktozero.sh`
+  A → edge v4 + AAAA → edge host v6, plus `*.homehost.risktozero.sh`. No
+  per-VM desktop record is written (worker) or needed. `EDGE_IPV6` retired.
 5. **No host GPU driver.** `nvidia-smi` fails; single GTX 1070 is 1:1-only.
    No multi-tenant GPU story (see above).
 6. **`check.sh` 80/443 MISS is a false alarm on the edge host.** Traefik
