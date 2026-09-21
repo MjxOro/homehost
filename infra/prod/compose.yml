@@ -20,6 +20,8 @@ services:
     # traffic stays inside the compose network.
     ports:
       - "127.0.0.1:55434:5432"
+    volumes:
+      - homehost-prod-postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U homehost -d homehost"]
       interval: 10s
