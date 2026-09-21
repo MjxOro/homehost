@@ -14,3 +14,7 @@ playwright-report/
 test-results/
 # Worker-written per-desktop Traefik routes (one per VM, removed on teardown).
 infra/traefik/routes/gui-*.yml
+# Foreign site route (banff-trip project, served from disk) and case-study
+# notes containing live creds: never track either.
+infra/traefik/routes/banff.yml
+docs/gui-desktop-notes.md

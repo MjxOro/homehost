@@ -30,8 +30,8 @@ Read this before touching the repo. Violations get reverted.
 ## Workflow
 
 - One branch per change, cut from `main`. Micro-commits, one logical change each, imperative subject (`admin: ...`, `web: ...`, `infra: ...`).
-- Before push: `typecheck` 0, `build` green, relevant tests pass. Merge with `--ff-only`, push, delete the branch.
-- Never commit `.env`, `.env.dev`, `infra/private/`, or anything under `dist/` / `node_modules/` (all gitignored).
+- Before push: `typecheck` 0, `build` green, relevant tests pass, secret scan clean (`gitleaks detect --source . --log-opts='main...HEAD'`; one-time install to `~/.local/bin` from the gitleaks releases). Merge with `--ff-only`, push, delete the branch.
+- Never commit `.env`, `.env.dev`, `infra/private/`, live creds, or anything under `dist/` / `node_modules/` (all gitignored). Untracked (`??`) files are never swept in bulk — `git add` named paths only, and every `??` gets an explicit track-or-ignore decision before commit.
 - Never rewrite public history (`main`). Reflog-expiring purges only for secret removal, coordinated explicitly.
 
 ## Code conventions
