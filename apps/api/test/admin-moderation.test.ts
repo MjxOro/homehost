@@ -323,7 +323,7 @@ describe.skipIf(!databaseUrl)("admin user moderation", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: fixture.cookie },
-      payload: { name: `Provision ${fixture.id.slice(0, 8)}`, planId: "game-small" },
+      payload: { name: `Provision ${fixture.id.slice(0, 8)}`, planId: "container-small" },
     });
     expect(blocked.statusCode).toBe(403);
     expect(blocked.json().code).toBe("AccountPending");
@@ -338,7 +338,7 @@ describe.skipIf(!databaseUrl)("admin user moderation", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: fixture.cookie },
-      payload: { name: `Provision ${fixture.id.slice(0, 8)}`, planId: "game-small" },
+      payload: { name: `Provision ${fixture.id.slice(0, 8)}`, planId: "container-small" },
     });
     expect(created.statusCode).toBe(201);
   });
