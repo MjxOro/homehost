@@ -100,8 +100,10 @@ function clampPan(
 }
 
 export function DesktopLoginPage() {
+  // Opacity only: a transform on this ancestor would skew the canvas's
+  // pointer/pinch coordinate math while the entrance runs.
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-in">
       <DesktopCanvas />
     </div>
   );
