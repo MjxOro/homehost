@@ -19,6 +19,11 @@ test("all thirty tasks validate, ids are unique, and corpus covers requested var
   ).toBe(true);
 });
 test("three candidates validate and single-model is a true ablation", async () => {
+  expect((await loadCandidate("cheap")).models).toEqual({
+    plan: "openai/gpt-oss-120b",
+    fill: "google/gemini-2.5-flash-lite",
+    escalate: "qwen/qwen3-235b-a22b-2507",
+  });
   for (const id of ["cheap", "mid", "single-model"])
     expect((await loadCandidate(id)).id).toBe(id);
   expect(

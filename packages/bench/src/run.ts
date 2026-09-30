@@ -251,7 +251,9 @@ export async function runBench(
               llm,
               models: options.candidate.models,
               concurrency: options.candidate.concurrency,
-              onCall: (call) => observed.push(call),
+              onCall: (call) => {
+                observed.push(call);
+              },
             },
           );
         } catch (error) {

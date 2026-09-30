@@ -1,9 +1,9 @@
 {
   "id": "cheap",
   "models": {
-    "plan": "google/gemini-2.5-flash-lite",
-    "fill": "openai/gpt-oss-120b",
+    "plan": "openai/gpt-oss-120b",
+    "fill": "google/gemini-2.5-flash-lite",
     "escalate": "qwen/qwen3-235b-a22b-2507"
   },
-  "notes": "Cheapest plausible stack: small planner, open-weight filler, larger open-weight model only for retries."
+  "notes": "Smoke-compatible roles: GPT OSS plans, Gemini Flash Lite fills, Qwen retries. Gemini Flash Lite rejected the planner's structured-output request with HTTP 400; see README."
 }

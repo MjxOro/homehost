@@ -41,7 +41,7 @@ async function scripted(
     status: "ok",
     errorCode: null,
   };
-  opts.onCall?.(call);
+  await opts.onCall?.(call);
   if (brief.description.includes("fail"))
     return {
       ok: false,

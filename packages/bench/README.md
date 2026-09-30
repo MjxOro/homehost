@@ -6,6 +6,29 @@ The corpus contains 30 invented Canadian small-business briefs across more than
 12 niches, including terse/rambling copy, typos, French-Canadian names, no-phone
 and six-page cases. Model candidates are starting points, not recommendations.
 
+### Planner compatibility (2026-09-30)
+
+The original cheap stack used Gemini 2.5 Flash Lite to plan. A planner-only
+diagnostic on the updated generator returned Google HTTP 400 / `INVALID_ARGUMENT`.
+The redacted OpenRouter body included this provider error (no key/account IDs):
+
+```json
+{
+  "message": "The specified schema produces a constraint that has too many states for serving.",
+  "status": "INVALID_ARGUMENT"
+}
+```
+
+Google's longer explanation cites large text/enum names, nested array bounds and
+complex value matchers as typical causes. This is the planner's structured-output
+schema constraint budget, not an invalid customer brief or a missing API key.
+The diagnostic reported zero billed cost. The `cheap` candidate therefore uses
+`openai/gpt-oss-120b` for planning, `google/gemini-2.5-flash-lite` for page filling,
+and `qwen/qwen3-235b-a22b-2507` for escalation, as in the working generation smoke.
+Fill schemas are page-specific and smaller. This is an observed compatibility
+limit of this request/model/provider combination, not a claim that all Gemini
+structured-output requests fail. No generator code or schema is changed here.
+
 ## Run
 
 From the repository root, with `OPENROUTER_API_KEY` in the environment:
