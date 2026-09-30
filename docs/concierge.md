@@ -122,9 +122,10 @@ homehost does not persist request text: not in run metadata, activity events,
 the ledger, error values or logs. The text (and its translation) is processed
 by Jev and the translation model through OpenRouter and their providers; the
 translation call asks OpenRouter to route only to providers that do not
-collect data (`provider.data_collection: "deny"`); the alpha Jev decisions
-endpoint takes no such option, so its retention follows OpenRouter's and
-TypeSafe's own policies. Provider bodies, error
+collect data (`provider.data_collection: "deny"`). The alpha Jev decisions
+call sends no such option (support for it there is unverified), so its
+retention follows OpenRouter's and TypeSafe's own policies. Provider bodies,
+error
 causes and the key never reach responses or logs; the log line on a 502
 carries only our code (`http_<status>`, `timeout`, `network`, `bad_response`,
 `translation_incomplete`).
