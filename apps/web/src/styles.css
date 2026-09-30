@@ -243,3 +243,39 @@
     animation: none !important;
   }
 }
+
+/* App motion */
+/* Static placeholders avoid painting an endless shimmer. */
+.skeleton {
+  animation: none;
+}
+
+/* Spin the small wrapper on the compositor; pause outside the viewport. */
+.spinner {
+  animation: spin 0.9s linear infinite;
+  animation-play-state: paused;
+}
+
+.spinner[data-motion-visible] {
+  animation-play-state: running;
+}
+
+.spinner svg {
+  animation: none;
+}
+
+/* Delayed entrances and drawer visibility must resolve immediately. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-up,
+  .animate-scale-in,
+  dialog::backdrop,
+  .spinner {
+    animation: none !important;
+  }
+
+  #primary-navigation,
+  .app-nav-scrim {
+    transition-delay: 0s !important;
+  }
+}
