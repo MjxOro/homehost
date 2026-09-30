@@ -97,6 +97,24 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
     return workerFunction("releaseIpv6", { sql: client })(requestId);
   }
 
+  function reconcileIpv6Assignments(): Promise<number> {
+    return workerFunction("reconcileIpv6Assignments", { sql: client })();
+  }
+
+  // The real IncusError (one class, so instanceof holds), so not-found matching
+  // runs on the shape the worker sees.
+  let incusErrorClass:
+    (new (a: string[], c: number, o: string) => Error) | undefined;
+  function incusErrorCtor() {
+    incusErrorClass ??= workerFunction("IncusError", {
+      redactArgs: workerFunction("redactArgs", {}),
+    });
+    return incusErrorClass!;
+  }
+  function incusError(output: string): Error {
+    return new (incusErrorCtor())(["delete", "x"], 1, output);
+  }
+
   async function teardown(
     owner: Awaited<ReturnType<typeof fixture>>,
     mode = "success",
@@ -106,27 +124,43 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
     const events: string[] = [];
     const instanceName = `req-${owner.requestId}`;
     const handler = workerFunction("handleTeardown", {
-      loadRequest: async () => ({
-        id: owner.requestId,
-        instanceName: noName ? null : instanceName,
-        subdomain: owner.subdomain,
-        planId: "game-small",
-      }),
+      loadRequest: async () =>
+        mode === "purged"
+          ? null
+          : {
+              id: owner.requestId,
+              instanceName: noName ? null : instanceName,
+              subdomain: owner.subdomain,
+              planId: "game-small",
+            },
       instanceNameOf: () => instanceName,
       projectForReq: () => "fixture-project",
+      isIncusNotFound: workerFunction("isIncusNotFound", {
+        IncusError: incusErrorCtor(),
+      }),
       incus: async (args: string[]) => {
         events.push(args[0]!);
         expect(args[1]).toBe(instanceName);
-        if (args[0] === "delete" && mode.startsWith("incus"))
+        if (args[0] === "delete" && mode === "instance-not-found")
+          throw incusError("Error: Instance not found");
+        if (
+          args[0] === "delete" &&
+          (mode.startsWith("incus") || mode.startsWith("list-"))
+        )
           throw new Error("delete unavailable");
         if (args[0] === "list" && mode === "incus-list-fails")
           throw new Error("list unavailable");
+        if (args[0] === "list" && mode === "list-project-not-found")
+          throw incusError("Error: Project not found");
+        if (args[0] === "list" && mode === "list-daemon-down")
+          throw incusError("Error: cannot connect to daemon");
         return mode === "incus-still-present" ? instanceName : "";
       },
       cfToken: true,
       deleteAAAA: async () => {
         events.push("dns");
-        expect((await lookup())[0]?.releasedAt).toBeNull();
+        // The instance is already gone, so history must be closed before DNS.
+        expect((await lookup())[0]?.releasedAt).not.toBeNull();
         if (mode === "dns-fails") throw new Error("DNS unavailable");
       },
       PLANS: [],
@@ -180,16 +214,24 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
     workerFunctions = {};
     for (const node of ast.statements) {
       if (
-        ts.isFunctionDeclaration(node) &&
+        (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
         node.name &&
-        ["setIpv6", "releaseIpv6", "handleTeardown"].includes(node.name.text)
+        [
+          "setIpv6",
+          "releaseIpv6",
+          "reconcileIpv6Assignments",
+          "handleTeardown",
+          "isIncusNotFound",
+          "IncusError",
+          "redactArgs",
+        ].includes(node.name.text)
       ) {
         workerFunctions[node.name.text] = new Bun.Transpiler({
           loader: "ts",
         }).transformSync(node.getText(ast));
       }
     }
-    expect(Object.keys(workerFunctions)).toHaveLength(3);
+    expect(Object.keys(workerFunctions)).toHaveLength(7);
     app = buildApp({ db: drizzle(client, { schema }) });
     [operator, member] = await Promise.all([login("operator"), login("alice")]);
   });
@@ -487,10 +529,10 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
     );
   });
 
-  test("worker teardown closes only after Incus/DNS success and release is idempotent", async () => {
+  test("worker teardown closes once the instance is gone, before DNS, and release is idempotent", async () => {
     const owner = await fixture();
     await setIpv6(owner.requestId);
-    expect(await teardown(owner)).toEqual(["delete", "dns", "release", "done"]);
+    expect(await teardown(owner)).toEqual(["delete", "release", "dns", "done"]);
     const releasedAt = (await lookup())[0]?.releasedAt;
     await releaseIpv6(owner.requestId);
     expect((await lookup())[0]?.releasedAt).toEqual(releasedAt);
@@ -499,21 +541,33 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
     expect((await lookup())[0]?.releasedAt).toBeNull();
   });
 
-  test("worker retries Incus, verification, DNS and ledger failures without releasing history", async () => {
+  test("worker retries Incus, verification and ledger failures without releasing history", async () => {
     const owner = await fixture();
     await setIpv6(owner.requestId);
     for (const mode of [
       "incus-still-present",
       "incus-list-fails",
-      "dns-fails",
+      "list-daemon-down",
       "ledger-fails",
     ]) {
       const events = await teardown(owner, mode);
       expect(events.at(-1)).toBe("retry");
       expect((await lookup())[0]?.releasedAt).toBeNull();
     }
+  });
+
+  test("failing DNS delete after the instance is gone still leaves the assignment closed", async () => {
+    const owner = await fixture();
+    await setIpv6(owner.requestId);
+    expect(await teardown(owner, "dns-fails")).toEqual([
+      "delete",
+      "release",
+      "dns",
+      "retry",
+    ]);
+    expect((await lookup())[0]?.releasedAt).not.toBeNull();
     expect((await teardown(owner, "dns-fails", 25)).at(-1)).toBe("failed");
-    expect((await lookup())[0]?.releasedAt).toBeNull();
+    expect((await lookup())[0]?.releasedAt).not.toBeNull();
   });
 
   test("worker verifies already-gone instances and derives a missing instance name", async () => {
@@ -522,9 +576,68 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
     expect(await teardown(owner, "incus-already-gone", 1, true)).toEqual([
       "delete",
       "list",
-      "dns",
       "release",
+      "dns",
       "done",
     ]);
+  });
+
+  test("Incus not-found on delete or list counts as gone", async () => {
+    const deleteMissing = await fixture();
+    await setIpv6(deleteMissing.requestId);
+    expect(await teardown(deleteMissing, "instance-not-found")).toEqual([
+      "delete",
+      "release",
+      "dns",
+      "done",
+    ]);
+    const projectMissing = await fixture();
+    await setIpv6(projectMissing.requestId, "2001:db8:abcd::b");
+    expect(await teardown(projectMissing, "list-project-not-found")).toEqual([
+      "delete",
+      "list",
+      "release",
+      "dns",
+      "done",
+    ]);
+  });
+
+  test("teardown of a purged request releases its assignment", async () => {
+    const owner = await fixture();
+    await setIpv6(owner.requestId);
+    expect(await teardown(owner, "purged")).toEqual(["release", "done"]);
+    expect((await lookup())[0]?.releasedAt).not.toBeNull();
+  });
+
+  test("reconcile inserts missing open assignments once and is idempotent", async () => {
+    const live = await fixture("running", address);
+    const parked = await fixture("approved", "2001:db8:abcd::d");
+    const covered = await fixture("running", "2001:db8:abcd::e");
+    await assign(covered, start, null, "2001:db8:abcd::e");
+    const holder = await fixture("running");
+    await assign(holder, start, null, "2001:db8:abcd::f");
+    await fixture("running", "2001:db8:abcd::f");
+    await fixture("deleted", "2001:db8:abcd::b");
+    await fixture("rejected", "2001:db8:abcd::c");
+    await fixture("running");
+    await fixture("running", "not-an-ip");
+    expect(await reconcileIpv6Assignments()).toBe(2);
+    expect(await reconcileIpv6Assignments()).toBe(0);
+    const rows =
+      await client`SELECT request_id, owner_email, assigned_at, released_at
+      FROM ip_assignments ORDER BY assigned_at, request_id`;
+    expect(rows).toHaveLength(4);
+    const inserted = rows.find((row) => row.request_id === live.requestId)!;
+    expect(inserted.owner_email).toBe(live.ownerEmail);
+    expect(new Date(inserted.assigned_at).toISOString()).toBe(start);
+    expect(inserted.released_at).toBeNull();
+    expect(rows.some((row) => row.request_id === parked.requestId)).toBe(true);
+  });
+
+  test("backfill skips malformed ipv6 text instead of aborting the migration", async () => {
+    await fixture("running", "not-an-ip");
+    await fixture("running", "2001:db8:abcd::a/64");
+    await client.unsafe(migration);
+    expect(await client`SELECT id FROM ip_assignments`).toHaveLength(0);
   });
 });
