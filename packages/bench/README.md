@@ -36,6 +36,9 @@ client and needs no key. Unit tests use scripted clients and never contact model
 - Full response caches preserve provider, model, tokens, integer micro-dollar
   cost and original latency. Replay matches results and original model-call
   metrics; elapsed wall time and spent-this-run deliberately differ.
+  Provider errors also preserve their redacted message, error code and telemetry:
+  changing a failure message would change the pipeline's escalation request hash.
+  Old response-only caches cannot reproduce previously unrecorded provider errors.
 - Wrap live calls below the cache in the shared spend guard. No new live call
   starts once known billed spend reaches the cap. The last call and calls already
   in flight can overshoot: unknown future provider cost cannot be reserved exactly.

@@ -8,3 +8,7 @@ export {
   generateSite,
   hashLlmRequest,
 } from "@homehost/sites";
+
+// Preserve the shipped error class when replaying provider failures. It is not
+// yet exported from the package root; keep this internal import centralized.
+export { LlmClientError } from "@homehost/sites/src/generate/openrouter";

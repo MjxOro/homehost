@@ -8,7 +8,7 @@ import type {
   LlmCallRecord,
   LlmRequest,
 } from "@homehost/sites";
-import { hashLlmRequest, PROMPT_VERSION } from "./pipeline";
+import { hashLlmRequest, PROMPT_VERSION, LlmClientError } from "./pipeline";
 import { runBench } from "./run";
 import { compareRuns, readRun } from "./report";
 import {
@@ -59,6 +59,89 @@ async function scripted(
   return { ok: true, spec, calls: [call], escalated: false, warnings: [] };
 }
 const git = async () => ({ sha: "pinned-test-sha", dirty: true });
+
+test("the shipped generator reproduces provider-failure escalation and parallel calls offline", async () => {
+  const temp = await temporary();
+  try {
+    const options = {
+      candidate,
+      tasks: [{ ...task, expect: {} }],
+      repeats: 1,
+      cache: "record" as const,
+      outputRoot: temp.dir,
+      cacheDir: join(temp.dir, "cache"),
+    };
+    const live = await runBench(options, {
+      git,
+      llm: {
+        complete: async (req) => {
+          if (req.model === candidate.models.plan)
+            throw new LlmClientError(
+              "Scripted planner rejects schema",
+              "http_400",
+            );
+          const content =
+            req.model === candidate.models.escalate
+              ? {
+                  theme: { preset: "ocean", fonts: "modern" },
+                  tagline: "Local repairs",
+                  pages: ["", "contact"].map((slug) => ({
+                    slug,
+                    title: slug || "Home",
+                    purpose: "Describe services",
+                    sectionTypes: ["hero.centered"],
+                  })),
+                }
+              : {
+                  title: "Local repairs",
+                  description: "Clear written estimates",
+                  sections: [
+                    {
+                      type: "hero.centered",
+                      heading: "Local repairs",
+                      text: "We repair household plumbing.",
+                    },
+                  ],
+                };
+          return {
+            ...response(),
+            model: req.model,
+            content: JSON.stringify(content),
+          };
+        },
+      },
+    });
+    expect(live.results[0]?.ok).toBe(true);
+    expect(live.results[0]?.calls).toHaveLength(4);
+    const replay = await runBench(
+      { ...options, cache: "replay" },
+      {
+        git,
+        llm: {
+          complete: async () => {
+            throw new Error("No network");
+          },
+        },
+      },
+    );
+    const comparable = (r: (typeof live.results)[number]) => ({
+      ...r,
+      latencyMs: 0,
+      spentMicroUsd: "0",
+      calls: r.calls.map(({ cacheStatus, ...c }) => c),
+    });
+    expect(replay.results.map(comparable)).toEqual(
+      live.results.map(comparable),
+    );
+    expect(replay.manifest.spentMicroUsd).toBe("0");
+    expect(replay.manifest.stopped).toBeNull();
+    expect(replay.results[0]?.calls.every((c) => c.cacheStatus === "hit")).toBe(
+      true,
+    );
+  } finally {
+    await temp.cleanup();
+  }
+});
 
 test("record cache hits run at zero cap and billed answers count even when cache storage fails", async () => {
   const temp = await temporary();

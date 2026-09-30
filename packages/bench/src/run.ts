@@ -227,6 +227,9 @@ export async function runBench(
               status = response.cacheStatus;
               return response;
             } catch (error) {
+              const source = (error as { cacheStatus?: "hit" | "live" })
+                ?.cacheStatus;
+              if (source === "hit" || source === "live") status = source;
               if (
                 error instanceof SpendCapExceeded ||
                 error instanceof CacheMiss
@@ -275,11 +278,19 @@ export async function runBench(
           result.ok ? result.spec : undefined,
           files,
         );
-        const calls = result.calls.map((call) => ({
-          ...call,
-          costMicroUsd: call.costMicroUsd.toString(),
-          cacheStatus: responses.get(call.promptHash)?.shift() ?? "error",
-        }));
+        const calls = result.calls
+          .map((call) => ({
+            ...call,
+            costMicroUsd: call.costMicroUsd.toString(),
+            cacheStatus: responses.get(call.promptHash)?.shift() ?? "error",
+          }))
+          .sort((a, b) => {
+            const stage = { plan: 0, fill: 1, escalate: 2 };
+            return (
+              stage[a.stage] - stage[b.stage] ||
+              a.promptHash.localeCompare(b.promptHash)
+            );
+          });
         const row: ResultRow = {
           taskId: job.task.id,
           repeat: job.repeat,

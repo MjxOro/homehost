@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { withCache, CacheMiss, type CachedResponse } from "./cache";
-import { hashLlmRequest } from "./pipeline";
+import { hashLlmRequest, LlmClientError } from "./pipeline";
 import { request, response, temporary } from "./fixtures.test-helper";
 
 test("record/replay round-trips full response, bigint and original latency without network", async () => {
@@ -80,6 +80,61 @@ test("live bypasses disk; corrupted or wrong-key cache cannot silently replay", 
     await expect(
       withCache(client, { dir: temp.dir, mode: "replay" }).complete(request),
     ).rejects.toThrow("key mismatch");
+  } finally {
+    await temp.cleanup();
+  }
+});
+
+test("provider errors replay exact class, message, code, usage and original latency", async () => {
+  const temp = await temporary();
+  try {
+    for (const billed of [false, true]) {
+      const req = {
+        ...request,
+        model: billed ? "test/billed" : "test/rejected",
+      };
+      const known = billed ? response(15n) : undefined;
+      const client = withCache(
+        {
+          complete: async () => {
+            throw new LlmClientError(
+              "Scripted provider rejected schema",
+              "http_400",
+              known,
+            );
+          },
+        },
+        { dir: temp.dir, mode: "record" },
+      );
+      let recorded: LlmClientError | undefined;
+      try {
+        await client.complete(req);
+      } catch (error) {
+        recorded = error as LlmClientError;
+      }
+      expect(recorded).toBeInstanceOf(LlmClientError);
+      const replay = withCache(
+        {
+          complete: async () => {
+            throw new Error("No network");
+          },
+        },
+        { dir: temp.dir, mode: "replay" },
+      );
+      let replayed: LlmClientError | undefined;
+      try {
+        await replay.complete(req);
+      } catch (error) {
+        replayed = error as LlmClientError;
+      }
+      expect(replayed).toBeInstanceOf(LlmClientError);
+      expect(replayed?.message).toBe(recorded?.message);
+      expect(replayed?.code).toBe(recorded?.code);
+      expect(replayed?.response).toEqual(recorded?.response);
+      expect((replayed as unknown as { cacheStatus: string }).cacheStatus).toBe(
+        "hit",
+      );
+    }
   } finally {
     await temp.cleanup();
   }
