@@ -174,7 +174,7 @@ function SuccessPanel({ request }: { request: ServerRequest }) {
 
   return (
     <div
-      className="animate-fade-in min-h-[1100px] @min-[500px]:min-h-[800px] @min-[750px]:min-h-[700px] @min-[900px]:min-h-[600px] flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center"
+      className="animate-fade-in lg:min-h-[1100px] lg:@min-[500px]:min-h-[800px] lg:@min-[750px]:min-h-[700px] lg:@min-[900px]:min-h-[600px] flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center"
       role="status"
     >
       <h2 className="text-[18px] font-bold" tabIndex={-1} ref={headingRef}>
@@ -218,7 +218,7 @@ function RequestForm({ user }: { user: PortalUser }) {
   if (plansQuery.isPending) {
     return (
       <div
-        className="min-h-[1100px] @min-[500px]:min-h-[800px] @min-[750px]:min-h-[700px] @min-[900px]:min-h-[600px] flex flex-col gap-5"
+        className="lg:min-h-[1100px] lg:@min-[500px]:min-h-[800px] lg:@min-[750px]:min-h-[700px] lg:@min-[900px]:min-h-[600px] flex flex-col gap-5"
         aria-hidden="true"
       >
         <div className="skeleton skeleton-line w-56" />
@@ -255,7 +255,7 @@ function RequestForm({ user }: { user: PortalUser }) {
 
   return (
     <form
-      className="animate-fade-in min-h-[1100px] @min-[500px]:min-h-[800px] @min-[750px]:min-h-[700px] @min-[900px]:min-h-[600px] flex flex-col gap-[18px]"
+      className="animate-fade-in lg:min-h-[1100px] lg:@min-[500px]:min-h-[800px] lg:@min-[750px]:min-h-[700px] lg:@min-[900px]:min-h-[600px] flex flex-col gap-[18px]"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();

@@ -115,12 +115,12 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
 
   return (
     <>
-      <div className="relative overflow-x-auto">
-        <table className="w-full border-collapse text-left text-[14px]">
+      <div className="relative lg:overflow-x-auto">
+        <table className="block w-full border-collapse text-left text-[14px] lg:table">
           <caption className="sr-only">
             User accounts pending operator review
           </caption>
-          <thead>
+          <thead className="sr-only lg:not-sr-only lg:table-header-group">
             <tr className="border-b border-line text-[12.5px] uppercase tracking-[0.04em] text-text-3">
               <th scope="col" className="px-2 py-2.5 pr-3 font-semibold">
                 User
@@ -139,14 +139,14 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line">
+          <tbody className="block divide-y divide-line lg:table-row-group">
             {visible.map((user) => (
               <tr
                 key={user.id}
-                className={`${entrance(user.id).className} align-top`}
+                className={`${entrance(user.id).className} grid grid-cols-2 align-top lg:table-row`}
                 style={entrance(user.id).style}
               >
-                <td className="min-w-0 px-2 py-3 pr-3">
+                <td className="col-span-2 block min-w-0 px-2 py-3 pr-3 lg:table-cell">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span
                       className="font-[650] text-text-1 [overflow-wrap:anywhere]"
@@ -159,13 +159,31 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
                     </span>
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-2 py-3">
+                <td className="block min-w-0 px-2 py-3 lg:table-cell lg:whitespace-nowrap">
+                  <span
+                    aria-hidden="true"
+                    className="mb-1 block text-[12px] text-text-3 lg:hidden"
+                  >
+                    Status
+                  </span>
                   <AccountStatusPill status={user.accountStatus} />
                 </td>
-                <td className="whitespace-nowrap px-2 py-3">
+                <td className="block min-w-0 px-2 py-3 lg:table-cell lg:whitespace-nowrap">
+                  <span
+                    aria-hidden="true"
+                    className="mb-1 block text-[12px] text-text-3 lg:hidden"
+                  >
+                    Technical
+                  </span>
                   <TechnicalBadge level={user.technicalLevel} />
                 </td>
-                <td className="whitespace-nowrap px-2 py-3 text-[13px] text-text-2">
+                <td className="col-span-2 block min-w-0 px-2 py-3 text-[13px] text-text-2 lg:table-cell lg:whitespace-nowrap">
+                  <span
+                    aria-hidden="true"
+                    className="mb-1 block text-[12px] text-text-3 lg:hidden"
+                  >
+                    Reviewed
+                  </span>
                   {(user.reviewedBy ?? user.reviewedAt) ? (
                     <span className="flex flex-col gap-0.5">
                       {user.reviewedBy ? (
@@ -184,7 +202,7 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
                     <span className="text-text-3">Not reviewed</span>
                   )}
                 </td>
-                <td className="px-2 py-3 pl-3">
+                <td className="col-span-2 block min-w-0 px-2 py-3 pl-3 lg:table-cell">
                   <div className="flex flex-wrap gap-2">
                     {user.accountStatus === "pending" ? (
                       <button
@@ -250,7 +268,7 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
           <p className="text-[13px] text-text-2" role="status">
             Page {safePage + 1} of {pageCount}
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               className={BUTTON_OUTLINE_SM}
