@@ -39,5 +39,5 @@ SELECT r.id, r.owner_id, COALESCE(u.name, r.owner_name), u.email,
        CASE WHEN r.status = 'deleted' THEN r.updated_at ELSE NULL END
 FROM server_requests r
 LEFT JOIN users u ON u.id = r.owner_id
-WHERE r.ipv6 IS NOT NULL AND r.status <> 'rejected'
+WHERE r.ipv6 IS NOT NULL AND r.ipv6 ~ '^[0-9a-fA-F:]+$' AND r.status <> 'rejected'
   AND NOT EXISTS (SELECT 1 FROM ip_assignments a WHERE a.request_id = r.id);
