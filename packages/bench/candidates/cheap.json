@@ -1,0 +1,9 @@
+{
+  "id": "cheap",
+  "models": {
+    "plan": "google/gemini-2.5-flash-lite",
+    "fill": "openai/gpt-oss-120b",
+    "escalate": "qwen/qwen3-235b-a22b-2507"
+  },
+  "notes": "Cheapest plausible stack: small planner, open-weight filler, larger open-weight model only for retries."
+}

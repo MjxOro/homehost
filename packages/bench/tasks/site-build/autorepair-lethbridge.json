@@ -1,0 +1,41 @@
+{
+  "id": "autorepair-lethbridge",
+  "suite": "site-build",
+  "tags": [
+    "auto-repair",
+    "diesel",
+    "terse",
+    "hours",
+    "address",
+    "no-email"
+  ],
+  "brief": {
+    "businessName": "Coulee Auto & Diesel",
+    "niche": "Auto and light-diesel repair",
+    "description": "Gas and diesel trucks, fleet maintenance, AC repair, windshield chip repair. Family owned. Walk-ins for oil changes.",
+    "city": "Lethbridge",
+    "phone": "403-555-0158",
+    "address": {
+      "street": "312 32 Street North",
+      "city": "Lethbridge",
+      "region": "AB",
+      "postalCode": "T1H 5J9",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu",
+          "fri"
+        ],
+        "opens": "08:00",
+        "closes": "17:30"
+      }
+    ],
+    "tone": "no-nonsense"
+  },
+  "expect": {}
+}

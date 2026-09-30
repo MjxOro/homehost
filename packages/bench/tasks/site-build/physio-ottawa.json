@@ -1,0 +1,54 @@
+{
+  "id": "physio-ottawa",
+  "suite": "site-build",
+  "tags": [
+    "clinic",
+    "physio",
+    "hours",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Rideau Physiotherapy & Sport Clinic",
+    "niche": "Physiotherapy clinic",
+    "description": "Registered physiotherapists treating sports injuries, back and neck pain, post-surgical rehab and concussion recovery. Direct billing to most extended health plans, and no doctor's referral is needed to book. Initial assessments are 60 minutes.",
+    "city": "Ottawa",
+    "phone": "+1 613 555 0171",
+    "email": "reception@rideauphysio.ca",
+    "address": {
+      "street": "270 Elgin Street",
+      "city": "Ottawa",
+      "region": "ON",
+      "postalCode": "K2P 1M4",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu"
+        ],
+        "opens": "07:30",
+        "closes": "20:00"
+      },
+      {
+        "days": [
+          "fri"
+        ],
+        "opens": "07:30",
+        "closes": "16:00"
+      }
+    ],
+    "tone": "professional and reassuring"
+  },
+  "expect": {
+    "requiredFacts": [
+      "60 minutes"
+    ],
+    "forbidden": [
+      "cure",
+      "guarantee"
+    ]
+  }
+}

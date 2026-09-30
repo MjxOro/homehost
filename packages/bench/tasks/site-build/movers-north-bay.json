@@ -1,0 +1,45 @@
+{
+  "id": "movers-north-bay",
+  "suite": "site-build",
+  "tags": [
+    "movers",
+    "rambling",
+    "hours",
+    "no-address"
+  ],
+  "brief": {
+    "businessName": "Nipissing Movers",
+    "niche": "Local moving company",
+    "description": "Two-man and three-man crews with a 26-foot truck for local moves in North Bay, Callander and Corbeil. We wrap furniture, disassemble beds, and carry insurance on the contents up to $50,000. We also do piano moves and storage-unit loads. Hourly rate with a three-hour minimum, and the clock starts when we arrive, not when we leave the yard. Book at least a week ahead in summer since students and new hires fill the calendar.",
+    "city": "North Bay",
+    "phone": "(705) 555-0129",
+    "email": "moves@nipissingmovers.ca",
+    "serviceArea": [
+      "North Bay",
+      "Callander",
+      "Corbeil"
+    ],
+    "hours": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu",
+          "fri",
+          "sat"
+        ],
+        "opens": "07:00",
+        "closes": "19:00"
+      }
+    ]
+  },
+  "expect": {
+    "requiredFacts": [
+      "piano"
+    ],
+    "forbidden": [
+      "fixed price"
+    ]
+  }
+}

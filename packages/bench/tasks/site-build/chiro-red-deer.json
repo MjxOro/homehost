@@ -1,0 +1,26 @@
+{
+  "id": "chiro-red-deer",
+  "suite": "site-build",
+  "tags": [
+    "clinic",
+    "chiropractic",
+    "typos",
+    "no-address"
+  ],
+  "brief": {
+    "businessName": "Red Deer Family Chiropractic",
+    "niche": "Chiropractor",
+    "description": "Dr. Amanda Pruitt has been helping Red Deer families with back pain, neck pain and headaches for over 12 years. We do adjustments, acupuncture and custom orthotics. First visit includes an exam and xrays if needed. We recieve alot of referals from local doctors and we direct bill most insurers.",
+    "city": "Red Deer",
+    "phone": "(403) 555-0122",
+    "email": "office@rdfamilychiro.ca"
+  },
+  "expect": {
+    "requiredFacts": [
+      "Dr. Amanda Pruitt"
+    ],
+    "forbidden": [
+      "cure"
+    ]
+  }
+}

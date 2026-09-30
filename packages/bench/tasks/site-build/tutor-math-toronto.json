@@ -1,0 +1,51 @@
+{
+  "id": "tutor-math-toronto",
+  "suite": "site-build",
+  "tags": [
+    "tutor",
+    "math",
+    "rambling",
+    "hours"
+  ],
+  "brief": {
+    "businessName": "Sharma Math Tutoring",
+    "niche": "Math tutoring",
+    "description": "I'm a retired high-school math teacher (32 years, most of them in the TDSB) and I tutor Grade 7 to 12 math one-on-one, either in my home in the Beaches or online. Lots of my students are stuck on functions, or on fractions if they're younger, and mostly need someone to slow down and explain it a different way. I also do EQAO and university-entrance prep. Sessions are 60 minutes, $70 per session, and I send a short summary to parents after each one.",
+    "city": "Toronto",
+    "phone": "(416) 555-0163",
+    "email": "priya@sharmamathtutoring.ca",
+    "serviceArea": [
+      "The Beaches",
+      "East York",
+      "Online"
+    ],
+    "hours": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu"
+        ],
+        "opens": "15:30",
+        "closes": "20:00"
+      },
+      {
+        "days": [
+          "sat"
+        ],
+        "opens": "09:00",
+        "closes": "14:00"
+      }
+    ],
+    "tone": "patient and encouraging"
+  },
+  "expect": {
+    "requiredFacts": [
+      "$70"
+    ],
+    "forbidden": [
+      "guarantee"
+    ]
+  }
+}

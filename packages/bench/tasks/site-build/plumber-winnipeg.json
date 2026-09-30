@@ -1,0 +1,67 @@
+{
+  "id": "plumber-winnipeg",
+  "suite": "site-build",
+  "tags": [
+    "trades",
+    "plumbing",
+    "rambling",
+    "hours",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Northgate Plumbing & Drains",
+    "niche": "Plumbing and drain cleaning",
+    "description": "We're a two-truck plumbing outfit that my brother and I started after ten years working for the big companies. Most of our calls are drain clearing, hot water tank swaps and fixing frozen pipes in winter (this is Winnipeg after all). We show up in the window we give you, we quote before we start, and we clean up after ourselves. Camera drain inspections are $149 and we credit that toward the repair if you go ahead. Emergency calls after hours cost extra, but we do pick up.",
+    "city": "Winnipeg",
+    "phone": "(204) 555-0138",
+    "email": "service@northgatedrains.ca",
+    "address": {
+      "street": "412 Selkirk Avenue",
+      "city": "Winnipeg",
+      "region": "MB",
+      "postalCode": "R2W 2M4",
+      "country": "Canada"
+    },
+    "serviceArea": [
+      "Winnipeg",
+      "St. Vital",
+      "Transcona",
+      "West Kildonan"
+    ],
+    "hours": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu",
+          "fri"
+        ],
+        "opens": "07:30",
+        "closes": "17:00"
+      },
+      {
+        "days": [
+          "sat"
+        ],
+        "opens": "09:00",
+        "closes": "13:00"
+      }
+    ],
+    "pagesWanted": [
+      "Services",
+      "About"
+    ],
+    "tone": "friendly and straightforward"
+  },
+  "expect": {
+    "requiredFacts": [
+      "$149"
+    ],
+    "forbidden": [
+      "24/7",
+      "award-winning"
+    ],
+    "minPages": 2
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "autorepair-brampton",
+  "suite": "site-build",
+  "tags": [
+    "auto-repair",
+    "hours",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Torbram Auto Service",
+    "niche": "Auto repair shop",
+    "description": "Independent shop doing brakes, oil changes, suspension, diagnostics, safety inspections and seasonal tire changes. Ontario safety certificates $89. We service all makes and give you a written estimate before any work starts, and old parts are returned on request.",
+    "city": "Brampton",
+    "phone": "905-555-0193",
+    "email": "service@torbramauto.ca",
+    "address": {
+      "street": "27 Torbram Road",
+      "city": "Brampton",
+      "region": "ON",
+      "postalCode": "L6T 1C4",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu",
+          "fri"
+        ],
+        "opens": "07:30",
+        "closes": "18:00"
+      },
+      {
+        "days": [
+          "sat"
+        ],
+        "opens": "08:00",
+        "closes": "14:00"
+      }
+    ]
+  },
+  "expect": {
+    "requiredFacts": [
+      "$89"
+    ],
+    "forbidden": [
+      "lifetime warranty"
+    ]
+  }
+}

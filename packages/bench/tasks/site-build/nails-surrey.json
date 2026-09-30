@@ -1,0 +1,30 @@
+{
+  "id": "nails-surrey",
+  "suite": "site-build",
+  "tags": [
+    "salon",
+    "nails",
+    "typos",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Lotus Nail Bar",
+    "niche": "Nail salon",
+    "description": "We offer manicures, pedicures, gel and acrylics, and nail art. All our tools are sterlized between every client and we use non-toxic polish. Walk ins are welcome but we recomend booking on weekends because we get very busy. We speak English, Punjabi and Hindi.",
+    "city": "Surrey",
+    "phone": "778-555-0193",
+    "email": "book@lotusnailbar.ca",
+    "address": {
+      "street": "13750 88 Avenue",
+      "city": "Surrey",
+      "region": "BC",
+      "postalCode": "V3W 3L1",
+      "country": "Canada"
+    }
+  },
+  "expect": {
+    "requiredFacts": [
+      "Punjabi"
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "locksmith-windsor",
+  "suite": "site-build",
+  "tags": [
+    "locksmith",
+    "mobile",
+    "no-address"
+  ],
+  "brief": {
+    "businessName": "Riverside Lock & Key",
+    "niche": "Locksmith",
+    "description": "Residential and automotive locksmith. Lockouts, rekeying, deadbolt installs, smart lock setup and car key replacement including transponder keys. Mobile service across Windsor-Essex. We quote you a price on the phone before we drive out, and there is no extra charge for late-night calls.",
+    "city": "Windsor",
+    "phone": "519-555-0108",
+    "email": "help@riversidelockkey.ca",
+    "serviceArea": [
+      "Windsor",
+      "Tecumseh",
+      "LaSalle"
+    ]
+  },
+  "expect": {
+    "requiredFacts": [
+      "transponder"
+    ],
+    "forbidden": [
+      "24/7"
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "groomer-guelph",
+  "suite": "site-build",
+  "tags": [
+    "pet-groomer",
+    "hours",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Wag & Wash Pet Grooming",
+    "niche": "Dog and cat grooming",
+    "description": "Full-service grooming for dogs and cats: baths, haircuts, nail trims, de-shedding and teeth brushing. Fear-free handling and one dog at a time, so no cages and no stressed pups. A puppy's first groom is discounted. Vaccination records are required.",
+    "city": "Guelph",
+    "phone": "(519) 555-0175",
+    "email": "book@wagandwash.ca",
+    "address": {
+      "street": "88 Woolwich Street",
+      "city": "Guelph",
+      "region": "ON",
+      "postalCode": "N1H 3V4",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": [
+          "tue",
+          "wed",
+          "thu",
+          "fri",
+          "sat"
+        ],
+        "opens": "09:00",
+        "closes": "17:00"
+      }
+    ],
+    "tone": "caring"
+  },
+  "expect": {
+    "requiredFacts": [
+      "nail trim"
+    ],
+    "forbidden": [
+      "sedation"
+    ]
+  }
+}

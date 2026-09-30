@@ -1,0 +1,54 @@
+{
+  "id": "cafe-nanaimo",
+  "suite": "site-build",
+  "tags": [
+    "cafe",
+    "hours",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Tidewater Coffee Co.",
+    "niche": "Specialty coffee shop",
+    "description": "We roast our own coffee in the back of the shop and pour it out front. Espresso, pour-over, cold brew, and a short menu of toasties and pastries from a local baker. Dogs welcome on the patio. Free wifi and plenty of outlets for people working remotely.",
+    "city": "Nanaimo",
+    "phone": "(250) 555-0175",
+    "email": "hello@tidewatercoffee.ca",
+    "address": {
+      "street": "34 Commercial Street",
+      "city": "Nanaimo",
+      "region": "BC",
+      "postalCode": "V9R 5G6",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu",
+          "fri"
+        ],
+        "opens": "06:30",
+        "closes": "16:00"
+      },
+      {
+        "days": [
+          "sat",
+          "sun"
+        ],
+        "opens": "07:30",
+        "closes": "16:00"
+      }
+    ],
+    "tone": "relaxed"
+  },
+  "expect": {
+    "requiredFacts": [
+      "cold brew"
+    ],
+    "forbidden": [
+      "award-winning"
+    ]
+  }
+}

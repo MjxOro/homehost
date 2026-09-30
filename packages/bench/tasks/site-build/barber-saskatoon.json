@@ -1,0 +1,43 @@
+{
+  "id": "barber-saskatoon",
+  "suite": "site-build",
+  "tags": [
+    "salon",
+    "barber",
+    "hours",
+    "address",
+    "no-email"
+  ],
+  "brief": {
+    "businessName": "Prairie Fade Barbershop",
+    "niche": "Barbershop",
+    "description": "Classic cuts, skin fades, beard trims and hot towel shaves. Walk-ins welcome, appointments if you want a guaranteed time. Cuts are $35, beard trims $20.",
+    "city": "Saskatoon",
+    "phone": "(306) 555-0127",
+    "address": {
+      "street": "715 Broadway Avenue",
+      "city": "Saskatoon",
+      "region": "SK",
+      "postalCode": "S7N 1B1",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": [
+          "tue",
+          "wed",
+          "thu",
+          "fri",
+          "sat"
+        ],
+        "opens": "09:00",
+        "closes": "18:00"
+      }
+    ]
+  },
+  "expect": {
+    "requiredFacts": [
+      "$35"
+    ]
+  }
+}

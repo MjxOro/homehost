@@ -1,0 +1,49 @@
+{
+  "id": "bakery-montreal",
+  "suite": "site-build",
+  "tags": [
+    "bakery",
+    "french-canadian",
+    "hours",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Boulangerie Petit Matin",
+    "niche": "Neighbourhood bakery",
+    "description": "Sourdough loaves, croissants, pain au chocolat and seasonal fruit tarts baked every morning before we open. We mill part of our flour ourselves and take special orders for birthday cakes and holiday bûches de Noël with 72 hours' notice. Come early, the croissants go fast on weekends.",
+    "city": "Montréal",
+    "phone": "(514) 555-0158",
+    "email": "bonjour@petitmatin.ca",
+    "address": {
+      "street": "4127 Rue Saint-Denis",
+      "city": "Montréal",
+      "region": "QC",
+      "postalCode": "H2W 2M7",
+      "country": "Canada"
+    },
+    "serviceArea": [
+      "Plateau-Mont-Royal",
+      "Mile End"
+    ],
+    "hours": [
+      {
+        "days": [
+          "tue",
+          "wed",
+          "thu",
+          "fri",
+          "sat",
+          "sun"
+        ],
+        "opens": "06:30",
+        "closes": "18:00"
+      }
+    ],
+    "tone": "inviting"
+  },
+  "expect": {
+    "requiredFacts": [
+      "72 hours"
+    ]
+  }
+}

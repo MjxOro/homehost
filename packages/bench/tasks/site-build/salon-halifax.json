@@ -1,0 +1,56 @@
+{
+  "id": "salon-halifax",
+  "suite": "site-build",
+  "tags": [
+    "salon",
+    "hair",
+    "hours",
+    "address"
+  ],
+  "brief": {
+    "businessName": "Salt & Shear Hair Studio",
+    "niche": "Hair salon",
+    "description": "A small, calm three-chair salon downtown. Cuts, colour, balayage and bridal styling. We use Olaplex on all colour services and book long appointments so nobody is rushed. Closed Sunday and Monday. Book online or call.",
+    "city": "Halifax",
+    "phone": "902-555-0184",
+    "email": "hello@saltandshear.ca",
+    "address": {
+      "street": "1560 Barrington Street",
+      "city": "Halifax",
+      "region": "NS",
+      "postalCode": "B3J 1Z9",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": [
+          "tue",
+          "wed",
+          "thu",
+          "fri"
+        ],
+        "opens": "10:00",
+        "closes": "19:00"
+      },
+      {
+        "days": [
+          "sat"
+        ],
+        "opens": "09:00",
+        "closes": "16:00"
+      }
+    ],
+    "pagesWanted": [
+      "Services",
+      "Team",
+      "Book"
+    ],
+    "tone": "warm and calm"
+  },
+  "expect": {
+    "requiredFacts": [
+      "balayage"
+    ],
+    "minPages": 3
+  }
+}

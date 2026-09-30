@@ -1,0 +1,9 @@
+{
+  "id": "single-model",
+  "models": {
+    "plan": "openai/gpt-oss-120b",
+    "fill": "openai/gpt-oss-120b",
+    "escalate": "openai/gpt-oss-120b"
+  },
+  "notes": "Ablation baseline: one model for every stage. Isolates what the plan/fill/escalate split buys."
+}
