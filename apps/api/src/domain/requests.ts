@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import { PLANS, TIER_QUOTAS, toDesktopHostname, toSubdomain } from "@homehost/shared";
+import {
+  PLANS,
+  QUOTA_HOLDING_STATUSES,
+  TIER_QUOTAS,
+  toDesktopHostname,
+  toSubdomain,
+} from "@homehost/shared";
 import type { Plan, PortalUser, ProvisionAction } from "@homehost/shared";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
@@ -15,8 +21,6 @@ import {
 } from "./errors.js";
 
 export type RequestRow = typeof schema.serverRequests.$inferSelect;
-
-const ACTIVE_STATUSES = ["pending_approval", "approved"] as const;
 
 function isUniqueViolation(e: unknown): boolean {
   return (
@@ -57,7 +61,9 @@ export const createRequest = (
             .where(
               and(
                 eq(schema.serverRequests.ownerId, input.user.id),
-                inArray(schema.serverRequests.status, [...ACTIVE_STATUSES]),
+                inArray(schema.serverRequests.status, [
+                  ...QUOTA_HOLDING_STATUSES,
+                ]),
               ),
             );
           const used = { servers: 0, cpu: 0, memoryMb: 0, diskGb: 0 };
