@@ -11,6 +11,7 @@ import {
   PLANS,
   QUOTA_HOLDING_STATUSES,
   SSH_KEY_MAX,
+  SuggestBody,
   TECHNICAL_LEVELS,
   TIER_QUOTAS,
   isValidSshPublicKey,
@@ -53,6 +54,12 @@ import {
   type UserRow,
 } from "./domain/users.js";
 import { listActions, type AuditCursor } from "./domain/audit.js";
+import {
+  ConciergeConfigTag,
+  suggest,
+  type ConciergeConfig,
+  type ConciergeError,
+} from "./domain/concierge.js";
 import { lookupAddress } from "./domain/ipAssignments.js";
 
 import {
@@ -193,6 +200,8 @@ export interface BuildAppOptions {
   baseDomain?: string;
   appOrigin?: string;
   appExtraOrigins?: string[];
+  /** Concierge transport/config; null disables it. Defaults from env. */
+  concierge?: ConciergeConfig | null;
 }
 
 interface Session {
@@ -210,11 +219,13 @@ function sendErr(
 }
 
 function zodMessage(
-  issues: { path: (string | number)[]; message: string }[],
+  issues: { path: readonly PropertyKey[]; message: string }[],
 ): string {
   return issues
     .map((i) =>
-      i.path.length > 0 ? `${i.path.join(".")}: ${i.message}` : i.message,
+      i.path.length > 0
+        ? `${i.path.map(String).join(".")}: ${i.message}`
+        : i.message,
     )
     .join("; ");
 }
@@ -279,6 +290,27 @@ function toActivityEvent(e: EventRow): ActivityEvent {
     createdAt: e.createdAt.toISOString(),
     detail: e.detail,
   };
+}
+
+function sendConciergeError(
+  reply: FastifyReply,
+  e: ConciergeError | DomainError,
+) {
+  if (e._tag === "ConciergeCapReached")
+    return sendErr(
+      reply,
+      429,
+      "daily suggestion limit reached",
+      "concierge_cap",
+    );
+  if (e._tag === "ConciergeUpstream")
+    return sendErr(
+      reply,
+      502,
+      "suggestion service failed",
+      "concierge_upstream",
+    );
+  return sendDomainError(reply, e);
 }
 
 function sendAdminError(reply: FastifyReply, e: UserNotFound | DomainError) {
@@ -349,6 +381,17 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     : createDb(opts?.databaseUrl ?? env.databaseUrl);
   const db: Database = opts?.db ?? (handle as { db: Database }).db;
   const runtime = ManagedRuntime.make(DatabaseLive(db));
+  const concierge: ConciergeConfig | null =
+    opts?.concierge !== undefined
+      ? opts.concierge
+      : env.openrouterApiKey
+        ? {
+            apiKey: env.openrouterApiKey,
+            dailyCap: env.conciergeDailyCap,
+            fetch: globalThis.fetch,
+            now: () => new Date(),
+          }
+        : null;
 
   const app = Fastify({ logger: true });
 
@@ -1013,6 +1056,38 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     return Either.match(created, {
       onLeft: (e) => sendDomainError(reply, e),
       onRight: (row) => reply.code(201).send(toServerRequest(row)),
+    });
+  });
+
+  // Suggests a use case, plan and recipe from free text. Creates nothing; the
+  // client confirms and then calls POST /api/requests.
+  app.post("/api/concierge/suggest", async (req, reply) => {
+    const session = await requireApprovedUser(req, reply);
+    if (!session) return;
+    if (!concierge) {
+      return sendErr(
+        reply,
+        503,
+        "suggestions are not configured",
+        "concierge_unavailable",
+      );
+    }
+    if (!requireJsonBody(req, reply)) return;
+    const parsed = SuggestBody.safeParse(req.body);
+    if (!parsed.success)
+      return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+    const result = await runtime.runPromise(
+      Effect.either(
+        suggest({ user: session.user, text: parsed.data.text }),
+      ).pipe(Effect.provideService(ConciergeConfigTag, concierge)),
+    );
+    return Either.match(result, {
+      onLeft: (e) => {
+        if (e._tag === "ConciergeUpstream")
+          req.log.warn({ code: e.code }, "concierge upstream failure");
+        return sendConciergeError(reply, e);
+      },
+      onRight: (suggestion) => reply.send(suggestion),
     });
   });
 
