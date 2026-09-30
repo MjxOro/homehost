@@ -5,6 +5,16 @@ and its own AAAA record, published at provision and removed at teardown.
 Reach any box directly with `ssh root@<subdomain>` over IPv6: default port
 22 with no extra flags or client config.
 
+Readiness gate: for boxes with an IPv6, the worker marks a request `running`
+only after the host can open a TCP connection to `[ipv6]:22` and, when
+`CF_DNS_API_TOKEN` is set, Cloudflare DoH returns the box's AAAA with the
+expected address (the user's resolvers are never queried, and only after the
+record exists, so the name is never negative-cached). It polls every 2s for
+up to `WORKER_READY_TIMEOUT_MS` (default 120000). If the budget runs out the
+job fails with the check that never passed and follows the normal attempts-capped
+requeue, which relaunches the same instance name and address. Boxes without an
+IPv6 skip the gate. The panel shows no SSH hostname while a box is `provisioning`.
+
 The current showcase only reserves names under `lab.example.test`: it does
 not publish DNS or provision instances. The production worker publishes each
 box's AAAA, installs the requester's SSH key for root, and derives the
@@ -82,6 +92,7 @@ each live request with an `ipv6` but none open (boxes an old worker provisioned
 between the migration and its restart), and logs how many rows it inserted.
 
 ## Desktop GUI exception (per-desktop HTTPS via Traefik) + worker topology
+
 SSH stays direct-v6 (above). Desktop hostnames resolve via wildcard DNS
 (`*.dev.<base>` + `*.homehost.risktozero.sh` A/AAAA at the edge host — no
 per-VM desktop record). Traefik serves each `<label>-vnc.<base>` with the
