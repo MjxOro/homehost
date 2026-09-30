@@ -35,6 +35,30 @@ The existing Traefik compose is a deployment starting point, **not launched**
 by the showcase. Its Docker provider/socket is not the tenant isolation model:
 never attach the host Docker socket to tenant workloads.
 
+## Abuse attribution
+
+`ip_assignments` records each public address, routed prefix, request/user IDs,
+hostname, owner name/email at assignment time, and assignment/release timestamps.
+The worker opens history atomically with `server_requests.ipv6`, preserves the
+first snapshot on provision retries, and closes it only after successful
+instance/DNS teardown (not on stop). IDs have no foreign keys: deleting or
+truncating live requests/users cannot erase or block this historical record.
+Lookups LEFT JOIN live rows, retaining snapshot attribution if those rows vanish.
+Keep history indefinitely for now; the owner will decide a retention period later.
+
+Authenticated operators can call
+`GET /api/admin/ip-lookup?address=2001%3Adb8%3A%3Aa&at=2026-10-02T14%3A03%3A00Z`.
+The optional `at` is ISO 8601 (UTC or explicit offset). Windows include assignment
+and exclude release: `assigned_at <= at < released_at`. Without `at`, results
+contain the open assignment first, followed by up to 20 most recent closed ones.
+Postgres normalizes equivalent IPv6 spellings, including IPv4-mapped IPv6;
+plain IPv4 is a distinct address from its mapped IPv6 form. Invalid addresses or
+network masks return 400; non-operators get 403. Dates in responses are UTC ISO.
+
+Legacy backfill is approximate: earliest recorded `running` event, falling back
+to request creation, clamped to `updated_at`; deleted requests close at
+`updated_at`. New assignments use the actual worker write/teardown time.
+
 ## Desktop GUI exception (per-desktop HTTPS via Traefik) + worker topology
 SSH stays direct-v6 (above). Desktop hostnames resolve via wildcard DNS
 (`*.dev.<base>` + `*.homehost.risktozero.sh` A/AAAA at the edge host — no
