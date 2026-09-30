@@ -51,7 +51,7 @@ export function PersonaPicker() {
           <li key={persona.id}>
             <button
               type="button"
-              className="flex w-full cursor-pointer flex-col items-center gap-2.5 rounded-card border border-line bg-ink-1 px-3.5 py-[18px] font-[inherit] text-text-1 transition-colors enabled:hover:border-accent-line enabled:hover:bg-ink-2 disabled:cursor-wait"
+              className="flex w-full cursor-pointer flex-row items-center gap-3.5 rounded-card border border-line bg-ink-1 px-3.5 py-3 text-left font-[inherit] text-text-1 transition-[transform,border-color,background-color] duration-(--duration-base) ease-out-quint enabled:hover:-translate-y-0.5 enabled:hover:border-accent-line enabled:hover:bg-ink-2 enabled:active:scale-[0.98] disabled:cursor-wait sm:flex-col sm:gap-2.5 sm:px-3.5 sm:py-[18px] sm:text-center"
               disabled={switchPersona.isPending}
               onClick={() => switchPersona.mutate(persona.id)}
             >
@@ -66,7 +66,7 @@ export function PersonaPicker() {
                 </span>
               )}
               <span className="text-[14.5px] font-[650]">{persona.name}</span>
-              <span className="flex gap-1.5">
+              <span className="ml-auto flex gap-1.5 sm:ml-0">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-line-strong px-[7px] py-[3px] font-mono text-[11px] uppercase tracking-[0.04em] text-text-2">
                   {persona.tier}
                 </span>
