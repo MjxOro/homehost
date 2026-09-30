@@ -1,14 +1,68 @@
+import type { CSSProperties } from "react";
 import { useSession, useSwitchPersona } from "../lib/query";
 import { initials } from "../lib/format";
+import { useReveal } from "../lib/motion";
 import { Spinner } from "./icons";
+import "./landing/landing.css";
 
 const PICKER_GRID =
-  "m-0 mt-3.5 grid list-none grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3";
+  "m-0 mt-4 grid list-none grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 p-0";
 
-/**
- * Large persona cards used on the signed-out home view and sign-in gates.
- * Personas come from the live /api/session payload — nothing is hardcoded.
- */
+const CARD_BASE =
+  "flex w-full items-center gap-3.5 rounded-card border border-line bg-ink-1 px-4 py-3.5 text-left";
+
+type Persona = NonNullable<
+  ReturnType<typeof useSession>["data"]
+>["personas"][number];
+
+function PersonaCard({
+  persona,
+  index,
+  disabled,
+  pending,
+  onPick,
+}: {
+  persona: Persona;
+  index: number;
+  disabled: boolean;
+  pending: boolean;
+  onPick: () => void;
+}) {
+  const ref = useReveal<HTMLLIElement>();
+  return (
+    <li
+      ref={ref}
+      className="reveal"
+      style={{ "--stagger": Math.min(index, 5) } as CSSProperties}
+    >
+      <button
+        type="button"
+        className={`lc-hl ${CARD_BASE} cursor-pointer font-[inherit] text-text-1 transition-[transform,border-color] duration-(--duration-base) ease-out-quint enabled:hover:-translate-y-0.5 enabled:hover:border-accent-line enabled:active:scale-[0.98] disabled:cursor-wait`}
+        disabled={disabled}
+        onClick={onPick}
+      >
+        {pending ? (
+          <Spinner className="spinner-sm size-8" />
+        ) : (
+          <span
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-dim text-[12px] font-bold tracking-[0.02em] text-accent"
+            aria-hidden="true"
+          >
+            {initials(persona.name)}
+          </span>
+        )}
+        <span className="min-w-0">
+          <span className="block text-[14.5px] font-[650]">{persona.name}</span>
+          <span className="block text-[12.5px] text-text-3">
+            {persona.tier} tier
+            {persona.role === "operator" ? " · operator" : ""}
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 export function PersonaPicker() {
   const { data: session, isPending } = useSession();
   const switchPersona = useSwitchPersona();
@@ -24,12 +78,11 @@ export function PersonaPicker() {
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="pointer-events-none flex w-full cursor-default flex-col items-center gap-2.5 rounded-card border border-line bg-ink-1 px-3.5 py-[18px]"
+            className={`${CARD_BASE} pointer-events-none cursor-default`}
             aria-hidden="true"
           >
-            <span className="skeleton skeleton-avatar" />
+            <span className="skeleton size-8 shrink-0 rounded-full" />
             <span className="skeleton skeleton-line w-24" />
-            <span className="skeleton skeleton-line w-16" />
           </div>
         ))}
       </div>
@@ -47,37 +100,15 @@ export function PersonaPicker() {
         </p>
       ) : null}
       <ul className={PICKER_GRID}>
-        {personas.map((persona) => (
-          <li key={persona.id}>
-            <button
-              type="button"
-              className="flex w-full cursor-pointer flex-col items-center gap-2.5 rounded-card border border-line bg-ink-1 px-3.5 py-[18px] font-[inherit] text-text-1 transition-colors enabled:hover:border-accent-line enabled:hover:bg-ink-2 disabled:cursor-wait"
-              disabled={switchPersona.isPending}
-              onClick={() => switchPersona.mutate(persona.id)}
-            >
-              {switchPersona.isPending ? (
-                <Spinner className="spinner-sm" />
-              ) : (
-                <span
-                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-dim text-[15px] font-bold tracking-[0.02em] text-accent"
-                  aria-hidden="true"
-                >
-                  {initials(persona.name)}
-                </span>
-              )}
-              <span className="text-[14.5px] font-[650]">{persona.name}</span>
-              <span className="flex gap-1.5">
-                <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-line-strong px-[7px] py-[3px] font-mono text-[11px] uppercase tracking-[0.04em] text-text-2">
-                  {persona.tier}
-                </span>
-                {persona.role === "operator" ? (
-                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-accent-line bg-accent-dim px-[7px] py-[3px] font-mono text-[11px] uppercase tracking-[0.04em] text-accent">
-                    operator
-                  </span>
-                ) : null}
-              </span>
-            </button>
-          </li>
+        {personas.map((persona, i) => (
+          <PersonaCard
+            key={persona.id}
+            persona={persona}
+            index={i}
+            disabled={switchPersona.isPending}
+            pending={switchPersona.isPending}
+            onPick={() => switchPersona.mutate(persona.id)}
+          />
         ))}
       </ul>
     </div>
