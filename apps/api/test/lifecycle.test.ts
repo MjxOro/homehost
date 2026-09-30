@@ -345,4 +345,44 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
     // v6-only contract: stale port values never surface to clients.
     expect(leased.requests.find((r) => r.id === id)?.sshPort).toBeUndefined();
   });
+
+  test("worker-owned statuses keep holding quota until deleted or rejected", async () => {
+    const create = (cookie: string, name: string, planId: string) =>
+      app.inject({
+        method: "POST",
+        url: "/api/requests",
+        headers: { cookie },
+        payload: { name, planId },
+      });
+    for (const held of ["provisioning", "running", "stopped"] as const) {
+      for (const released of ["deleted", "rejected"] as const) {
+        const first = await create(alice, `Held ${held}`, "game-small");
+        expect(first.statusCode).toBe(201);
+        const id = first.json<ServerRequest>().id;
+        // Mirror the worker: the request leaves pending/approved for good.
+        await client`UPDATE server_requests SET status = ${held} WHERE id = ${id}`;
+        const blocked = await create(alice, `Blocked ${held}`, "game-small");
+        expect(blocked.statusCode).toBe(429);
+        await client`UPDATE server_requests SET status = ${released} WHERE id = ${id}`;
+        const admitted = await create(alice, `After ${released}`, "game-small");
+        expect(admitted.statusCode).toBe(201);
+        await client`TRUNCATE provision_jobs, activity_events, server_requests`;
+      }
+    }
+
+    // Technical aggregates: a running vm-medium plus a pending one fill cpu/memory.
+    const running = await create(bob, "Running medium", "vm-medium");
+    expect(running.statusCode).toBe(201);
+    await client`UPDATE server_requests SET status = 'running' WHERE id = ${running.json<ServerRequest>().id}`;
+    expect((await create(bob, "Pending medium", "vm-medium")).statusCode).toBe(
+      201,
+    );
+    expect((await create(bob, "Overflow medium", "vm-medium")).statusCode).toBe(
+      429,
+    );
+    const dashboard = (
+      await app.inject({ url: "/api/dashboard", headers: { cookie: bob } })
+    ).json<DashboardResponse>();
+    expect(dashboard.usage.servers).toBe(2);
+  });
 });
