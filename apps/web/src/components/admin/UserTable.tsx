@@ -1,3 +1,4 @@
+import { useListEntrance } from "../../lib/app-motion";
 import { useState } from "react";
 import type { AccountStatus, AdminUser } from "../../lib/api-admin";
 import { ModerationDialog, type ModerationAction } from "./ModerationDialog";
@@ -12,7 +13,7 @@ import { formatDateTime, formatRelative } from "../../lib/format";
 const PAGE_SIZE = 25;
 
 const ACCOUNT_PILL_BASE =
-  "inline-flex items-center gap-2 text-balance rounded-full border px-2.5 py-1 text-[13px] font-semibold";
+  "inline-flex items-center gap-2 text-balance rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors duration-(--duration-fast)";
 
 /**
  * Account statuses are operator decisions: static, never auto-flipping.
@@ -55,11 +56,7 @@ function AccountStatusPill({ status }: { status: AccountStatus }) {
   );
 }
 
-function TechnicalBadge({
-  level,
-}: {
-  level: AdminUser["technicalLevel"];
-}) {
+function TechnicalBadge({ level }: { level: AdminUser["technicalLevel"] }) {
   if (level === "technical") {
     return <Chip tone="accent">Technical</Chip>;
   }
@@ -101,15 +98,6 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
     trigger: HTMLElement | null;
   } | null>(null);
 
-  if (users.length === 0) {
-    return (
-      <EmptyState
-        title="No users"
-        copy="No accounts match this filter yet."
-      />
-    );
-  }
-
   const pageCount = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const visible = users.slice(
@@ -117,9 +105,17 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
     safePage * PAGE_SIZE + PAGE_SIZE,
   );
 
+  const entrance = useListEntrance(visible);
+
+  if (users.length === 0) {
+    return (
+      <EmptyState title="No users" copy="No accounts match this filter yet." />
+    );
+  }
+
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full border-collapse text-left text-[14px]">
           <caption className="sr-only">
             User accounts pending operator review
@@ -145,7 +141,11 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
           </thead>
           <tbody className="divide-y divide-line">
             {visible.map((user) => (
-              <tr key={user.id} className="align-top">
+              <tr
+                key={user.id}
+                className={`${entrance(user.id).className} align-top`}
+                style={entrance(user.id).style}
+              >
                 <td className="min-w-0 px-2 py-3 pr-3">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span
@@ -166,7 +166,7 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
                   <TechnicalBadge level={user.technicalLevel} />
                 </td>
                 <td className="whitespace-nowrap px-2 py-3 text-[13px] text-text-2">
-                  {user.reviewedBy ?? user.reviewedAt ? (
+                  {(user.reviewedBy ?? user.reviewedAt) ? (
                     <span className="flex flex-col gap-0.5">
                       {user.reviewedBy ? (
                         <span translate="no">{user.reviewedBy}</span>
