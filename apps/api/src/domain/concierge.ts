@@ -3,15 +3,21 @@ import { and, count, eq, gte, sql } from "drizzle-orm";
 import { Context, Data, Duration, Effect, Either } from "effect";
 import { z } from "zod/v4";
 import {
-  PLANS,
   PLAN_NONE,
   RECIPES,
   RECIPE_IDS,
   USE_CASES,
   USE_CASE_IDS,
   decideSuggestion,
+  eligiblePlans,
 } from "@homehost/shared";
-import type { PortalUser, Suggestion } from "@homehost/shared";
+import type {
+  ConciergeAnswers,
+  PortalUser,
+  SuggestPicks,
+  Suggestion,
+  TrustTier,
+} from "@homehost/shared";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
 import { DbFailure } from "./errors.js";
@@ -58,64 +64,6 @@ export class ConciergeUpstream extends Data.TaggedError("ConciergeUpstream")<{
 
 export type ConciergeError = ConciergeCapReached | ConciergeUpstream;
 
-const PLAN_OPTIONS: [string, ...string[]] = [
-  PLAN_NONE,
-  ...PLANS.map((p) => p.id),
-];
-
-const PLANS_TEXT = PLANS.map(
-  (p) =>
-    `${p.id}: ${p.cpu} cpu, ${p.memoryMb / 1024} GB RAM, ${p.diskGb} GB disk, ${p.kind}, ${p.desktop ? "graphical desktop" : "no desktop"}`,
-).join("\n");
-
-/** One Jev request, every question answered independently. */
-const JEV_QUESTIONS = {
-  use_case: {
-    type: "choice",
-    instructions:
-      "What does the person mainly want a server from this homelab for? Pick the closest option.",
-    criteria: Object.fromEntries(
-      USE_CASE_IDS.map((id) => [id, USE_CASES[id].description]),
-    ),
-  },
-  plan: {
-    type: "choice",
-    instructions: {
-      plans: PLANS_TEXT,
-      question:
-        "Which `plans` entry is the smallest one that comfortably fits `request`?",
-    },
-    criteria: Object.fromEntries(PLAN_OPTIONS.map((id) => [id, null])),
-  },
-  recipe: {
-    type: "choice",
-    instructions:
-      "Which setup should be installed on the new server right after it boots?",
-    criteria: Object.fromEntries(
-      RECIPE_IDS.map((id) => [id, RECIPES[id].description]),
-    ),
-  },
-  wants_gui: {
-    type: "noul",
-    instructions:
-      "Does the person want a graphical desktop (not just a terminal)?",
-  },
-  players_connect: {
-    type: "noul",
-    instructions:
-      "Will other people (friends, players, customers) need to connect directly to this server?",
-  },
-  abuse: {
-    type: "noul",
-    instructions:
-      "Does the request involve something against a hosting acceptable-use policy: crypto mining, port scanning, sending bulk email or spam, open proxies, torrenting, or attacking other systems?",
-  },
-  is_english: {
-    type: "noul",
-    instructions: "Is `request` written in English?",
-  },
-} as const;
-
 const probability = z.number().min(0).max(1);
 const tokens = z.number().int().nonnegative();
 const choiceAnswer = <const T extends readonly [string, ...string[]]>(ids: T) =>
@@ -126,16 +74,104 @@ const choiceAnswer = <const T extends readonly [string, ...string[]]>(ids: T) =>
   });
 const noulAnswer = z.object({ noul: probability });
 
+interface JevQuestionSet {
+  questions: Record<string, unknown>;
+  /** Eligible plan ids plus PLAN_NONE; the only valid plan answers. */
+  planOptions: readonly string[];
+}
+
+/**
+ * One Jev request per tier, every question answered independently. The plan
+ * question lists only plans this tier can create right now.
+ */
+function jevQuestionSet(tier: TrustTier): JevQuestionSet {
+  const plans = eligiblePlans(tier);
+  const planOptions = [PLAN_NONE, ...plans.map((p) => p.id)];
+  const questions = {
+    use_case: {
+      type: "choice",
+      instructions:
+        "What does the person mainly want a server from this homelab for? Pick the closest option.",
+      criteria: Object.fromEntries(
+        USE_CASE_IDS.map((id) => [id, USE_CASES[id].description]),
+      ),
+    },
+    plan: {
+      type: "choice",
+      instructions: {
+        plans: plans
+          .map(
+            (p) =>
+              `${p.id}: ${p.cpu} cpu, ${p.memoryMb / 1024} GB RAM, ${p.diskGb} GB disk, ${p.kind}, ${p.desktop ? "graphical desktop" : "no desktop"}`,
+          )
+          .join("\n"),
+        question:
+          "Which `plans` entry is the smallest one that comfortably fits `request`?",
+      },
+      criteria: Object.fromEntries(planOptions.map((id) => [id, null])),
+    },
+    recipe: {
+      type: "choice",
+      instructions:
+        "Which setup should be installed on the new server right after it boots?",
+      criteria: Object.fromEntries(
+        RECIPE_IDS.map((id) => [id, RECIPES[id].description]),
+      ),
+    },
+    wants_gui: {
+      type: "noul",
+      instructions:
+        "Does the person want a graphical desktop (not just a terminal)?",
+    },
+    players_connect: {
+      type: "noul",
+      instructions:
+        "Will other people (friends, players, customers) need to connect directly to this server?",
+    },
+    console_player: {
+      type: "noul",
+      instructions:
+        "Will players join from a game console such as Nintendo Switch, Xbox or PlayStation?",
+    },
+    abuse: {
+      type: "noul",
+      instructions:
+        "Does the request involve something against a hosting acceptable-use policy: crypto mining, port scanning, sending bulk email or spam, open proxies, torrenting, or attacking other systems?",
+    },
+    scraping: {
+      type: "noul",
+      instructions:
+        "Does the request involve automatically collecting data from websites?",
+    },
+    is_english: {
+      type: "noul",
+      instructions: "Is `request` written in English?",
+    },
+  };
+  return { questions, planOptions };
+}
+
+const JEV_QUESTION_SETS: Record<TrustTier, JevQuestionSet> = {
+  nontechnical: jevQuestionSet("nontechnical"),
+  technical: jevQuestionSet("technical"),
+};
+
 const JevResponse = z.object({
   id: z.string().optional(),
   model: z.string().min(1),
   answers: z.object({
     use_case: choiceAnswer(USE_CASE_IDS),
-    plan: choiceAnswer(PLAN_OPTIONS),
+    plan: z.object({
+      choice: z.string(),
+      probabilities: z.record(z.string(), probability),
+      confidence: probability,
+    }),
     recipe: choiceAnswer(RECIPE_IDS),
     wants_gui: noulAnswer,
     players_connect: noulAnswer,
+    console_player: noulAnswer,
     abuse: noulAnswer,
+    scraping: noulAnswer,
     is_english: noulAnswer,
   }),
   usage: z.object({
@@ -280,18 +316,24 @@ const callOpenRouter = <A>(
     return billed.value;
   });
 
-const askJev = (ctx: CallContext, text: string) =>
+const askJev = (ctx: CallContext, tier: TrustTier, text: string) =>
   callOpenRouter(ctx, {
     path: "/alpha/decisions",
     model: JEV_MODEL,
     body: {
       model: JEV_MODEL,
       state: { request: text },
-      questions: JEV_QUESTIONS,
+      questions: JEV_QUESTION_SETS[tier].questions,
     },
     parse: (json): Billed<{ model: string; answers: JevAnswers }> | null => {
       const r = JevResponse.safeParse(json);
-      if (!r.success) return null;
+      if (
+        !r.success ||
+        !JEV_QUESTION_SETS[tier].planOptions.includes(
+          r.data.answers.plan.choice,
+        )
+      )
+        return null;
       return {
         value: { model: r.data.model, answers: r.data.answers },
         model: r.data.model,
@@ -344,6 +386,22 @@ const translate = (ctx: CallContext, text: string) =>
 export interface SuggestInput {
   user: PortalUser;
   text: string;
+  /** Answers to an earlier `choose`; validated by the caller (picksProblem). */
+  picks?: SuggestPicks;
+}
+
+function toAnswers(a: JevAnswers): ConciergeAnswers {
+  return {
+    use_case: a.use_case,
+    plan: a.plan,
+    recipe: a.recipe,
+    wants_gui: a.wants_gui.noul,
+    players_connect: a.players_connect.noul,
+    console_player: a.console_player.noul,
+    abuse: a.abuse.noul,
+    scraping: a.scraping.noul,
+    is_english: a.is_english.noul,
+  };
 }
 
 /**
@@ -401,30 +459,22 @@ export const suggest = (
       agentRunId: run.id,
       userId: input.user.id,
     };
+    const tier = input.user.tier;
     const suggestion = yield* Effect.gen(function* () {
-      let jev = yield* askJev(ctx, input.text);
+      let jev = yield* askJev(ctx, tier, input.text);
       let translated = false;
       if (
         jev.answers.is_english.noul < ENGLISH_MIN &&
         jev.answers.use_case.confidence < TRANSLATE_USE_CASE_MIN
       ) {
         const english = yield* translate(ctx, input.text);
-        jev = yield* askJev(ctx, english);
+        jev = yield* askJev(ctx, tier, english);
         translated = true;
       }
-      const a = jev.answers;
-      const decision = decideSuggestion(
-        {
-          use_case: a.use_case,
-          plan: a.plan,
-          recipe: a.recipe,
-          wants_gui: a.wants_gui.noul,
-          players_connect: a.players_connect.noul,
-          abuse: a.abuse.noul,
-          is_english: a.is_english.noul,
-        },
-        { userTier: input.user.tier },
-      );
+      const decision = decideSuggestion(toAnswers(jev.answers), {
+        userTier: tier,
+        picks: input.picks,
+      });
       return { ...decision, translated, model: jev.model };
     }).pipe(
       Effect.tapErrorCause(() =>

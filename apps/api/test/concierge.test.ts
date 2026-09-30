@@ -5,7 +5,8 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { Effect, Either } from "effect";
 import type { FastifyInstance } from "fastify";
-import type { PortalUser, Suggestion } from "@homehost/shared";
+import { Suggestion } from "@homehost/shared";
+import type { PortalUser } from "@homehost/shared";
 import { buildApp } from "../src/app.js";
 import * as schema from "../src/db/schema.js";
 import type { Database } from "../src/db/client.js";
@@ -52,9 +53,17 @@ function fakeTransport(replies: Reply[]) {
   return { fetch, calls };
 }
 
-function jevReply(
-  o: { isEnglish?: number; useCaseConfidence?: number; cost?: number } = {},
-): Reply {
+interface JevOverrides {
+  isEnglish?: number;
+  useCaseConfidence?: number;
+  planChoice?: string;
+  planConfidence?: number;
+  recipeConfidence?: number;
+  abuse?: number;
+  cost?: number;
+}
+
+function jevReply(o: JevOverrides = {}): Reply {
   return {
     status: 200,
     body: {
@@ -69,19 +78,21 @@ function jevReply(
         },
         plan: {
           type: "choice",
-          choice: "game-small",
-          probabilities: { "game-small": 0.88, "vm-medium": 0.1 },
-          confidence: 0.88,
+          choice: o.planChoice ?? "game-small",
+          probabilities: { "game-small": 0.88, none: 0.1 },
+          confidence: o.planConfidence ?? 0.88,
         },
         recipe: {
           type: "choice",
           choice: "minecraft_java",
           probabilities: { minecraft_java: 0.9, minecraft_bedrock: 0.08 },
-          confidence: 0.9,
+          confidence: o.recipeConfidence ?? 0.9,
         },
         wants_gui: { type: "noul", noul: 0.02 },
         players_connect: { type: "noul", noul: 0.95 },
-        abuse: { type: "noul", noul: 0.01 },
+        console_player: { type: "noul", noul: 0.03 },
+        abuse: { type: "noul", noul: o.abuse ?? 0.01 },
+        scraping: { type: "noul", noul: 0.02 },
         is_english: { type: "noul", noul: o.isEnglish ?? 0.99 },
       },
       usage: { input_tokens: 812, output_tokens: 9, cost: o.cost ?? 0.0000312 },
@@ -402,6 +413,36 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
     expect(dump).not.toContain(englishMarker);
   });
 
+  test("Jev is only offered plans the user can create", async () => {
+    const planOptions = (call: SentCall) =>
+      Object.keys(JSON.parse(call.body).questions.plan.criteria).sort();
+    const t = fakeTransport([jevReply(), jevReply()]);
+    await succeeds(
+      { user: await newUser("nontechnical"), text: "a bot" },
+      config(t.fetch),
+    );
+    await succeeds(
+      { user: await newUser("technical"), text: "a bot" },
+      config(t.fetch),
+    );
+    expect(planOptions(t.calls[0]!)).toEqual(["game-small", "none"]);
+    expect(planOptions(t.calls[1]!)).toEqual([
+      "desktop-ubuntu",
+      "game-small",
+      "none",
+      "vm-large",
+      "vm-medium",
+    ]);
+    // An answer outside the offered options is malformed, not a suggestion.
+    const locked = fakeTransport([jevReply({ planChoice: "vm-medium" })]);
+    expect(
+      await fails(
+        { user: await newUser("nontechnical"), text: "a bot" },
+        config(locked.fetch),
+      ),
+    ).toMatchObject({ _tag: "ConciergeUpstream", code: "bad_response" });
+  });
+
   describe("POST /api/concierge/suggest", () => {
     let app: FastifyInstance | null = null;
 
@@ -437,8 +478,33 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       const t = fakeTransport([jevReply()]);
       const res = await post(config(t.fetch), { text: "  minecraft  " });
       expect(res.status).toBe(200);
-      expect(res.body.outcome).toBe("suggested");
+      expect(Suggestion.parse(res.body).outcome).toBe("suggested");
       expect(JSON.parse(t.calls[0]!.body).state.request).toBe("minecraft");
+    });
+
+    test("picks resolve an earlier question; ineligible picks are rejected", async () => {
+      const t = fakeTransport([jevReply({ useCaseConfidence: 0.2 })]);
+      const unsure = await post(config(t.fetch), { text: "something fun" });
+      expect(unsure.body).toMatchObject({
+        outcome: "choose",
+        choice: { slot: "use_case" },
+      });
+      const again = fakeTransport([jevReply({ useCaseConfidence: 0.2 })]);
+      const picked = await post(config(again.fetch), {
+        text: "something fun",
+        picks: { useCase: "game_server" },
+      });
+      expect(picked.body).toMatchObject({
+        outcome: "suggested",
+        useCase: "game_server",
+      });
+      const none = fakeTransport([]);
+      const locked = await post(config(none.fetch), {
+        text: "a bot",
+        picks: { planId: "vm-medium" },
+      });
+      expect(locked).toMatchObject({ status: 400, body: { code: "invalid" } });
+      expect(none.calls).toHaveLength(0);
     });
 
     test("maps unavailable, invalid, cap and upstream to stable codes", async () => {
