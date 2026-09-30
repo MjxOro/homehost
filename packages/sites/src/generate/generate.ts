@@ -139,7 +139,67 @@ function checkSpec(candidate: unknown) {
     );
   return { spec: validation.spec, warnings: rendered.warnings };
 }
-function checkedPlan(input: unknown, wanted: string[] | undefined): Plan {
+/** Every string leaf of a JSON value, keyed by its dotted path. */
+function stringFields(value: unknown, path = ""): [string, string][] {
+  if (typeof value === "string") return [[path, value]];
+  if (typeof value !== "object" || value === null) return [];
+  return Object.entries(value).flatMap(([key, item]) =>
+    stringFields(item, path ? `${path}.${key}` : key),
+  );
+}
+/** Digits of phone-like runs: 7+ digits joined by spaces, dashes, dots or parentheses. */
+function phoneLikeDigits(text: string): string[] {
+  return (text.match(/\+?\(?\d+(?:(?:\) ?|[ .-]\(?)\d+)*/g) ?? [])
+    .map((match) => match.replace(/\D/g, ""))
+    .filter((digits) => digits.length >= 7);
+}
+/**
+ * Facts the model could invent that schema checks cannot see: external URLs
+ * and phone numbers must come from the brief, and site-relative links must
+ * reach a planned page. `briefTexts` holds every string field of the brief.
+ */
+function groundingIssues(
+  output: unknown,
+  briefTexts: readonly string[],
+  pagePaths: ReadonlySet<string>,
+): string[] {
+  const phones = briefTexts.flatMap(phoneLikeDigits);
+  const issues: string[] = [];
+  for (const [path, text] of stringFields(output)) {
+    const key = path.slice(path.lastIndexOf(".") + 1);
+    if (key === "href" || key === "src") {
+      if (text.startsWith("#")) continue;
+      if (text.startsWith("/")) {
+        if (key === "href" && !pagePaths.has(text.replace(/[?#].*$/s, "")))
+          issues.push(
+            `${path}: ${text} is not a page of this site; link to / or /{slug}/ of a planned page`,
+          );
+      } else if (!briefTexts.some((brief) => brief.includes(text)))
+        issues.push(
+          `${path}: ${text} does not appear in the brief; use only URLs copied exactly from the brief`,
+        );
+      continue;
+    }
+    // Equal, or the same number with/without a country or area code prefix.
+    for (const digits of phoneLikeDigits(text))
+      if (
+        !phones.some(
+          (phone) =>
+            Math.abs(phone.length - digits.length) <= 3 &&
+            (phone.endsWith(digits) || digits.endsWith(phone)),
+        )
+      )
+        issues.push(
+          `${path}: phone-like number ${digits} is not supplied in the brief; do not write phone numbers in copy`,
+        );
+  }
+  return issues;
+}
+function checkedPlan(
+  input: unknown,
+  wanted: string[] | undefined,
+  briefTexts: readonly string[],
+): Plan {
   const result = Plan.safeParse(input);
   if (!result.success)
     throw new CheckError("schema_error", issueStrings(result.error));
@@ -172,6 +232,7 @@ function checkedPlan(input: unknown, wanted: string[] | undefined): Plan {
     new Map([["plan", JSON.stringify(plan)]]),
   ))
     issues.push(`plan: forbidden placeholder ${match.placeholder}`);
+  issues.push(...groundingIssues(plan, briefTexts, new Set()));
   if (issues.length) throw new CheckError("invalid_plan", issues);
   return plan;
 }
@@ -257,7 +318,8 @@ export async function generateSite(
       throw new CheckError("invalid_brief", issueStrings(parsed.error));
     brief = parsed.data;
     const wanted = requestedPages(brief),
-      concurrency = opts.concurrency ?? 4;
+      concurrency = opts.concurrency ?? 4,
+      briefTexts = stringFields(brief).map(([, text]) => text);
     if (!Number.isInteger(concurrency) || concurrency < 1)
       throw new CheckError("invalid_options", [
         "concurrency must be a positive integer",
@@ -288,7 +350,7 @@ export async function generateSite(
       plan = await call(
         planRequest(opts.models.plan, brief, wanted),
         "plan",
-        (input) => checkedPlan(input, wanted),
+        (input) => checkedPlan(input, wanted, briefTexts),
       );
     } catch (error) {
       checkAbort();
@@ -298,7 +360,7 @@ export async function generateSite(
       plan = await call(
         planRequest(opts.models.escalate, brief, wanted, errorsForRetry(error)),
         "escalate",
-        (input) => checkedPlan(input, wanted),
+        (input) => checkedPlan(input, wanted, briefTexts),
       );
     }
     checkAbort();
@@ -327,6 +389,14 @@ export async function generateSite(
     });
     type Page = SiteSpec["pages"][number];
     const pages: (Page | undefined)[] = Array(plan.pages.length);
+    // Rendered page paths; site-relative links resolve from the host root.
+    const pagePaths = new Set(
+      plan.pages.flatMap((page) =>
+        page.slug
+          ? [`/${page.slug}`, `/${page.slug}/`, `/${page.slug}/index.html`]
+          : ["/", "/index.html"],
+      ),
+    );
     const failures: (unknown | undefined)[] = Array(plan.pages.length);
     let next = 0,
       pageFailed = false;
@@ -343,6 +413,9 @@ export async function generateSite(
             ],
       );
       if (mismatches.length) throw new CheckError("section_order", mismatches);
+      const ungrounded = groundingIssues(result, briefTexts, pagePaths);
+      if (ungrounded.length)
+        throw new CheckError("ungrounded_content", ungrounded);
       const candidate = { slug: page.slug, ...result };
       checkSpec({
         version: 1,

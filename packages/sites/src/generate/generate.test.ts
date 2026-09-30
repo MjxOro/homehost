@@ -589,3 +589,131 @@ test("invalid concurrency returns an error before calls", async () => {
   expect(result.ok).toBe(false);
   expect(result.calls).toEqual([]);
 });
+function withAction(href: string) {
+  const page = fill();
+  return {
+    ...page,
+    sections: [{ ...page.sections[0]!, action: { label: "Book now", href } }],
+  };
+}
+function splitImagePlan(): Plan {
+  const structure = plan(["", "services"]);
+  structure.pages[0]!.sectionTypes = ["hero.split-image"];
+  return structure;
+}
+function withImage(
+  src: string,
+  text = "Repairs explained before work starts.",
+) {
+  return {
+    ...fill(),
+    sections: [
+      {
+        type: "hero.split-image",
+        heading: "Repairs made clear",
+        text,
+        image: { src, alt: "Plumber at work" },
+        action: { label: "Our services", href: "/services/" },
+      },
+    ],
+  };
+}
+test.each([
+  {
+    kind: "external link",
+    structure: plan(),
+    bad: withAction("https://evil.example/login"),
+    issue:
+      "sections.0.action.href: https://evil.example/login does not appear in the brief",
+  },
+  {
+    kind: "external image",
+    structure: splitImagePlan(),
+    bad: withImage("https://cdn.evil.example/van.jpg"),
+    issue: "sections.0.image.src: https://cdn.evil.example/van.jpg",
+  },
+  {
+    kind: "link to an unplanned page",
+    structure: plan(),
+    bad: withAction("/careers/"),
+    issue: "sections.0.action.href: /careers/ is not a page of this site",
+  },
+  {
+    kind: "invented phone number",
+    structure: plan(),
+    bad: {
+      ...fill(),
+      sections: [
+        {
+          ...fill().sections[0]!,
+          text: "Emergencies? Call (604) 555-0199 any time.",
+        },
+      ],
+    },
+    issue: "phone-like number 6045550199 is not supplied in the brief",
+  },
+])(
+  "a page with an ungrounded $kind is escalated",
+  async ({ structure, bad, issue }) => {
+    const good =
+      structure.pages[0]!.sectionTypes[0] === "hero.split-image"
+        ? withImage("/images/van.jpg")
+        : fill();
+    // With concurrency 1 the failed home page is escalated before later pages.
+    const pages = structure.pages.slice(1).map(() => fill("Services"));
+    const llm = new ScriptedClient([structure, bad, good, ...pages]);
+    const result = await generateSite(
+      brief(),
+      options(llm, { concurrency: 1 }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.escalated).toBe(true);
+    expect(result.calls.slice(1, 3)).toMatchObject([
+      { stage: "fill", errorCode: "ungrounded_content" },
+      { stage: "escalate", errorCode: null },
+    ]);
+    expect(llm.requests[2]!.messages.at(-1)!.content).toContain(issue);
+  },
+);
+test("an external link still absent from the brief after escalation fails generation", async () => {
+  const phishing = withAction("https://evil.example/login");
+  const llm = new ScriptedClient([plan(), phishing, phishing]);
+  const result = await generateSite(brief(), options(llm));
+  expect(result.ok).toBe(false);
+  expect(result.escalated).toBe(true);
+  expect(result.calls.map((call) => [call.stage, call.errorCode])).toEqual([
+    ["plan", null],
+    ["fill", "ungrounded_content"],
+    ["escalate", "ungrounded_content"],
+  ]);
+  if (!result.ok) expect(result.error).toContain("https://evil.example/login");
+});
+test("URLs and phone numbers supplied in the brief, planned pages and local images are allowed", async () => {
+  const input = {
+    ...brief(),
+    description: `${brief().description} Book online at https://book.birchbrook.ca/new?src=site. After hours, call 250.555.0199. Photos: https://cdn.birchbrook.ca/van.jpg`,
+  };
+  const home = withImage(
+    "https://cdn.birchbrook.ca/van.jpg",
+    "Call 250-555-0147 or our after-hours line (250) 555-0199.",
+  );
+  const services = withAction("https://book.birchbrook.ca/new?src=site");
+  const llm = new ScriptedClient([splitImagePlan(), home, services]);
+  const result = await generateSite(input, options(llm, { concurrency: 1 }));
+  if (!result.ok) throw new Error(result.error);
+  expect(result.escalated).toBe(false);
+  expect(result.spec.pages[1]!.sections[0]).toMatchObject({
+    action: { href: "https://book.birchbrook.ca/new?src=site" },
+  });
+});
+test("an invented phone number in the plan tagline escalates the plan", async () => {
+  const bad = plan();
+  bad.tagline = "Call 1-800-555-0100 for fast repairs";
+  const llm = new ScriptedClient([bad, plan(), fill()]);
+  const result = await generateSite(brief(), options(llm));
+  expect(result.ok).toBe(true);
+  expect(result.calls[0]!.errorCode).toBe("invalid_plan");
+  expect(llm.requests[1]!.messages.at(-1)!.content).toContain(
+    "tagline: phone-like number 18005550100",
+  );
+});
