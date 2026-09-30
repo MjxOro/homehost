@@ -11,16 +11,16 @@ HTTP routes, UI, Stripe or AI calls here; later work consumes this layer.
 
 One row per agent job. `user_id` is nullable (bench runs have no user).
 
-| column | notes |
-| --- | --- |
-| `id` | uuid |
-| `user_id` | nullable FK `users` |
-| `kind` | `site_build`, `site_edit`, `site_import`, `concierge`, `bench` |
-| `purpose` | `prod`, `bench`, `dev` |
-| `ref_type`, `ref_id` | nullable text pointer to the thing the run acted on |
-| `status` | `running` (default), `succeeded`, `failed`, `cancelled` |
-| `started_at`, `finished_at` | `finished_at` null while running |
-| `metadata` | jsonb, default `{}` |
+| column                      | notes                                                          |
+| --------------------------- | -------------------------------------------------------------- |
+| `id`                        | uuid                                                           |
+| `user_id`                   | nullable FK `users`                                            |
+| `kind`                      | `site_build`, `site_edit`, `site_import`, `concierge`, `bench` |
+| `purpose`                   | `prod`, `bench`, `dev`                                         |
+| `ref_type`, `ref_id`        | nullable text pointer to the thing the run acted on            |
+| `status`                    | `running` (default), `succeeded`, `failed`, `cancelled`        |
+| `started_at`, `finished_at` | `finished_at` null while running                               |
+| `metadata`                  | jsonb, default `{}`                                            |
 
 Index: `(user_id, started_at)`.
 
@@ -28,19 +28,19 @@ Index: `(user_id, started_at)`.
 
 One row per provider call; benchmark runs use `purpose = 'bench'`.
 
-| column | notes |
-| --- | --- |
-| `id` | uuid |
-| `agent_run_id`, `user_id` | nullable FKs |
-| `purpose` | as above |
-| `provider`, `model`, `provider_request_id` | request id nullable |
-| `prompt_hash` | 64 lowercase hex (check) |
-| `input_tokens`, `output_tokens`, `cached_input_tokens`, `cache_write_tokens` | int, `>= 0` |
-| `cost_micro_usd` | bigint `>= 0`; integer micro-dollars, never floats |
-| `price_table_version` | which price table produced the cost |
-| `latency_ms` | int `>= 0` |
-| `status`, `error_code` | `ok` or `error`; code nullable |
-| `created_at` | timestamptz |
+| column                                                                       | notes                                              |
+| ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| `id`                                                                         | uuid                                               |
+| `agent_run_id`, `user_id`                                                    | nullable FKs                                       |
+| `purpose`                                                                    | as above                                           |
+| `provider`, `model`, `provider_request_id`                                   | request id nullable                                |
+| `prompt_hash`                                                                | 64 lowercase hex (check)                           |
+| `input_tokens`, `output_tokens`, `cached_input_tokens`, `cache_write_tokens` | int, `>= 0`                                        |
+| `cost_micro_usd`                                                             | bigint `>= 0`; integer micro-dollars, never floats |
+| `price_table_version`                                                        | which price table produced the cost                |
+| `latency_ms`                                                                 | int `>= 0`                                         |
+| `status`, `error_code`                                                       | `ok` or `error`; code nullable                     |
+| `created_at`                                                                 | timestamptz                                        |
 
 Indexes: `(user_id, created_at)`, `(agent_run_id)`, and a unique partial index on
 `(provider, provider_request_id)` where the request id is not null, so a retried
@@ -50,18 +50,18 @@ webhook or callback cannot double-record a call.
 
 Single global, append-only, hash-chained table.
 
-| column | notes |
-| --- | --- |
-| `id` | `bigint generated always as identity`; chain order |
-| `user_id` | NOT NULL FK `users` (no cascade: history outlives nothing) |
-| `delta` | bigint, `<> 0` |
-| `balance_after` | bigint, `>= 0`; the user's balance after this row |
-| `reason` | `purchase`, `usage`, `refund`, `grant`, `adjustment` |
-| `ref_type`, `ref_id` | nullable text |
-| `confirm_id` | nullable uuid, no FK yet (`confirmations` comes later) |
-| `created_at` | set by the app at millisecond precision; part of the hash |
-| `prev_hash` | `char(64)`; hash of the previous row, genesis is 64 `'0'` |
-| `hash` | `char(64)`, unique |
+| column               | notes                                                      |
+| -------------------- | ---------------------------------------------------------- |
+| `id`                 | `bigint generated always as identity`; chain order         |
+| `user_id`            | NOT NULL FK `users` (no cascade: history outlives nothing) |
+| `delta`              | bigint, `<> 0`                                             |
+| `balance_after`      | bigint, `>= 0`; the user's balance after this row          |
+| `reason`             | `purchase`, `usage`, `refund`, `grant`, `adjustment`       |
+| `ref_type`, `ref_id` | nullable text                                              |
+| `confirm_id`         | nullable uuid, no FK yet (`confirmations` comes later)     |
+| `created_at`         | set by the app at millisecond precision; part of the hash  |
+| `prev_hash`          | `char(64)`; hash of the previous row, genesis is 64 `'0'`  |
+| `hash`               | `char(64)`, unique                                         |
 
 ## Hash formula
 

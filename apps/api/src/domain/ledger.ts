@@ -24,7 +24,9 @@ export class InvalidUsage extends Data.TaggedError("InvalidUsage")<{
   readonly message: string;
 }> {}
 
-export class DuplicateLlmCall extends Data.TaggedError("DuplicateLlmCall")<{}> {}
+export class DuplicateLlmCall extends Data.TaggedError(
+  "DuplicateLlmCall",
+)<{}> {}
 
 export class AgentRunNotRunning extends Data.TaggedError(
   "AgentRunNotRunning",
@@ -123,8 +125,7 @@ export interface AppendCreditInput {
 }
 
 export type AppendOutcome =
-  | { ok: true; row: LedgerRow }
-  | { ok: false; balance: bigint };
+  { ok: true; row: LedgerRow } | { ok: false; balance: bigint };
 
 /**
  * Append inside a caller-owned transaction, so "spend credits for this action"
@@ -250,14 +251,17 @@ export const verifyLedger = (): Effect.Effect<
       });
       const batch = rowsOf(page).map(toLedgerRow);
       for (const row of batch) {
-        const broken = (reason: "prev_hash" | "hash" | "balance"): VerifyResult => ({
+        const broken = (
+          reason: "prev_hash" | "hash" | "balance",
+        ): VerifyResult => ({
           ok: false,
           rows,
           brokenAtId: row.id,
           reason,
         });
         if (row.prevHash !== prevHash) return broken("prev_hash");
-        if (row.hash !== ledgerRowHash(row.prevHash, row)) return broken("hash");
+        if (row.hash !== ledgerRowHash(row.prevHash, row))
+          return broken("hash");
         const expected = (balances.get(row.userId) ?? 0n) + row.delta;
         if (row.balanceAfter !== expected) return broken("balance");
         balances.set(row.userId, expected);

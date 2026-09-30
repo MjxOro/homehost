@@ -203,14 +203,19 @@ export const agentRuns = pgTable(
       .defaultNow()
       .notNull(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
-    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    metadata: jsonb("metadata")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
   },
   (t) => [
     check(
       "agent_runs_kind_check",
       sql`${t.kind} IN ('site_build','site_edit','site_import','concierge','bench')`,
     ),
-    check("agent_runs_purpose_check", sql`${t.purpose} IN ('prod','bench','dev')`),
+    check(
+      "agent_runs_purpose_check",
+      sql`${t.purpose} IN ('prod','bench','dev')`,
+    ),
     check(
       "agent_runs_status_check",
       sql`${t.status} IN ('running','succeeded','failed','cancelled')`,
@@ -244,12 +249,24 @@ export const llmCalls = pgTable(
       .notNull(),
   },
   (t) => [
-    check("llm_calls_purpose_check", sql`${t.purpose} IN ('prod','bench','dev')`),
-    check("llm_calls_prompt_hash_check", sql`${t.promptHash} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "llm_calls_purpose_check",
+      sql`${t.purpose} IN ('prod','bench','dev')`,
+    ),
+    check(
+      "llm_calls_prompt_hash_check",
+      sql`${t.promptHash} ~ '^[0-9a-f]{64}$'`,
+    ),
     check("llm_calls_input_tokens_check", sql`${t.inputTokens} >= 0`),
     check("llm_calls_output_tokens_check", sql`${t.outputTokens} >= 0`),
-    check("llm_calls_cached_input_tokens_check", sql`${t.cachedInputTokens} >= 0`),
-    check("llm_calls_cache_write_tokens_check", sql`${t.cacheWriteTokens} >= 0`),
+    check(
+      "llm_calls_cached_input_tokens_check",
+      sql`${t.cachedInputTokens} >= 0`,
+    ),
+    check(
+      "llm_calls_cache_write_tokens_check",
+      sql`${t.cacheWriteTokens} >= 0`,
+    ),
     check("llm_calls_cost_micro_usd_check", sql`${t.costMicroUsd} >= 0`),
     check("llm_calls_latency_ms_check", sql`${t.latencyMs} >= 0`),
     check("llm_calls_status_check", sql`${t.status} IN ('ok','error')`),
@@ -266,7 +283,9 @@ export const llmCalls = pgTable(
 export const creditLedger = pgTable(
   "credit_ledger",
   {
-    id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+    id: bigint("id", { mode: "bigint" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
     userId: text("user_id")
       .notNull()
       .references(() => users.id),
@@ -287,7 +306,10 @@ export const creditLedger = pgTable(
       "credit_ledger_reason_check",
       sql`${t.reason} IN ('purchase','usage','refund','grant','adjustment')`,
     ),
-    check("credit_ledger_prev_hash_check", sql`${t.prevHash} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "credit_ledger_prev_hash_check",
+      sql`${t.prevHash} ~ '^[0-9a-f]{64}$'`,
+    ),
     check("credit_ledger_hash_check", sql`${t.hash} ~ '^[0-9a-f]{64}$'`),
     index("credit_ledger_user_id_id_idx").on(t.userId, t.id),
   ],

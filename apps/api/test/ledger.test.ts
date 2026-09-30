@@ -1,10 +1,4 @@
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  test,
-} from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import postgres from "postgres";
@@ -32,9 +26,7 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
   const namespace = `test_${randomUUID().replaceAll("-", "")}`;
   let admin: postgres.Sql;
   let client: postgres.Sql;
-  let run: <A, E>(
-    effect: Effect.Effect<A, E, DatabaseTag>,
-  ) => Promise<A>;
+  let run: <A, E>(effect: Effect.Effect<A, E, DatabaseTag>) => Promise<A>;
   let runExit: <A, E>(
     effect: Effect.Effect<A, E, DatabaseTag>,
   ) => Promise<{ error: unknown }>;
@@ -81,10 +73,20 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
 
   test("chain links across users and balances accumulate per user", async () => {
     const [alice, bob] = [await newUser(), await newUser()];
-    const a1 = await run(appendCredit({ userId: alice, delta: 100n, reason: "purchase" }));
-    const b1 = await run(appendCredit({ userId: bob, delta: 50n, reason: "grant" }));
+    const a1 = await run(
+      appendCredit({ userId: alice, delta: 100n, reason: "purchase" }),
+    );
+    const b1 = await run(
+      appendCredit({ userId: bob, delta: 50n, reason: "grant" }),
+    );
     const a2 = await run(
-      appendCredit({ userId: alice, delta: -30n, reason: "usage", refType: "llm_call", refId: randomUUID() }),
+      appendCredit({
+        userId: alice,
+        delta: -30n,
+        reason: "usage",
+        refType: "llm_call",
+        refId: randomUUID(),
+      }),
     );
     expect(a1.balanceAfter).toBe(100n);
     expect(b1.balanceAfter).toBe(50n);
@@ -96,7 +98,14 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
     expect(await run(getBalance(await newUser()))).toBe(0n);
     // Independent recomputation of the documented formula for a stored row.
     const canonical = JSON.stringify([
-      a2.userId, "-30", "70", "usage", "llm_call", a2.refId, null, a2.createdAt.toISOString(),
+      a2.userId,
+      "-30",
+      "70",
+      "usage",
+      "llm_call",
+      a2.refId,
+      null,
+      a2.createdAt.toISOString(),
     ]);
     expect(a2.hash).toBe(
       createHash("sha256").update(`${a2.prevHash}\n${canonical}`).digest("hex"),
@@ -140,7 +149,9 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
     // postgres-js queries are lazy thenables; settle them as real promises first.
     const attempt = (q: PromiseLike<unknown>) => Promise.resolve(q);
     await expect(
-      attempt(client`UPDATE credit_ledger SET delta = 999 WHERE user_id = ${user}`),
+      attempt(
+        client`UPDATE credit_ledger SET delta = 999 WHERE user_id = ${user}`,
+      ),
     ).rejects.toThrow(/append-only/);
     await expect(
       attempt(client`DELETE FROM credit_ledger WHERE user_id = ${user}`),
@@ -153,7 +164,9 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
 
   test("verifyLedger pinpoints a tampered row", async () => {
     const user = await newUser();
-    const row = await run(appendCredit({ userId: user, delta: 7n, reason: "grant" }));
+    const row = await run(
+      appendCredit({ userId: user, delta: 7n, reason: "grant" }),
+    );
     await run(appendCredit({ userId: user, delta: 1n, reason: "grant" }));
     const setDelta = async (delta: bigint) => {
       // Table owner in the scratch schema: disable the guard, alter, re-enable.
@@ -183,7 +196,9 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
   });
 
   describe("llm calls and agent runs", () => {
-    const call = (over: Partial<RecordLlmCallInput> = {}): RecordLlmCallInput => ({
+    const call = (
+      over: Partial<RecordLlmCallInput> = {},
+    ): RecordLlmCallInput => ({
       purpose: "bench",
       provider: "prov",
       model: "model-x",
@@ -202,13 +217,19 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
 
     test("provider request id is unique per provider; null ids never collide", async () => {
       const requestId = randomUUID();
-      const first = await run(recordLlmCall(call({ providerRequestId: requestId })));
+      const first = await run(
+        recordLlmCall(call({ providerRequestId: requestId })),
+      );
       expect(first.costMicroUsd).toBe(1234n);
       const { error } = await runExit(
         recordLlmCall(call({ providerRequestId: requestId })),
       );
       expect(error).toBeInstanceOf(DuplicateLlmCall);
-      await run(recordLlmCall(call({ providerRequestId: requestId, provider: "other" })));
+      await run(
+        recordLlmCall(
+          call({ providerRequestId: requestId, provider: "other" }),
+        ),
+      );
       await run(recordLlmCall(call({ providerRequestId: null })));
       await run(recordLlmCall(call({ providerRequestId: null })));
     });
@@ -223,13 +244,17 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
         const { error } = await runExit(recordLlmCall(bad));
         expect(error).toBeInstanceOf(InvalidUsage);
       }
-      const { error } = await runExit(recordLlmCall(call({ promptHash: "nope" })));
+      const { error } = await runExit(
+        recordLlmCall(call({ promptHash: "nope" })),
+      );
       expect(error).toBeInstanceOf(InvalidUsage);
       expect(error).not.toBeInstanceOf(DbFailure);
     });
 
     test("agent runs start running for a user or none, and finish once", async () => {
-      const bench = await run(startAgentRun({ kind: "bench", purpose: "bench" }));
+      const bench = await run(
+        startAgentRun({ kind: "bench", purpose: "bench" }),
+      );
       expect(bench.userId).toBeNull();
       expect(bench.status).toBe("running");
       const done = await run(finishAgentRun(bench.id, "succeeded"));
@@ -239,9 +264,19 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
       expect(error).toMatchObject({ _tag: "AgentRunNotRunning" });
       const user = await newUser();
       const owned = await run(
-        startAgentRun({ userId: user, kind: "site_build", purpose: "prod", refType: "site", refId: randomUUID() }),
+        startAgentRun({
+          userId: user,
+          kind: "site_build",
+          purpose: "prod",
+          refType: "site",
+          refId: randomUUID(),
+        }),
       );
-      const linked = await run(recordLlmCall(call({ agentRunId: owned.id, userId: user, purpose: "prod" })));
+      const linked = await run(
+        recordLlmCall(
+          call({ agentRunId: owned.id, userId: user, purpose: "prod" }),
+        ),
+      );
       expect(linked.agentRunId).toBe(owned.id);
     });
   });
