@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "business": {
+    "name": "Cedar Grove Plumbing",
+    "tagline": "Thoughtful repairs. Clear estimates. Local people.",
+    "niche": "Residential plumbing and drain service",
+    "phone": "+1 (250) 555-0147",
+    "email": "hello@cedargroveplumbing.ca",
+    "address": "184 Alder Street, Victoria, BC V8V 2A1, Canada",
+    "serviceArea": ["Victoria", "Oak Bay", "Saanich", "Esquimalt"],
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "08:00",
+        "closes": "17:00"
+      },
+      { "days": ["sat"], "opens": "09:00", "closes": "13:00" }
+    ],
+    "socials": [
+      {
+        "kind": "Instagram",
+        "url": "https://www.instagram.com/cedargroveplumbing/"
+      }
+    ]
+  },
+  "theme": { "preset": "ocean", "fonts": "modern" },
+  "pages": [
+    {
+      "slug": "",
+      "title": "Cedar Grove Plumbing",
+      "description": "Friendly residential plumbing in Greater Victoria. Leak repairs, drain clearing and water heater installation with written estimates.",
+      "sections": [
+        {
+          "type": "hero.split-image",
+          "heading": "A comfortable home starts with plumbing you can trust",
+          "text": "Our Victoria team helps homeowners fix leaks, restore drains and plan sensible upgrades. We explain the work and agree on a price before we begin.",
+          "image": {
+            "src": "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80",
+            "alt": "Workshop tools arranged for a home repair"
+          },
+          "action": { "label": "Explore our services", "href": "/services/" }
+        },
+        {
+          "type": "services.grid",
+          "heading": "Practical help for everyday plumbing",
+          "items": [
+            {
+              "title": "Leak repairs",
+              "description": "From dripping taps to hidden supply-line leaks, we find the source and explain your repair options."
+            },
+            {
+              "title": "Drain clearing",
+              "description": "Careful clearing for slow sinks, tubs and household drains, with advice to help prevent the next blockage."
+            },
+            {
+              "title": "Water heaters",
+              "description": "Tank replacement and maintenance sized to your household, including removal of the old unit."
+            }
+          ]
+        },
+        {
+          "type": "about.text",
+          "heading": "Your neighbours since 2016",
+          "text": "Cedar Grove is a small, locally owned team led by licensed plumber Rowan Chen. We protect floors, clean up our work area and leave you with a clear record of every repair."
+        },
+        {
+          "type": "testimonials.cards",
+          "heading": "Kind words from local homeowners",
+          "items": [
+            {
+              "quote": "Rowan found the leaking connection, explained the repair and left the kitchen spotless. The written estimate made everything easy.",
+              "author": "Maya L.",
+              "detail": "Oak Bay homeowner"
+            },
+            {
+              "quote": "The team arrived on time and had our laundry drain running again that morning. Friendly service from start to finish.",
+              "author": "Daniel R.",
+              "detail": "Saanich homeowner"
+            }
+          ]
+        },
+        {
+          "type": "cta.banner",
+          "heading": "Tell us what needs fixing",
+          "text": "Call during our opening hours to describe the problem and arrange a visit. If water is actively leaking, turn off the supply valve while you wait.",
+          "action": { "label": "Contact the team", "href": "/contact/" }
+        }
+      ]
+    },
+    {
+      "slug": "services",
+      "title": "Services",
+      "description": "See Cedar Grove Plumbing's repair, drain and installation services, starting rates and answers to common booking questions.",
+      "sections": [
+        {
+          "type": "hero.centered",
+          "heading": "Repairs and upgrades with no guesswork",
+          "text": "We inspect the issue, explain the options and provide a written estimate. Work starts once you are comfortable with the plan."
+        },
+        {
+          "type": "pricing.table",
+          "heading": "Starting rates in Canadian dollars",
+          "items": [
+            {
+              "name": "Diagnostic visit",
+              "price": "$115 + tax",
+              "description": "Inspection and a written estimate. Credited toward approved repair work on the same visit."
+            },
+            {
+              "name": "Tap or toilet repair",
+              "price": "From $175 + tax",
+              "description": "Labour for common repairs; parts priced separately in your estimate."
+            },
+            {
+              "name": "Drain clearing",
+              "price": "From $210 + tax",
+              "description": "Accessible household drain clearing. Camera inspection is quoted separately if needed."
+            }
+          ]
+        },
+        {
+          "type": "faq.list",
+          "heading": "Before we visit",
+          "items": [
+            {
+              "question": "Do you offer overnight emergency service?",
+              "answer": "We take appointments during our listed hours. For an active leak outside those hours, shut off your home's main water valve and contact a 24-hour emergency provider."
+            },
+            {
+              "question": "Which areas do you serve?",
+              "answer": "We work in Victoria, Oak Bay, Saanich and Esquimalt. Call with your address so we can confirm availability."
+            },
+            {
+              "question": "Can I send a photo of the problem?",
+              "answer": "Yes. Email a clear photo with your phone number and a short description. Photos help us prepare, though the final estimate follows an on-site inspection."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "contact",
+      "title": "Contact",
+      "description": "Call or email Cedar Grove Plumbing to book a repair in Victoria, Oak Bay, Saanich or Esquimalt.",
+      "sections": [
+        {
+          "type": "contact.details",
+          "heading": "Let's arrange your visit",
+          "text": "Have your address, a description of the issue and your preferred appointment days ready. Our office is open for scheduled visits; please call before stopping by."
+        },
+        { "type": "hours.table", "heading": "Office and appointment hours" },
+        { "type": "map.embed", "heading": "Our Victoria office" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "business": {
+    "name": "Harbour Finch Café",
+    "tagline": "Coffee, baking and a seat by the window.",
+    "niche": "Independent café and bakery",
+    "phone": "+1 (902) 555-0164",
+    "email": "hello@harbourfinch.ca",
+    "address": "36 Birch Quay, Dartmouth, NS B2Y 1H6, Canada",
+    "serviceArea": ["Downtown Dartmouth", "Halifax", "Woodside"],
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "07:00",
+        "closes": "16:00"
+      },
+      { "days": ["sat", "sun"], "opens": "08:00", "closes": "16:00" }
+    ],
+    "socials": [
+      {
+        "kind": "Instagram",
+        "url": "https://www.instagram.com/harbourfinchcafe/"
+      }
+    ]
+  },
+  "theme": { "preset": "terracotta", "fonts": "classic" },
+  "pages": [
+    {
+      "slug": "",
+      "title": "Harbour Finch Café",
+      "description": "Small-batch coffee, fresh baking and simple lunches in downtown Dartmouth. Drop into Harbour Finch Café seven days a week.",
+      "sections": [
+        {
+          "type": "hero.split-image",
+          "heading": "A warm welcome on the Dartmouth waterfront",
+          "text": "Start your morning with a carefully pulled espresso and something fresh from the oven. Stay for lunch, bring a book or take your coffee down to the harbour.",
+          "image": {
+            "src": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80",
+            "alt": "A welcoming café with tables beside large windows"
+          },
+          "action": { "label": "Browse the menu", "href": "/menu/" }
+        },
+        {
+          "type": "services.grid",
+          "heading": "Made for your daily pause",
+          "items": [
+            {
+              "title": "Coffee with care",
+              "description": "Espresso drinks and filter coffee made with beans from a small Nova Scotia roaster. Oat milk is always available."
+            },
+            {
+              "title": "Baked every morning",
+              "description": "Buttery pastries, oat cookies and seasonal muffins made in our kitchen. The selection changes with the day."
+            },
+            {
+              "title": "A simple, good lunch",
+              "description": "Soup, toasties and fresh sandwiches from 11:00 until sold out. Ask us about today's vegetarian option."
+            }
+          ]
+        },
+        {
+          "type": "about.text",
+          "heading": "Our little spot by the harbour",
+          "text": "Friends Leah MacDonald and Sam Ortiz opened Harbour Finch in 2021 with one idea: make the neighbourhood's daily coffee feel special. We buy locally where we can and bake in small batches to keep things fresh."
+        },
+        {
+          "type": "gallery.grid",
+          "heading": "Pull up a chair",
+          "images": [
+            {
+              "src": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1000&q=80",
+              "alt": "Freshly prepared coffee ready to serve"
+            },
+            {
+              "src": "https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1000&q=80",
+              "alt": "Golden pastries from a morning bake"
+            }
+          ]
+        },
+        {
+          "type": "cta.banner",
+          "heading": "See you at the café",
+          "text": "No booking needed for everyday visits. For groups of six or more, give us a call so we can help you find a good time.",
+          "action": { "label": "Plan your visit", "href": "/visit/" }
+        }
+      ]
+    },
+    {
+      "slug": "menu",
+      "title": "Menu",
+      "description": "Coffee, pastries and lunch at Harbour Finch Café. Browse our everyday menu and Canadian-dollar prices before your Dartmouth visit.",
+      "sections": [
+        {
+          "type": "hero.centered",
+          "heading": "Good things, made simply",
+          "text": "Prices are in Canadian dollars, before tax. Baking and lunch specials change daily; our team can tell you what is fresh today."
+        },
+        {
+          "type": "pricing.table",
+          "heading": "Coffee and tea",
+          "items": [
+            {
+              "name": "Espresso",
+              "price": "$3.25",
+              "description": "A balanced double shot from our house blend."
+            },
+            {
+              "name": "Filter coffee",
+              "price": "$3.50",
+              "description": "Freshly brewed, 12 oz."
+            },
+            {
+              "name": "Cappuccino",
+              "price": "$4.75",
+              "description": "Double espresso with steamed milk, 8 oz."
+            },
+            {
+              "name": "Latte",
+              "price": "$5.25",
+              "description": "Double espresso with steamed milk, 12 oz. Oat milk adds $0.50."
+            },
+            {
+              "name": "Loose-leaf tea",
+              "price": "$3.75",
+              "description": "Choose black, green or herbal tea."
+            }
+          ]
+        },
+        {
+          "type": "pricing.table",
+          "heading": "From the kitchen",
+          "items": [
+            {
+              "name": "Butter croissant",
+              "price": "$4.25",
+              "description": "Flaky, golden and baked every morning."
+            },
+            {
+              "name": "Seasonal muffin",
+              "price": "$3.75",
+              "description": "Ask about today's fruit and spice combination."
+            },
+            {
+              "name": "Cheddar toastie",
+              "price": "$8.50",
+              "description": "Aged cheddar and onion relish on sourdough."
+            },
+            {
+              "name": "Soup and bread",
+              "price": "$9.00",
+              "description": "A warming bowl with a slice of sourdough. Available from 11:00."
+            }
+          ]
+        },
+        {
+          "type": "faq.list",
+          "heading": "Dietary questions",
+          "items": [
+            {
+              "question": "Do you have vegan or gluten-free options?",
+              "answer": "We usually have a vegan bake and can prepare several drinks with oat milk. Our shared kitchen handles wheat, milk, eggs and nuts, so we cannot guarantee an allergen-free item. Speak with our team before ordering."
+            },
+            {
+              "question": "Can I order baking for a meeting?",
+              "answer": "Yes. Email at least two working days ahead with the date, number of people and any dietary requests. We will confirm availability and a price before you order."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "visit",
+      "title": "Visit",
+      "description": "Find Harbour Finch Café in downtown Dartmouth, check opening hours and get in touch about a group visit or baking order.",
+      "sections": [
+        {
+          "type": "contact.details",
+          "heading": "Come on in",
+          "text": "Our café has a step-free entrance, indoor tables and a small outdoor seating area in warm weather. Bicycle parking is nearby. Well-behaved dogs are welcome at outdoor tables."
+        },
+        { "type": "hours.table", "heading": "Here seven days a week" },
+        { "type": "map.embed", "heading": "Find your way to Birch Quay" }
+      ]
+    }
+  ]
+}

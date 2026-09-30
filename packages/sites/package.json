@@ -1,0 +1,17 @@
+{
+  "name": "@homehost/sites",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.5.0"
+  }
+}
