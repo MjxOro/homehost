@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useSession } from "../lib/query";
+import { CheckIcon } from "./icons";
 import { PersonaPicker } from "./PersonaPicker";
 import { PrimaryCta } from "./landing/PrimaryCta";
 import { BUTTON_OUTLINE } from "./primitives";
@@ -9,7 +10,7 @@ interface ProviderTarget {
   label: string;
 }
 
-const STEPS: Array<{ title: string; copy: string }> = [
+export const STEPS: Array<{ title: string; copy: string }> = [
   { title: "Request a box.", copy: "Pick a plan and send a request." },
   {
     title: "Operator approves.",
@@ -54,13 +55,23 @@ export function OAuthButtons({
   const facts = (
     <ul
       aria-label="Connection facts"
-      className="m-0 flex list-none flex-wrap gap-2 p-0"
+      className={`m-0 flex list-none flex-wrap p-0 ${
+        landing ? "animate-fade-up gap-x-5 gap-y-2" : "gap-2"
+      }`}
+      style={landing ? { animationDelay: "420ms" } : undefined}
     >
       {LIVE_FACTS.map((fact) => (
         <li
           key={fact}
-          className="rounded-full border border-line bg-ink-2 px-2.5 py-1 text-[12.5px] font-[600] text-text-2"
+          className={
+            landing
+              ? "flex items-center gap-1.5 text-[13px] text-text-2"
+              : "rounded-full border border-line bg-ink-2 px-2.5 py-1 text-[12.5px] font-[600] text-text-2"
+          }
         >
+          {landing ? (
+            <CheckIcon className="size-3.5 shrink-0 text-accent" />
+          ) : null}
           {fact}
         </li>
       ))}
@@ -100,13 +111,16 @@ export function OAuthButtons({
       )}
       {primary ? (
         <div
-          className={`flex w-full flex-col gap-2.5 ${landing ? "sm:max-w-[360px]" : ""}`}
+          className={`flex w-full flex-col gap-2.5 ${landing ? "animate-fade-up sm:flex-row sm:flex-wrap sm:items-center" : ""}`}
+          style={landing ? { animationDelay: "320ms" } : undefined}
         >
-          <PrimaryCta href={primary.href}>{primary.label}</PrimaryCta>
+          <PrimaryCta href={primary.href} landing={landing}>
+            {primary.label}
+          </PrimaryCta>
           {secondary.map((t) => (
             <a
               key={t.href}
-              className={`${BUTTON_OUTLINE} w-full`}
+              className={`${BUTTON_OUTLINE} w-full ${landing ? "min-h-12 px-6 sm:w-auto" : ""}`}
               href={t.href}
             >
               {t.label}
