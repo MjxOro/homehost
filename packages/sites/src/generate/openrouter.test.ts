@@ -72,14 +72,17 @@ test("OpenRouter sends strict structured output and maps recorded billing metada
   });
   expect(response.latencyMs).toBeGreaterThanOrEqual(0);
 });
-test("optional response metadata defaults to zero and requested model", async () => {
+test("optional response metadata defaults to zero and requested model when cost is reported", async () => {
   const response = await createOpenRouterClient({
     apiKey: key(),
     baseUrl: "https://router.internal/v1/",
     fetch: transport(async (url, init) => {
       expect(url).toBe("https://router.internal/v1/chat/completions");
       expect(JSON.parse(String(init?.body)).response_format).toBeUndefined();
-      return Response.json({ choices: [{ message: { content: "{}" } }] });
+      return Response.json({
+        choices: [{ message: { content: "{}" } }],
+        usage: { cost: 0 },
+      });
     }),
   }).complete({ model: "requested", messages: [] });
   expect(response).toMatchObject({
@@ -106,6 +109,43 @@ test("maps top-level cache writes when token details are missing", async () => {
   }).complete(request);
   expect(response.usage.cacheWriteTokens).toBe(7);
   expect(response.usage.costMicroUsd).toBe(1n);
+});
+test.each([
+  { label: "no usage", usage: undefined, inputTokens: 0 },
+  {
+    label: "usage without cost",
+    usage: { prompt_tokens: 40, completion_tokens: 5 },
+    inputTokens: 40,
+  },
+])(
+  "a successful response with $label is a missing_usage error, not a free call",
+  async ({ usage, inputTokens }) => {
+    const client = createOpenRouterClient({
+      apiKey: key(),
+      fetch: transport(async () => Response.json(recorded({ usage }))),
+    });
+    await expect(client.complete(request)).rejects.toMatchObject({
+      code: "missing_usage",
+      response: {
+        content: '{"ok":true}',
+        providerRequestId: "gen-recorded",
+        usage: { inputTokens, costMicroUsd: 0n },
+      },
+    });
+  },
+);
+test("an invalid envelope still carries reported usage and cost", async () => {
+  const client = createOpenRouterClient({
+    apiKey: key(),
+    fetch: transport(async () => Response.json(recorded({ choices: [] }))),
+  });
+  await expect(client.complete(request)).rejects.toMatchObject({
+    code: "invalid_response",
+    response: {
+      providerRequestId: "gen-recorded",
+      usage: { inputTokens: 123, costMicroUsd: 1235n },
+    },
+  });
 });
 test.each([429, 503])("retries HTTP %i with backoff", async (status) => {
   let attempts = 0;

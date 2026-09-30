@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { generateSite } from "./generate";
 import { hashLlmRequest } from "./hash";
-import { LlmClientError } from "./openrouter";
+import { createOpenRouterClient, LlmClientError } from "./openrouter";
 import type { Plan } from "./prompts";
 import type {
   GenerateOptions,
@@ -403,6 +403,32 @@ test("provider errors carrying known usage preserve it in failed call records", 
     providerRequestId: "call-99",
     costMicroUsd: 10n,
     inputTokens: 100,
+  });
+});
+test("an OpenRouter response without cost is recorded as a missing_usage error", async () => {
+  const llm = createOpenRouterClient({
+    apiKey: "test-key",
+    fetch: (async () =>
+      Response.json({
+        id: "gen-free",
+        choices: [{ message: { content: JSON.stringify(plan()) } }],
+        usage: { prompt_tokens: 80, completion_tokens: 30 },
+      })) as unknown as typeof globalThis.fetch,
+  });
+  const seen: LlmCallRecord[] = [];
+  const result = await generateSite(
+    brief(),
+    options(llm, { onCall: (call) => seen.push(call) }),
+  );
+  expect(result.ok).toBe(false);
+  expect(seen[0]).toMatchObject({
+    stage: "plan",
+    status: "error",
+    errorCode: "missing_usage",
+    providerRequestId: "gen-free",
+    inputTokens: 80,
+    outputTokens: 30,
+    costMicroUsd: 0n,
   });
 });
 test("plan failure after escalation returns false without any fill calls", async () => {

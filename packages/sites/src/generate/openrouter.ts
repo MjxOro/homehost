@@ -2,6 +2,17 @@ import { z } from "zod/v4";
 import type { LlmClient, LlmRequest, LlmResponse } from "./types";
 
 const count = z.number().int().nonnegative().optional();
+const usageSchema = z
+  .object({
+    prompt_tokens: count,
+    completion_tokens: count,
+    cost: z.number().nonnegative().optional(),
+    cache_write_tokens: count,
+    prompt_tokens_details: z
+      .object({ cached_tokens: count, cache_write_tokens: count })
+      .optional(),
+  })
+  .optional();
 const envelope = z.object({
   id: z.string().optional(),
   provider: z.string().optional(),
@@ -9,17 +20,7 @@ const envelope = z.object({
   choices: z
     .array(z.object({ message: z.object({ content: z.string().nullable() }) }))
     .min(1),
-  usage: z
-    .object({
-      prompt_tokens: count,
-      completion_tokens: count,
-      cost: z.number().nonnegative().optional(),
-      cache_write_tokens: count,
-      prompt_tokens_details: z
-        .object({ cached_tokens: count, cache_write_tokens: count })
-        .optional(),
-    })
-    .optional(),
+  usage: usageSchema,
 });
 
 /** Carries known billed usage even if the provider returned no usable content. */
@@ -165,21 +166,29 @@ export function createOpenRouterClient(
               `http_${response.status}`,
             );
           }
-          let data: z.infer<typeof envelope>;
+          let json: unknown;
           try {
-            data = envelope.parse(JSON.parse(body));
+            json = JSON.parse(body);
           } catch {
             throw new LlmClientError(
               "OpenRouter returned an invalid response envelope",
               "invalid_response",
             );
           }
-          const usage = data.usage;
-          const result: LlmResponse = {
-            content: data.choices[0]!.message.content ?? "",
-            provider: data.provider ?? "openrouter",
-            model: data.model ?? request.model,
-            providerRequestId: data.id ?? null,
+          // Usage is read before the rest of the envelope so a billed call
+          // keeps its tokens and cost even when other fields are unusable.
+          const raw: Record<string, unknown> =
+            typeof json === "object" && json !== null
+              ? (json as Record<string, unknown>)
+              : {};
+          const text = (value: unknown) =>
+            typeof value === "string" ? value : undefined;
+          const usage = usageSchema.safeParse(raw.usage).data;
+          const billed = (content: string): LlmResponse => ({
+            content,
+            provider: text(raw.provider) ?? "openrouter",
+            model: text(raw.model) ?? request.model,
+            providerRequestId: text(raw.id) ?? null,
             usage: {
               inputTokens: usage?.prompt_tokens ?? 0,
               outputTokens: usage?.completion_tokens ?? 0,
@@ -192,7 +201,22 @@ export function createOpenRouterClient(
               costMicroUsd: BigInt(Math.round((usage?.cost ?? 0) * 1e6)),
             },
             latencyMs: Math.round(performance.now() - started),
-          };
+          });
+          const data = envelope.safeParse(json);
+          if (!data.success)
+            throw new LlmClientError(
+              "OpenRouter returned an invalid response envelope",
+              "invalid_response",
+              usage ? billed("") : undefined,
+            );
+          const result = billed(data.data.choices[0]!.message.content ?? "");
+          // An absent cost is unknown, not free: never meter it as $0 ok.
+          if (usage?.cost === undefined)
+            throw new LlmClientError(
+              "OpenRouter response did not report usage cost",
+              "missing_usage",
+              result,
+            );
           if (!result.content)
             throw new LlmClientError(
               "OpenRouter returned no text content",
