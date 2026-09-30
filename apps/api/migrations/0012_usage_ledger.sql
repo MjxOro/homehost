@@ -68,10 +68,20 @@ CREATE TABLE IF NOT EXISTS credit_ledger (
   confirm_id UUID,
   created_at TIMESTAMPTZ NOT NULL,
   prev_hash CHAR(64) NOT NULL CHECK (prev_hash ~ '^[0-9a-f]{64}$'),
-  hash CHAR(64) NOT NULL UNIQUE CHECK (hash ~ '^[0-9a-f]{64}$')
+  hash CHAR(64) NOT NULL UNIQUE CHECK (hash ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT credit_ledger_reason_sign_check CHECK (
+    CASE reason
+      WHEN 'usage' THEN delta < 0
+      WHEN 'adjustment' THEN true
+      ELSE delta > 0
+    END
+  )
 );
 CREATE INDEX IF NOT EXISTS credit_ledger_user_id_id_idx
   ON credit_ledger(user_id, id);
+-- One successor per row: a stale-head append fails instead of forking the chain.
+CREATE UNIQUE INDEX IF NOT EXISTS credit_ledger_prev_hash_unique
+  ON credit_ledger(prev_hash);
 
 CREATE OR REPLACE FUNCTION credit_ledger_reject_mutation() RETURNS trigger AS $$
 BEGIN
