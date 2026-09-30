@@ -40,3 +40,22 @@ sudo netfilter-persistent save
 
 Tenant bridges also have no IPv6 route: guest package installs must force
 IPv4 (`Acquire::ForceIPv4 "true"` in cloud-init) until the host routes v6.
+
+## Prod worker service
+
+`homehost-worker.service` (host systemd, `WORKER_ENV=prod`) reads its
+environment from `infra/private/worker.env` (mode 600, never committed) via
+the drop-in `/etc/systemd/system/homehost-worker.service.d/env.conf`, which
+replaces the unit's `EnvironmentFile=.env`. The repo `.env` belongs to the
+host dev loop and must never point at prod.
+
+```ini
+# infra/private/worker.env
+DATABASE_URL=postgres://homehost:<password>@127.0.0.1:55434/homehost  # prod DB only
+IPV6_PREFIX=<same as infra/private/prod.env>
+CF_DNS_API_TOKEN=<Edit-zone-DNS token, same as infra/private/traefik.env>
+```
+
+Deploys (`prod:deploy`) don't restart this unit. After a merge that changes
+`apps/worker`, run `sudo systemctl restart homehost-worker` and check
+`journalctl -u homehost-worker -n 20` for `worker up (prod)`.
