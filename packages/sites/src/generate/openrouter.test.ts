@@ -79,6 +79,7 @@ test("optional response metadata defaults to zero and requested model when cost 
     fetch: transport(async (url, init) => {
       expect(url).toBe("https://router.internal/v1/chat/completions");
       expect(JSON.parse(String(init?.body)).response_format).toBeUndefined();
+      expect(JSON.parse(String(init?.body)).provider).toBeUndefined();
       return Response.json({
         choices: [{ message: { content: "{}" } }],
         usage: { cost: 0 },

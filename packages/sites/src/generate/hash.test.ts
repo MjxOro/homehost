@@ -123,8 +123,8 @@ test("brief goes last and system prefix is stable across businesses and retries"
       (s: any) => s.properties.type.const,
     ),
   ).toEqual(["hero.centered", "contact.details"]);
-  expect(schema.properties.sections.minItems).toBe(2);
-  expect(schema.properties.sections.maxItems).toBe(2);
+  expect(schema.properties.sections.minItems).toBeUndefined();
+  expect(schema.properties.sections.maxItems).toBeUndefined();
   expect(
     pageFillSchema(plan.pages[0]!).safeParse({
       title: "Home",

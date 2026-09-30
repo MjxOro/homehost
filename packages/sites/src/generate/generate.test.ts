@@ -330,6 +330,7 @@ test("permanently failed fill stops scheduling unstarted pages", async () => {
 });
 test.each([
   { value: "```json\n{}\n```", code: "invalid_json" },
+  { value: { page: fill() }, code: "schema_error" },
   { value: fill("x".repeat(161)), code: "schema_error" },
   {
     value: {
