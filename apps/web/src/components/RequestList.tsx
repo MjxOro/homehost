@@ -357,8 +357,13 @@ export function SshAccess({
   }
   return (
     <>
+      {request.status === "provisioning" ? (
+        <p className="mt-2.5 text-[13px] leading-[1.55] text-text-2">
+          Setting up the network. Your SSH address appears once the box answers.
+        </p>
+      ) : null}
       {request.status === "running" ? (
-        <div className="mt-2.5 flex flex-col items-start gap-1 [&>span]:mt-0">
+        <div className="animate-fade-in mt-2.5 flex flex-col items-start gap-1 [&>span]:mt-0">
           <span className={LABEL_CHIP}>SSH</span>
           <SshCommand command={`ssh root@${request.subdomain}`} />
         </div>
@@ -551,7 +556,9 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
                 <span aria-hidden="true">·</span>
                 <span>{resourceLine(request)}</span>
               </p>
-              <SubdomainText value={request.subdomain} />
+              {request.status === "provisioning" ? null : (
+                <SubdomainText value={request.subdomain} />
+              )}
               {request.ipv4 ? <IpBadge value={request.ipv4} /> : null}
               {request.ipv6 ? <Ipv6Badge value={request.ipv6} /> : null}
               <SshAccess request={request} onAnnounce={onAnnounce} />
