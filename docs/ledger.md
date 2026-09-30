@@ -54,7 +54,7 @@ Single global, append-only, hash-chained table.
 | -------------------- | ---------------------------------------------------------- |
 | `id`                 | `bigint generated always as identity`; chain order         |
 | `user_id`            | NOT NULL FK `users` (no cascade: history outlives nothing) |
-| `delta`              | bigint, `<> 0`                                             |
+| `delta`              | bigint, `<> 0`; sign follows `reason` (below)              |
 | `balance_after`      | bigint, `>= 0`; the user's balance after this row          |
 | `reason`             | `purchase`, `usage`, `refund`, `grant`, `adjustment`       |
 | `ref_type`, `ref_id` | nullable text                                              |
@@ -62,6 +62,14 @@ Single global, append-only, hash-chained table.
 | `created_at`         | set by the app at millisecond precision; part of the hash  |
 | `prev_hash`          | `char(64)`; hash of the previous row, genesis is 64 `'0'`  |
 | `hash`               | `char(64)`, unique                                         |
+
+`prev_hash` is also unique, so each row has at most one successor and a
+stale-head append fails instead of forking the chain. A `CHECK` ties `reason`
+to the sign of `delta`: `usage` requires `delta < 0`; `purchase`, `grant` and
+`refund` require `delta > 0`; `adjustment` may be either sign.
+
+Idempotency keys (a unique `confirm_id` or `(reason, ref_type, ref_id)`) are
+not enforced yet; they arrive with the first writer, in the credits PR.
 
 ## Hash formula
 
