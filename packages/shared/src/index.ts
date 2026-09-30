@@ -9,6 +9,13 @@ export {
   toSubdomain,
 } from "./provisioning.js";
 export * from "./control-plane.js";
+export {
+  dohHasAaaa,
+  normalizeIpv6,
+  pollChecks,
+  sameIpv6,
+} from "./readiness.js";
+export type { PollOptions, ReadinessCheck } from "./readiness.js";
 export { SSH_KEY_MAX, isValidSshPublicKey } from "./ssh.js";
 export {
   STREAM_MOBILE_MAX_MBPS,
