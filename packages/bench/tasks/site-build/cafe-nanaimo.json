@@ -1,11 +1,7 @@
 {
   "id": "cafe-nanaimo",
   "suite": "site-build",
-  "tags": [
-    "cafe",
-    "hours",
-    "address"
-  ],
+  "tags": ["cafe", "hours", "address"],
   "brief": {
     "businessName": "Tidewater Coffee Co.",
     "niche": "Specialty coffee shop",
@@ -22,21 +18,12 @@
     },
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri"],
         "opens": "06:30",
         "closes": "16:00"
       },
       {
-        "days": [
-          "sat",
-          "sun"
-        ],
+        "days": ["sat", "sun"],
         "opens": "07:30",
         "closes": "16:00"
       }
@@ -44,11 +31,7 @@
     "tone": "relaxed"
   },
   "expect": {
-    "requiredFacts": [
-      "cold brew"
-    ],
-    "forbidden": [
-      "award-winning"
-    ]
+    "requiredFacts": ["cold brew"],
+    "forbidden": ["award-winning"]
   }
 }

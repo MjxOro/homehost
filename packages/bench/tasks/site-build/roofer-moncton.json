@@ -1,13 +1,7 @@
 {
   "id": "roofer-moncton",
   "suite": "site-build",
-  "tags": [
-    "trades",
-    "roofing",
-    "french-canadian",
-    "bilingual",
-    "address"
-  ],
+  "tags": ["trades", "roofing", "french-canadian", "bilingual", "address"],
   "brief": {
     "businessName": "Toitures Léger Roofing",
     "niche": "Residential roofing",
@@ -22,23 +16,12 @@
       "postalCode": "E1C 2T6",
       "country": "Canada"
     },
-    "serviceArea": [
-      "Moncton",
-      "Dieppe",
-      "Riverview"
-    ],
-    "pagesWanted": [
-      "Services",
-      "About",
-      "Contact"
-    ],
+    "serviceArea": ["Moncton", "Dieppe", "Riverview"],
+    "pagesWanted": ["Services", "About", "Contact"],
     "tone": "trustworthy"
   },
   "expect": {
-    "requiredFacts": [
-      "Dieppe",
-      "French"
-    ],
+    "requiredFacts": ["Dieppe", "French"],
     "minPages": 3
   }
 }

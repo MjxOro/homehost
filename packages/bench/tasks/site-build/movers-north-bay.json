@@ -1,12 +1,7 @@
 {
   "id": "movers-north-bay",
   "suite": "site-build",
-  "tags": [
-    "movers",
-    "rambling",
-    "hours",
-    "no-address"
-  ],
+  "tags": ["movers", "rambling", "hours", "no-address"],
   "brief": {
     "businessName": "Nipissing Movers",
     "niche": "Local moving company",
@@ -14,32 +9,17 @@
     "city": "North Bay",
     "phone": "(705) 555-0129",
     "email": "moves@nipissingmovers.ca",
-    "serviceArea": [
-      "North Bay",
-      "Callander",
-      "Corbeil"
-    ],
+    "serviceArea": ["North Bay", "Callander", "Corbeil"],
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri",
-          "sat"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat"],
         "opens": "07:00",
         "closes": "19:00"
       }
     ]
   },
   "expect": {
-    "requiredFacts": [
-      "piano"
-    ],
-    "forbidden": [
-      "fixed price"
-    ]
+    "requiredFacts": ["piano"],
+    "forbidden": ["fixed price"]
   }
 }

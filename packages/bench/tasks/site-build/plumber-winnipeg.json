@@ -1,13 +1,7 @@
 {
   "id": "plumber-winnipeg",
   "suite": "site-build",
-  "tags": [
-    "trades",
-    "plumbing",
-    "rambling",
-    "hours",
-    "address"
-  ],
+  "tags": ["trades", "plumbing", "rambling", "hours", "address"],
   "brief": {
     "businessName": "Northgate Plumbing & Drains",
     "niche": "Plumbing and drain cleaning",
@@ -22,46 +16,25 @@
       "postalCode": "R2W 2M4",
       "country": "Canada"
     },
-    "serviceArea": [
-      "Winnipeg",
-      "St. Vital",
-      "Transcona",
-      "West Kildonan"
-    ],
+    "serviceArea": ["Winnipeg", "St. Vital", "Transcona", "West Kildonan"],
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri"],
         "opens": "07:30",
         "closes": "17:00"
       },
       {
-        "days": [
-          "sat"
-        ],
+        "days": ["sat"],
         "opens": "09:00",
         "closes": "13:00"
       }
     ],
-    "pagesWanted": [
-      "Services",
-      "About"
-    ],
+    "pagesWanted": ["Services", "About"],
     "tone": "friendly and straightforward"
   },
   "expect": {
-    "requiredFacts": [
-      "$149"
-    ],
-    "forbidden": [
-      "24/7",
-      "award-winning"
-    ],
+    "requiredFacts": ["$149"],
+    "forbidden": ["24/7", "award-winning"],
     "minPages": 2
   }
 }

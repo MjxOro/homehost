@@ -1,12 +1,7 @@
 {
   "id": "trainer-vancouver",
   "suite": "site-build",
-  "tags": [
-    "trainer",
-    "strength",
-    "hours",
-    "address"
-  ],
+  "tags": ["trainer", "strength", "hours", "address"],
   "brief": {
     "businessName": "Kits Strength Lab",
     "niche": "Personal training studio",
@@ -23,20 +18,12 @@
     },
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri"],
         "opens": "06:00",
         "closes": "20:00"
       },
       {
-        "days": [
-          "sat"
-        ],
+        "days": ["sat"],
         "opens": "08:00",
         "closes": "12:00"
       }
@@ -44,11 +31,7 @@
     "tone": "encouraging, no hype"
   },
   "expect": {
-    "requiredFacts": [
-      "30-minute"
-    ],
-    "forbidden": [
-      "guaranteed results"
-    ]
+    "requiredFacts": ["30-minute"],
+    "forbidden": ["guaranteed results"]
   }
 }

@@ -1,11 +1,7 @@
 {
   "id": "photographer-charlottetown",
   "suite": "site-build",
-  "tags": [
-    "photographer",
-    "wedding",
-    "no-address"
-  ],
+  "tags": ["photographer", "wedding", "no-address"],
   "brief": {
     "businessName": "Island Light Photography",
     "niche": "Wedding and portrait photography",
@@ -13,17 +9,11 @@
     "city": "Charlottetown",
     "phone": "902-555-0167",
     "email": "hello@islandlightphoto.ca",
-    "pagesWanted": [
-      "Portfolio",
-      "Pricing",
-      "Contact"
-    ],
+    "pagesWanted": ["Portfolio", "Pricing", "Contact"],
     "tone": "warm and relaxed"
   },
   "expect": {
-    "requiredFacts": [
-      "$2,800"
-    ],
+    "requiredFacts": ["$2,800"],
     "minPages": 3
   }
 }

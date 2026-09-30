@@ -1,12 +1,7 @@
 {
   "id": "nails-surrey",
   "suite": "site-build",
-  "tags": [
-    "salon",
-    "nails",
-    "typos",
-    "address"
-  ],
+  "tags": ["salon", "nails", "typos", "address"],
   "brief": {
     "businessName": "Lotus Nail Bar",
     "niche": "Nail salon",
@@ -23,8 +18,6 @@
     }
   },
   "expect": {
-    "requiredFacts": [
-      "Punjabi"
-    ]
+    "requiredFacts": ["Punjabi"]
   }
 }

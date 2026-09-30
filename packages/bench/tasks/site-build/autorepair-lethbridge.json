@@ -1,14 +1,7 @@
 {
   "id": "autorepair-lethbridge",
   "suite": "site-build",
-  "tags": [
-    "auto-repair",
-    "diesel",
-    "terse",
-    "hours",
-    "address",
-    "no-email"
-  ],
+  "tags": ["auto-repair", "diesel", "terse", "hours", "address", "no-email"],
   "brief": {
     "businessName": "Coulee Auto & Diesel",
     "niche": "Auto and light-diesel repair",
@@ -24,13 +17,7 @@
     },
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri"],
         "opens": "08:00",
         "closes": "17:30"
       }

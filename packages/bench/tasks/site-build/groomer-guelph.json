@@ -1,11 +1,7 @@
 {
   "id": "groomer-guelph",
   "suite": "site-build",
-  "tags": [
-    "pet-groomer",
-    "hours",
-    "address"
-  ],
+  "tags": ["pet-groomer", "hours", "address"],
   "brief": {
     "businessName": "Wag & Wash Pet Grooming",
     "niche": "Dog and cat grooming",
@@ -22,13 +18,7 @@
     },
     "hours": [
       {
-        "days": [
-          "tue",
-          "wed",
-          "thu",
-          "fri",
-          "sat"
-        ],
+        "days": ["tue", "wed", "thu", "fri", "sat"],
         "opens": "09:00",
         "closes": "17:00"
       }
@@ -36,11 +26,7 @@
     "tone": "caring"
   },
   "expect": {
-    "requiredFacts": [
-      "nail trim"
-    ],
-    "forbidden": [
-      "sedation"
-    ]
+    "requiredFacts": ["nail trim"],
+    "forbidden": ["sedation"]
   }
 }

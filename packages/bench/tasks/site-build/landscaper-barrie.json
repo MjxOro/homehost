@@ -1,11 +1,7 @@
 {
   "id": "landscaper-barrie",
   "suite": "site-build",
-  "tags": [
-    "landscaper",
-    "hardscape",
-    "hours"
-  ],
+  "tags": ["landscaper", "hardscape", "hours"],
   "brief": {
     "businessName": "Kempenfelt Landscape & Stone",
     "niche": "Landscaping and hardscaping",
@@ -13,20 +9,10 @@
     "city": "Barrie",
     "phone": "705-555-0184",
     "email": "design@kempenfeltlandscape.ca",
-    "serviceArea": [
-      "Barrie",
-      "Innisfil",
-      "Orillia"
-    ],
+    "serviceArea": ["Barrie", "Innisfil", "Orillia"],
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri"],
         "opens": "07:00",
         "closes": "16:00"
       }
@@ -34,8 +20,6 @@
     "tone": "practical"
   },
   "expect": {
-    "requiredFacts": [
-      "interlock"
-    ]
+    "requiredFacts": ["interlock"]
   }
 }

@@ -1,11 +1,7 @@
 {
   "id": "tutor-music-edmonton",
   "suite": "site-build",
-  "tags": [
-    "tutor",
-    "music",
-    "no-address"
-  ],
+  "tags": ["tutor", "music", "no-address"],
   "brief": {
     "businessName": "Bright Notes Piano Studio",
     "niche": "Piano and voice lessons",
@@ -13,14 +9,9 @@
     "city": "Edmonton",
     "phone": "780-555-0138",
     "email": "lessons@brightnotespiano.ca",
-    "serviceArea": [
-      "Strathcona",
-      "Edmonton"
-    ]
+    "serviceArea": ["Strathcona", "Edmonton"]
   },
   "expect": {
-    "requiredFacts": [
-      "RCM"
-    ]
+    "requiredFacts": ["RCM"]
   }
 }

@@ -1,12 +1,7 @@
 {
   "id": "tutor-math-toronto",
   "suite": "site-build",
-  "tags": [
-    "tutor",
-    "math",
-    "rambling",
-    "hours"
-  ],
+  "tags": ["tutor", "math", "rambling", "hours"],
   "brief": {
     "businessName": "Sharma Math Tutoring",
     "niche": "Math tutoring",
@@ -14,26 +9,15 @@
     "city": "Toronto",
     "phone": "(416) 555-0163",
     "email": "priya@sharmamathtutoring.ca",
-    "serviceArea": [
-      "The Beaches",
-      "East York",
-      "Online"
-    ],
+    "serviceArea": ["The Beaches", "East York", "Online"],
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu"
-        ],
+        "days": ["mon", "tue", "wed", "thu"],
         "opens": "15:30",
         "closes": "20:00"
       },
       {
-        "days": [
-          "sat"
-        ],
+        "days": ["sat"],
         "opens": "09:00",
         "closes": "14:00"
       }
@@ -41,11 +25,7 @@
     "tone": "patient and encouraging"
   },
   "expect": {
-    "requiredFacts": [
-      "$70"
-    ],
-    "forbidden": [
-      "guarantee"
-    ]
+    "requiredFacts": ["$70"],
+    "forbidden": ["guarantee"]
   }
 }

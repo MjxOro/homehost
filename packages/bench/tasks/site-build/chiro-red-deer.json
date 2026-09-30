@@ -1,12 +1,7 @@
 {
   "id": "chiro-red-deer",
   "suite": "site-build",
-  "tags": [
-    "clinic",
-    "chiropractic",
-    "typos",
-    "no-address"
-  ],
+  "tags": ["clinic", "chiropractic", "typos", "no-address"],
   "brief": {
     "businessName": "Red Deer Family Chiropractic",
     "niche": "Chiropractor",
@@ -16,11 +11,7 @@
     "email": "office@rdfamilychiro.ca"
   },
   "expect": {
-    "requiredFacts": [
-      "Dr. Amanda Pruitt"
-    ],
-    "forbidden": [
-      "cure"
-    ]
+    "requiredFacts": ["Dr. Amanda Pruitt"],
+    "forbidden": ["cure"]
   }
 }

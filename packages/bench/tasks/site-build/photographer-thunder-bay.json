@@ -1,12 +1,7 @@
 {
   "id": "photographer-thunder-bay",
   "suite": "site-build",
-  "tags": [
-    "photographer",
-    "headshots",
-    "hours",
-    "address"
-  ],
+  "tags": ["photographer", "headshots", "hours", "address"],
   "brief": {
     "businessName": "Lakehead Portrait Co.",
     "niche": "Headshot and portrait studio",
@@ -23,20 +18,13 @@
     },
     "hours": [
       {
-        "days": [
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["tue", "wed", "thu", "fri"],
         "opens": "10:00",
         "closes": "17:00"
       }
     ]
   },
   "expect": {
-    "requiredFacts": [
-      "$95"
-    ]
+    "requiredFacts": ["$95"]
   }
 }

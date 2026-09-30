@@ -1,11 +1,7 @@
 {
   "id": "locksmith-windsor",
   "suite": "site-build",
-  "tags": [
-    "locksmith",
-    "mobile",
-    "no-address"
-  ],
+  "tags": ["locksmith", "mobile", "no-address"],
   "brief": {
     "businessName": "Riverside Lock & Key",
     "niche": "Locksmith",
@@ -13,18 +9,10 @@
     "city": "Windsor",
     "phone": "519-555-0108",
     "email": "help@riversidelockkey.ca",
-    "serviceArea": [
-      "Windsor",
-      "Tecumseh",
-      "LaSalle"
-    ]
+    "serviceArea": ["Windsor", "Tecumseh", "LaSalle"]
   },
   "expect": {
-    "requiredFacts": [
-      "transponder"
-    ],
-    "forbidden": [
-      "24/7"
-    ]
+    "requiredFacts": ["transponder"],
+    "forbidden": ["24/7"]
   }
 }

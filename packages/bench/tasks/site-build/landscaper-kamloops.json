@@ -1,11 +1,7 @@
 {
   "id": "landscaper-kamloops",
   "suite": "site-build",
-  "tags": [
-    "landscaper",
-    "six-pages",
-    "address"
-  ],
+  "tags": ["landscaper", "six-pages", "address"],
   "brief": {
     "businessName": "Sagebrush Garden Design",
     "niche": "Garden design and maintenance",
@@ -20,20 +16,11 @@
       "postalCode": "V2B 3G8",
       "country": "Canada"
     },
-    "pagesWanted": [
-      "Home",
-      "Services",
-      "Projects",
-      "About",
-      "Blog",
-      "Contact"
-    ],
+    "pagesWanted": ["Home", "Services", "Projects", "About", "Blog", "Contact"],
     "tone": "knowledgeable and down-to-earth"
   },
   "expect": {
-    "requiredFacts": [
-      "xeriscape"
-    ],
+    "requiredFacts": ["xeriscape"],
     "minPages": 6,
     "maxPages": 6
   }

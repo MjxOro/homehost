@@ -1,11 +1,7 @@
 {
   "id": "yoga-kelowna",
   "suite": "site-build",
-  "tags": [
-    "trainer",
-    "yoga",
-    "no-address"
-  ],
+  "tags": ["trainer", "yoga", "no-address"],
   "brief": {
     "businessName": "Still Water Yoga",
     "niche": "Yoga studio",
@@ -16,8 +12,6 @@
     "tone": "gentle"
   },
   "expect": {
-    "requiredFacts": [
-      "by donation"
-    ]
+    "requiredFacts": ["by donation"]
   }
 }

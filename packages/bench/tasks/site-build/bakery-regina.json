@@ -1,11 +1,7 @@
 {
   "id": "bakery-regina",
   "suite": "site-build",
-  "tags": [
-    "bakery",
-    "hours",
-    "address"
-  ],
+  "tags": ["bakery", "hours", "address"],
   "brief": {
     "businessName": "Crumb & Kettle Bakery",
     "niche": "Bakery and tea room",
@@ -22,23 +18,14 @@
     },
     "hours": [
       {
-        "days": [
-          "wed",
-          "thu",
-          "fri",
-          "sat"
-        ],
+        "days": ["wed", "thu", "fri", "sat"],
         "opens": "08:00",
         "closes": "17:00"
       }
     ]
   },
   "expect": {
-    "requiredFacts": [
-      "saskatoon berry pie"
-    ],
-    "forbidden": [
-      "vegan"
-    ]
+    "requiredFacts": ["saskatoon berry pie"],
+    "forbidden": ["vegan"]
   }
 }

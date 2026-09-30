@@ -1,12 +1,7 @@
 {
   "id": "cleaner-fredericton",
   "suite": "site-build",
-  "tags": [
-    "cleaner",
-    "commercial",
-    "terse",
-    "address"
-  ],
+  "tags": ["cleaner", "commercial", "terse", "address"],
   "brief": {
     "businessName": "Sparkle Line Commercial Cleaning",
     "niche": "Office and commercial cleaning",
@@ -21,14 +16,9 @@
       "postalCode": "E3B 3X6",
       "country": "Canada"
     },
-    "serviceArea": [
-      "Fredericton",
-      "Oromocto"
-    ]
+    "serviceArea": ["Fredericton", "Oromocto"]
   },
   "expect": {
-    "requiredFacts": [
-      "Oromocto"
-    ]
+    "requiredFacts": ["Oromocto"]
   }
 }

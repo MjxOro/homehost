@@ -1,13 +1,7 @@
 {
   "id": "barber-saskatoon",
   "suite": "site-build",
-  "tags": [
-    "salon",
-    "barber",
-    "hours",
-    "address",
-    "no-email"
-  ],
+  "tags": ["salon", "barber", "hours", "address", "no-email"],
   "brief": {
     "businessName": "Prairie Fade Barbershop",
     "niche": "Barbershop",
@@ -23,21 +17,13 @@
     },
     "hours": [
       {
-        "days": [
-          "tue",
-          "wed",
-          "thu",
-          "fri",
-          "sat"
-        ],
+        "days": ["tue", "wed", "thu", "fri", "sat"],
         "opens": "09:00",
         "closes": "18:00"
       }
     ]
   },
   "expect": {
-    "requiredFacts": [
-      "$35"
-    ]
+    "requiredFacts": ["$35"]
   }
 }

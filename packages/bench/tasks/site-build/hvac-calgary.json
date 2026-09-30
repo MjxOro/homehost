@@ -1,12 +1,7 @@
 {
   "id": "hvac-calgary",
   "suite": "site-build",
-  "tags": [
-    "trades",
-    "hvac",
-    "hours",
-    "address"
-  ],
+  "tags": ["trades", "hvac", "hours", "address"],
   "brief": {
     "businessName": "Chinook Heating & Air",
     "niche": "Furnace and air conditioning",
@@ -23,13 +18,7 @@
     },
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri"],
         "opens": "08:00",
         "closes": "18:00"
       }
@@ -37,11 +26,7 @@
     "tone": "reassuring"
   },
   "expect": {
-    "requiredFacts": [
-      "heat pump"
-    ],
-    "forbidden": [
-      "24/7"
-    ]
+    "requiredFacts": ["heat pump"],
+    "forbidden": ["24/7"]
   }
 }

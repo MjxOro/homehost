@@ -1,26 +1,16 @@
 {
   "id": "electrician-hamilton",
   "suite": "site-build",
-  "tags": [
-    "trades",
-    "electrical",
-    "terse"
-  ],
+  "tags": ["trades", "electrical", "terse"],
   "brief": {
     "businessName": "Spark & Sons Electric",
     "niche": "Residential electrician",
     "description": "Licensed electricians. Panel upgrades, EV chargers, pot lights, knob and tube replacement.",
     "city": "Hamilton",
     "phone": "905-555-0119",
-    "serviceArea": [
-      "Hamilton",
-      "Burlington",
-      "Stoney Creek"
-    ]
+    "serviceArea": ["Hamilton", "Burlington", "Stoney Creek"]
   },
   "expect": {
-    "requiredFacts": [
-      "EV charger"
-    ]
+    "requiredFacts": ["EV charger"]
   }
 }

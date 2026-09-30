@@ -1,11 +1,7 @@
 {
   "id": "florist-kitchener",
   "suite": "site-build",
-  "tags": [
-    "florist",
-    "hours",
-    "address"
-  ],
+  "tags": ["florist", "hours", "address"],
   "brief": {
     "businessName": "Bloom & Barrow Florist",
     "niche": "Florist",
@@ -20,20 +16,10 @@
       "postalCode": "N2G 1B1",
       "country": "Canada"
     },
-    "serviceArea": [
-      "Kitchener",
-      "Waterloo"
-    ],
+    "serviceArea": ["Kitchener", "Waterloo"],
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri",
-          "sat"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat"],
         "opens": "09:00",
         "closes": "17:30"
       }
@@ -41,8 +27,6 @@
     "tone": "cheerful"
   },
   "expect": {
-    "requiredFacts": [
-      "Waterloo"
-    ]
+    "requiredFacts": ["Waterloo"]
   }
 }

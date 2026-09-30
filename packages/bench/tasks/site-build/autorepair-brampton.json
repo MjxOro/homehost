@@ -1,11 +1,7 @@
 {
   "id": "autorepair-brampton",
   "suite": "site-build",
-  "tags": [
-    "auto-repair",
-    "hours",
-    "address"
-  ],
+  "tags": ["auto-repair", "hours", "address"],
   "brief": {
     "businessName": "Torbram Auto Service",
     "niche": "Auto repair shop",
@@ -22,31 +18,19 @@
     },
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri"],
         "opens": "07:30",
         "closes": "18:00"
       },
       {
-        "days": [
-          "sat"
-        ],
+        "days": ["sat"],
         "opens": "08:00",
         "closes": "14:00"
       }
     ]
   },
   "expect": {
-    "requiredFacts": [
-      "$89"
-    ],
-    "forbidden": [
-      "lifetime warranty"
-    ]
+    "requiredFacts": ["$89"],
+    "forbidden": ["lifetime warranty"]
   }
 }

@@ -1,11 +1,7 @@
 {
   "id": "cleaner-mississauga",
   "suite": "site-build",
-  "tags": [
-    "cleaner",
-    "residential",
-    "hours"
-  ],
+  "tags": ["cleaner", "residential", "hours"],
   "brief": {
     "businessName": "Maple Fresh Cleaning",
     "niche": "Residential cleaning",
@@ -13,32 +9,17 @@
     "city": "Mississauga",
     "phone": "(905) 555-0172",
     "email": "book@maplefreshcleaning.ca",
-    "serviceArea": [
-      "Mississauga",
-      "Oakville",
-      "Brampton"
-    ],
+    "serviceArea": ["Mississauga", "Oakville", "Brampton"],
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu",
-          "fri",
-          "sat"
-        ],
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat"],
         "opens": "08:00",
         "closes": "18:00"
       }
     ]
   },
   "expect": {
-    "requiredFacts": [
-      "move-out"
-    ],
-    "forbidden": [
-      "free quote"
-    ]
+    "requiredFacts": ["move-out"],
+    "forbidden": ["free quote"]
   }
 }

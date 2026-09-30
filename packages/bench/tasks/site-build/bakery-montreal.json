@@ -1,12 +1,7 @@
 {
   "id": "bakery-montreal",
   "suite": "site-build",
-  "tags": [
-    "bakery",
-    "french-canadian",
-    "hours",
-    "address"
-  ],
+  "tags": ["bakery", "french-canadian", "hours", "address"],
   "brief": {
     "businessName": "Boulangerie Petit Matin",
     "niche": "Neighbourhood bakery",
@@ -21,20 +16,10 @@
       "postalCode": "H2W 2M7",
       "country": "Canada"
     },
-    "serviceArea": [
-      "Plateau-Mont-Royal",
-      "Mile End"
-    ],
+    "serviceArea": ["Plateau-Mont-Royal", "Mile End"],
     "hours": [
       {
-        "days": [
-          "tue",
-          "wed",
-          "thu",
-          "fri",
-          "sat",
-          "sun"
-        ],
+        "days": ["tue", "wed", "thu", "fri", "sat", "sun"],
         "opens": "06:30",
         "closes": "18:00"
       }
@@ -42,8 +27,6 @@
     "tone": "inviting"
   },
   "expect": {
-    "requiredFacts": [
-      "72 hours"
-    ]
+    "requiredFacts": ["72 hours"]
   }
 }

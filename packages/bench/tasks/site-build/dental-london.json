@@ -1,12 +1,7 @@
 {
   "id": "dental-london",
   "suite": "site-build",
-  "tags": [
-    "clinic",
-    "dental",
-    "hours",
-    "address"
-  ],
+  "tags": ["clinic", "dental", "hours", "address"],
   "brief": {
     "businessName": "Wortley Village Dental",
     "niche": "Family dental clinic",
@@ -23,30 +18,19 @@
     },
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu"
-        ],
+        "days": ["mon", "tue", "wed", "thu"],
         "opens": "08:00",
         "closes": "17:00"
       },
       {
-        "days": [
-          "fri"
-        ],
+        "days": ["fri"],
         "opens": "08:00",
         "closes": "13:00"
       }
     ]
   },
   "expect": {
-    "requiredFacts": [
-      "Canadian Dental Care Plan"
-    ],
-    "forbidden": [
-      "painless"
-    ]
+    "requiredFacts": ["Canadian Dental Care Plan"],
+    "forbidden": ["painless"]
   }
 }

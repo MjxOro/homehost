@@ -1,12 +1,7 @@
 {
   "id": "physio-ottawa",
   "suite": "site-build",
-  "tags": [
-    "clinic",
-    "physio",
-    "hours",
-    "address"
-  ],
+  "tags": ["clinic", "physio", "hours", "address"],
   "brief": {
     "businessName": "Rideau Physiotherapy & Sport Clinic",
     "niche": "Physiotherapy clinic",
@@ -23,19 +18,12 @@
     },
     "hours": [
       {
-        "days": [
-          "mon",
-          "tue",
-          "wed",
-          "thu"
-        ],
+        "days": ["mon", "tue", "wed", "thu"],
         "opens": "07:30",
         "closes": "20:00"
       },
       {
-        "days": [
-          "fri"
-        ],
+        "days": ["fri"],
         "opens": "07:30",
         "closes": "16:00"
       }
@@ -43,12 +31,7 @@
     "tone": "professional and reassuring"
   },
   "expect": {
-    "requiredFacts": [
-      "60 minutes"
-    ],
-    "forbidden": [
-      "cure",
-      "guarantee"
-    ]
+    "requiredFacts": ["60 minutes"],
+    "forbidden": ["cure", "guarantee"]
   }
 }
