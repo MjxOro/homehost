@@ -51,7 +51,13 @@ const routeTree = rootRoute.addChildren([
   desktopRoute,
 ]);
 
-export const router = createRouter({ routeTree, defaultPreload: "intent" });
+export const router = createRouter({
+  routeTree,
+  defaultPreload: "intent",
+  // Cross-fades the `.vt-page` column between routes where the browser
+  // supports View Transitions; elsewhere navigation is instant as before.
+  defaultViewTransition: true,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

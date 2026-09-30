@@ -30,7 +30,7 @@ const CODE_BADGE =
   "rounded-md border border-line bg-ink-2 px-1.5 py-0.5 font-mono text-[12.5px] text-accent [overflow-wrap:anywhere]";
 const FIELD_LABEL = "text-[13.5px] font-semibold text-text-1";
 const INPUT_FIELD =
-  "min-h-11 w-full rounded-control border border-line-strong bg-ink-2 px-3 py-2.5 text-[14.5px] text-text-1 transition-colors placeholder:text-text-3 focus:border-accent aria-invalid:border-bad disabled:opacity-60";
+  "min-h-11 w-full rounded-control border border-line-strong bg-ink-2 px-3 py-2.5 text-[14.5px] text-text-1 transition-colors duration-(--duration-fast) ease-out-quint placeholder:text-text-3 focus:border-accent aria-invalid:border-bad disabled:opacity-60";
 const FIELD_HINT = "m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-text-3";
 const COUNTER_BASE = "m-0 whitespace-nowrap font-mono text-[12px]";
 
@@ -58,7 +58,7 @@ interface PlanChoice {
 const PLAN_RADIO_GRID =
   "grid grid-cols-[repeat(auto-fit,minmax(min(100%,230px),1fr))] gap-3";
 const PLAN_CARD_LABEL =
-  "flex h-full cursor-pointer flex-col gap-1.5 rounded-control border border-line-strong bg-ink-2 p-3.5 transition-[border-color,box-shadow] duration-[0.15s] ease-[ease] hover:border-text-3 peer-checked:border-accent peer-checked:shadow-[inset_0_0_0_1px_var(--color-accent)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
+  "flex h-full cursor-pointer flex-col gap-1.5 rounded-control border border-line-strong bg-ink-2 p-3.5 transition-colors duration-(--duration-fast) ease-out-quint hover:border-text-3 peer-checked:bg-accent-dim peer-checked:border-accent peer-checked:shadow-[inset_0_0_0_1px_var(--color-accent)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
 
 const DESKTOP_LABEL: Record<NonNullable<Plan["desktop"]>["env"], string> = {
   "ubuntu-xfce": "Ubuntu XFCE",
@@ -174,7 +174,7 @@ function SuccessPanel({ request }: { request: ServerRequest }) {
 
   return (
     <div
-      className="flex flex-col items-center gap-2.5 px-4 py-10 text-center"
+      className="animate-fade-in min-h-[1100px] @min-[500px]:min-h-[800px] @min-[750px]:min-h-[700px] @min-[900px]:min-h-[600px] flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center"
       role="status"
     >
       <h2 className="text-[18px] font-bold" tabIndex={-1} ref={headingRef}>
@@ -217,7 +217,10 @@ function RequestForm({ user }: { user: PortalUser }) {
 
   if (plansQuery.isPending) {
     return (
-      <div className="flex flex-col gap-5" aria-hidden="true">
+      <div
+        className="min-h-[1100px] @min-[500px]:min-h-[800px] @min-[750px]:min-h-[700px] @min-[900px]:min-h-[600px] flex flex-col gap-5"
+        aria-hidden="true"
+      >
         <div className="skeleton skeleton-line w-56" />
         <div className="skeleton skeleton-row" />
         <div className="skeleton skeleton-row" />
@@ -252,7 +255,7 @@ function RequestForm({ user }: { user: PortalUser }) {
 
   return (
     <form
-      className="flex flex-col gap-[18px]"
+      className="animate-fade-in min-h-[1100px] @min-[500px]:min-h-[800px] @min-[750px]:min-h-[700px] @min-[900px]:min-h-[600px] flex flex-col gap-[18px]"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -401,7 +404,7 @@ export function NewRequestPage() {
           </p>
         </div>
       </div>
-      <div className={CARD}>
+      <div className={`${CARD} @container`}>
         <RequestForm key={session.user.id} user={session.user} />
       </div>
     </div>

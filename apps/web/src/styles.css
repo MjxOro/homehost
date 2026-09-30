@@ -40,6 +40,81 @@
   --radius-card: 10px;
 
   --shadow-pop: 0 14px 40px rgba(0, 0, 0, 0.5);
+
+  /* Motion. Only transform/opacity animate; every duration is one of these. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 420ms;
+  --duration-reveal: 640ms;
+
+  --animate-fade-in: fade-in var(--duration-base) var(--ease-out-quint) both;
+  --animate-fade-up: fade-up var(--duration-slow) var(--ease-out-quint) both;
+  --animate-scale-in: scale-in var(--duration-base) var(--ease-out-quint) both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+  }
+}
+
+/* Scroll reveal: pair with useReveal() from lib/motion. `--stagger` (an
+   integer index set inline) offsets siblings by 60ms each. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity var(--duration-reveal) var(--ease-out-quint),
+    transform var(--duration-reveal) var(--ease-out-quint);
+  transition-delay: calc(var(--stagger, 0) * 60ms);
+}
+
+.reveal[data-shown] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Route changes: the router starts a view transition; only the element with
+   .vt-page (the main content column) cross-fades, the shell stays put. */
+.vt-page {
+  view-transition-name: page;
+}
+
+::view-transition-old(page) {
+  animation: vt-out var(--duration-fast) var(--ease-in-out-soft) both;
+}
+
+::view-transition-new(page) {
+  animation: vt-in var(--duration-base) var(--ease-out-quint) both;
+}
+
+@keyframes vt-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 @layer base {
@@ -155,5 +230,52 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* App motion */
+/* Static placeholders avoid painting an endless shimmer. */
+.skeleton {
+  animation: none;
+}
+
+/* Spin the small wrapper on the compositor; pause outside the viewport. */
+.spinner {
+  animation: spin 0.9s linear infinite;
+  animation-play-state: paused;
+}
+
+.spinner[data-motion-visible] {
+  animation-play-state: running;
+}
+
+.spinner svg {
+  animation: none;
+}
+
+/* Delayed entrances and drawer visibility must resolve immediately. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-up,
+  .animate-scale-in,
+  dialog::backdrop,
+  .spinner {
+    animation: none !important;
+  }
+
+  #primary-navigation,
+  .app-nav-scrim {
+    transition-delay: 0s !important;
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Plan, PortalUser } from "@homehost/shared";
@@ -10,9 +10,12 @@ import {
   usePlans,
   useSession,
 } from "../lib/query";
-import { formatMemory } from "../lib/format";
 import { ActivityFeed } from "../components/ActivityFeed";
-import { LockIcon } from "../components/icons";
+import { HowItWorks } from "../components/landing/HowItWorks";
+import { LifecycleDiagram } from "../components/landing/LifecycleDiagram";
+import { PlanCard, PlanCardSkeleton } from "../components/landing/PlanCard";
+import { PrimaryCta } from "../components/landing/PrimaryCta";
+import { usePauseOffscreen } from "../components/landing/usePauseOffscreen";
 import { PersonaPicker } from "../components/PersonaPicker";
 import { OAuthButtons, SignInGate } from "../components/SignInGate";
 import { RequestList } from "../components/RequestList";
@@ -32,48 +35,41 @@ import {
 } from "../components/primitives";
 
 const PLAN_GRID =
-  "m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3";
+  "m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3";
+
+const LABEL =
+  "m-0 text-[12px] font-bold uppercase tracking-[0.07em] text-text-3";
+
+const stagger = (i: number): CSSProperties => ({
+  animationDelay: `${i * 70}ms`,
+});
+
+const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
+
+function PlansHeader() {
+  return (
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-x-8 gap-y-1.5">
+      <h2
+        id="catalog-heading"
+        className="text-[22px] font-[700] tracking-[-0.015em]"
+      >
+        Plans
+      </h2>
+      <p className="m-0 max-w-[60ch] text-[13.5px] leading-[1.5] text-text-3">
+        Live from the API. Quotas are per trust tier, so every plan shares the
+        same tier ceilings.
+      </p>
+    </div>
+  );
+}
 
 function PlanCatalog({ plans }: { plans: Plan[] }) {
   return (
-    <section className={CARD} aria-labelledby="catalog-heading">
-      <div className={CARD_HEAD}>
-        <div>
-          <h2 id="catalog-heading" className={CARD_TITLE}>
-            Plan catalog
-          </h2>
-          <p className={CARD_SUB}>
-            Live from the API — the same catalog members request against.
-          </p>
-        </div>
-      </div>
+    <section aria-labelledby="catalog-heading">
+      <PlansHeader />
       <ul className={PLAN_GRID}>
-        {plans.map((plan) => (
-          <li
-            key={plan.id}
-            className={
-              plan.technicalOnly
-                ? "rounded-control border border-line bg-ink-2 p-3.5 opacity-[0.78]"
-                : "rounded-control border border-line bg-ink-2 p-3.5"
-            }
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 [&>*]:min-w-0">
-              <h3 className="text-[14.5px] font-[650]">{plan.name}</h3>
-              {plan.technicalOnly ? (
-                <Chip>
-                  <LockIcon className="size-3" /> technical only
-                </Chip>
-              ) : null}
-            </div>
-            <p className="mt-2 text-[13.5px] text-text-2">
-              {plan.cpu} CPU · {formatMemory(plan.memoryMb)} RAM · {plan.diskGb}{" "}
-              GB disk
-            </p>
-            <p className="mt-1.5 text-[12.5px] text-text-3">
-              Quotas are per trust tier — plans share the same tier-wide
-              ceilings.
-            </p>
-          </li>
+        {plans.map((plan, i) => (
+          <PlanCard key={plan.id} plan={plan} index={i} />
         ))}
       </ul>
     </section>
@@ -83,48 +79,91 @@ function PlanCatalog({ plans }: { plans: Plan[] }) {
 function SignedOutHome() {
   const { data: session } = useSession();
   const plans = usePlans();
+  const heroRef = usePauseOffscreen<HTMLElement>();
+  const showcase = session?.mode === "showcase";
+  const showPersonas = showcase && (session?.personas ?? []).length > 0;
   return (
-    <div className="flex flex-col gap-5">
-      <section className="max-w-[780px] px-0 pb-1.5 pt-[clamp(8px,3vw,28px)]">
-        <h1 className="mb-3 text-[clamp(26px,4vw,36px)] font-[750] tracking-[-0.015em]">
-          Request a server from the homelab.
-        </h1>
-        <p className="m-0 max-w-[66ch] text-[15.5px] leading-[1.65] text-text-2">
-          {session?.mode === "live"
-            ? "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. Approved servers are provisioned as real machines on the homelab."
-            : "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. This running copy is an honest showcase — requests only reserve capacity on paper, and no server is ever created."}
-        </p>
-        <h2 className="mb-0 mt-[30px] text-[12px] font-bold uppercase tracking-[0.07em] text-text-3">
-          Sign in
-        </h2>
-        <OAuthButtons />
-        {(session?.personas ?? []).length > 0 ? (
-          <>
-            <h2 className="mb-0 mt-[30px] text-[12px] font-bold uppercase tracking-[0.07em] text-text-3">
-              Try a demo persona
-            </h2>
-            <PersonaPicker />
-          </>
-        ) : null}
-      </section>
-      {plans.isPending ? (
-        <div className={CARD} aria-hidden="true">
-          <div className="skeleton skeleton-line w-40" />
-          <div className={PLAN_GRID}>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="rounded-control border border-line p-3.5">
-                <div className="skeleton skeleton-line w-28" />
-                <div className="skeleton skeleton-line w-full" />
-                <div className="skeleton skeleton-line w-20" />
-              </div>
-            ))}
+    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-[clamp(56px,8vw,96px)]">
+      <section
+        ref={heroRef}
+        className="lc relative isolate flex flex-col gap-10 pt-[clamp(8px,4vw,40px)] lg:grid lg:grid-cols-12 lg:items-center lg:gap-12"
+      >
+        <div className="lc-ambient" aria-hidden="true">
+          <div className="lc-grid" />
+          <div className="absolute bottom-0 right-1/2 size-[560px] translate-x-1/2 lg:bottom-auto lg:right-[-40px] lg:top-1/2 lg:translate-x-0 lg:-translate-y-1/2">
+            <div className="lc-glow" />
           </div>
         </div>
+        <div className="flex min-w-0 flex-col lg:col-span-7">
+          <p className="m-0 inline-flex w-fit animate-fade-up items-center gap-2 rounded-full border border-line bg-ink-1/70 px-3 py-1 text-[12px] text-text-2">
+            <span
+              className={`lc-ring relative size-1.5 rounded-full ${showcase ? "bg-pending" : "bg-ok"}`}
+              aria-hidden="true"
+            />
+            {showcase
+              ? "Homelab control plane · showcase"
+              : "Homelab control plane · live"}
+          </p>
+          <h1 className="mb-5 mt-5 text-[clamp(36px,5.4vw,62px)] font-[750] leading-[1.04] tracking-[-0.03em]">
+            <span className="lc-line">
+              <span className="lc-line-in">Request a server.</span>
+            </span>{" "}
+            <span className="lc-line">
+              <span className="lc-line-in text-accent-strong" style={delay(90)}>
+                SSH in over IPv6.
+              </span>
+            </span>
+          </h1>
+          <p
+            className="m-0 max-w-[54ch] animate-fade-up text-[16px] leading-[1.65] text-text-2"
+            style={delay(220)}
+          >
+            {session?.mode === "live"
+              ? "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. Approved servers are provisioned as real machines on the homelab."
+              : "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. This running copy is an honest showcase — requests only reserve capacity on paper, and no server is ever created."}
+          </p>
+          <div className="mt-8">
+            {showPersonas ? (
+              <div className="animate-fade-up" style={delay(320)}>
+                <PrimaryCta href="#personas" landing>
+                  Try a demo persona
+                </PrimaryCta>
+              </div>
+            ) : (
+              <OAuthButtons variant="landing" />
+            )}
+          </div>
+        </div>
+        <div
+          className="flex animate-fade-up lg:col-span-5 lg:justify-end"
+          style={delay(280)}
+        >
+          <LifecycleDiagram showcase={showcase} />
+        </div>
+      </section>
+      <HowItWorks />
+      {plans.isPending ? (
+        <section aria-hidden="true">
+          <PlansHeader />
+          <ul className={PLAN_GRID}>
+            {[0, 1, 2].map((i) => (
+              <PlanCardSkeleton key={i} />
+            ))}
+          </ul>
+        </section>
       ) : plans.isError ? (
         <ErrorState error={plans.error} onRetry={() => void plans.refetch()} />
       ) : (
         <PlanCatalog plans={plans.data} />
       )}
+      {showPersonas ? (
+        <section id="personas" aria-labelledby="personas-heading">
+          <h2 id="personas-heading" className={LABEL}>
+            Try a demo persona
+          </h2>
+          <PersonaPicker />
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -190,7 +229,7 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
   const { quota, usage, requests, activity } = dashboard.data;
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex animate-fade-up flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[clamp(22px,3vw,28px)] font-bold tracking-[-0.01em]">
             Dashboard
@@ -207,9 +246,15 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
         </Link>
       </div>
 
-      <QuotaCard quota={quota} usage={usage} tier={user.tier} />
+      <div className="animate-fade-up" style={stagger(1)}>
+        <QuotaCard quota={quota} usage={usage} tier={user.tier} />
+      </div>
 
-      <section className={CARD} aria-labelledby="requests-heading">
+      <section
+        className={`${CARD} animate-fade-up`}
+        style={stagger(2)}
+        aria-labelledby="requests-heading"
+      >
         <div className={CARD_HEAD}>
           <div>
             <h2 id="requests-heading" className={CARD_TITLE} tabIndex={-1}>
@@ -236,7 +281,11 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
         )}
       </section>
 
-      <section className={CARD} aria-labelledby="activity-heading">
+      <section
+        className={`${CARD} animate-fade-up`}
+        style={stagger(3)}
+        aria-labelledby="activity-heading"
+      >
         <div className={CARD_HEAD}>
           <div>
             <h2 id="activity-heading" className={CARD_TITLE}>

@@ -100,7 +100,13 @@ function clampPan(
 }
 
 export function DesktopLoginPage() {
-  return <DesktopCanvas />;
+  // Opacity only: a transform on this ancestor would skew the canvas's
+  // pointer/pinch coordinate math while the entrance runs.
+  return (
+    <div className="animate-fade-in">
+      <DesktopCanvas />
+    </div>
+  );
 }
 
 function DesktopCanvas() {
@@ -137,7 +143,9 @@ function DesktopCanvas() {
     at: number;
     moved: boolean;
   } | null>(null);
-  const pinchRef = useRef<{ d: number; mid: { x: number; y: number } } | null>(null);
+  const pinchRef = useRef<{ d: number; mid: { x: number; y: number } } | null>(
+    null,
+  );
   const overlayRef = useRef<HTMLDivElement>(null);
   const suppressClickRef = useRef(false);
   const pDragRef = useRef(0);
@@ -167,13 +175,25 @@ function DesktopCanvas() {
   // solve the translate-then-scale mapping for the new pan. `touchAt`
   // tolerates real TouchLists plus plain-array synthetics (tests).
   const touchAt = (
-    list: { item?: (i: number) => unknown; length: number; [i: number]: unknown } | null | undefined,
+    list:
+      | { item?: (i: number) => unknown; length: number; [i: number]: unknown }
+      | null
+      | undefined,
     i: number,
   ) => {
     if (!list) return null;
     const item = (list as { item?: (i: number) => unknown }).item;
-    if (typeof item === "function") return item.call(list, i) as { identifier: number; clientX: number; clientY: number } | null;
-    return (list[i] as { identifier: number; clientX: number; clientY: number } | undefined) ?? null;
+    if (typeof item === "function")
+      return item.call(list, i) as {
+        identifier: number;
+        clientX: number;
+        clientY: number;
+      } | null;
+    return (
+      (list[i] as
+        { identifier: number; clientX: number; clientY: number } | undefined) ??
+      null
+    );
   };
 
   const touchList = (raw: unknown, id: number) => {
@@ -181,10 +201,24 @@ function DesktopCanvas() {
     const rec = raw as { length?: unknown; item?: (i: number) => unknown };
     if (typeof rec.length !== "number") return null;
     for (let i = 0; i < rec.length; i += 1) {
-      const t = touchAt(rec as { item?: (i: number) => unknown; length: number; [i: number]: unknown }, i);
+      const t = touchAt(
+        rec as {
+          item?: (i: number) => unknown;
+          length: number;
+          [i: number]: unknown;
+        },
+        i,
+      );
       if (t && t.identifier === id) return t;
     }
-    return touchAt(rec as { item?: (i: number) => unknown; length: number; [i: number]: unknown }, 0);
+    return touchAt(
+      rec as {
+        item?: (i: number) => unknown;
+        length: number;
+        [i: number]: unknown;
+      },
+      0,
+    );
   };
 
   const zoomAt = (nextRaw: number, at: { x: number; y: number }) => {
@@ -201,7 +235,15 @@ function DesktopCanvas() {
     const z0 = Math.max(z, 0.001);
     setZoom(next);
     setFullError(null);
-    setPan(clampPan(at.x - next * ((at.x - p.x) / z0), at.y - next * ((at.y - p.y) / z0), next, w, h));
+    setPan(
+      clampPan(
+        at.x - next * ((at.x - p.x) / z0),
+        at.y - next * ((at.y - p.y) / z0),
+        next,
+        w,
+        h,
+      ),
+    );
     setAnnounce(`Zoom ${Math.round(next * 100)} percent.`);
   };
 
@@ -310,9 +352,14 @@ function DesktopCanvas() {
         x: e.clientX - wrap.getBoundingClientRect().left,
         y: e.clientY - wrap.getBoundingClientRect().top,
       };
-      if (viewRef.current.zoom > MIN_ZOOM && (Math.abs(dx) > 0 || Math.abs(dy) > 0)) {
+      if (
+        viewRef.current.zoom > MIN_ZOOM &&
+        (Math.abs(dx) > 0 || Math.abs(dy) > 0)
+      ) {
         const { zoom: z, pan: p } = viewRef.current;
-        setPan(clampPan(p.x + dx, p.y + dy, z, wrap.clientWidth, wrap.clientHeight));
+        setPan(
+          clampPan(p.x + dx, p.y + dy, z, wrap.clientWidth, wrap.clientHeight),
+        );
       }
     };
     const pUp = () => {
@@ -365,7 +412,9 @@ function DesktopCanvas() {
       cursorRef.current = { x: t.clientX - r.left, y: t.clientY - r.top };
       if (cur.moved && viewRef.current.zoom > MIN_ZOOM) {
         const { zoom: z, pan: p } = viewRef.current;
-        setPan(clampPan(p.x + dx, p.y + dy, z, wrap.clientWidth, wrap.clientHeight));
+        setPan(
+          clampPan(p.x + dx, p.y + dy, z, wrap.clientWidth, wrap.clientHeight),
+        );
       }
     };
     const end = (e: TouchEvent) => {
@@ -378,7 +427,12 @@ function DesktopCanvas() {
       const dx = t ? t.clientX - cur.x : 0;
       const dy = t ? t.clientY - cur.y : 0;
       cursorRef.current = null;
-      if (!cur.moved && dt <= TAP_MAX_MS && Math.abs(dx) <= TAP_SLOP && Math.abs(dy) <= TAP_SLOP) {
+      if (
+        !cur.moved &&
+        dt <= TAP_MAX_MS &&
+        Math.abs(dx) <= TAP_SLOP &&
+        Math.abs(dy) <= TAP_SLOP
+      ) {
         // Suppress the mouse-compat click a tap would otherwise fire —
         // preventDefault on touchstart already tries, this is the backstop.
         suppressClickRef.current = true;
@@ -553,7 +607,13 @@ function DesktopCanvas() {
     const frame = wrapRef.current;
     if (!frame) return;
     setPan((p) =>
-      clampPan(p.x, p.y, viewRef.current.zoom, frame.clientWidth, frame.clientHeight),
+      clampPan(
+        p.x,
+        p.y,
+        viewRef.current.zoom,
+        frame.clientWidth,
+        frame.clientHeight,
+      ),
     );
   }, [isFullscreen]);
 
@@ -630,9 +690,7 @@ function DesktopCanvas() {
         <ErrorState
           title="Desktop has no saved session"
           error={
-            new Error(
-              "This desktop predates saved sessions — reprovision it.",
-            )
+            new Error("This desktop predates saved sessions — reprovision it.")
           }
           onRetry={() => void desktop.refetch()}
         />
@@ -697,7 +755,9 @@ function DesktopCanvas() {
   const sendGuestKey = (key: string, code: string) => {
     const doc = frameRef.current?.contentDocument;
     if (!doc) {
-      setAnnounce("Desktop is still loading — try the keyboard again in a moment.");
+      setAnnounce(
+        "Desktop is still loading — try the keyboard again in a moment.",
+      );
       return;
     }
     const init: KeyboardEventInit = {
@@ -727,7 +787,9 @@ function DesktopCanvas() {
   const sendCtrlAltDel = () => {
     const doc = frameRef.current?.contentDocument;
     if (!doc) {
-      setAnnounce("Desktop is still loading — try the keyboard again in a moment.");
+      setAnnounce(
+        "Desktop is still loading — try the keyboard again in a moment.",
+      );
       return;
     }
     const base = { bubbles: true, cancelable: true, composed: true } as const;
@@ -744,8 +806,10 @@ function DesktopCanvas() {
     sendingKeyRef.current = true;
     try {
       const target = guestKeyTarget(doc);
-      for (const init of down) target.dispatchEvent(new KeyboardEvent("keydown", init));
-      for (const init of up) target.dispatchEvent(new KeyboardEvent("keyup", init));
+      for (const init of down)
+        target.dispatchEvent(new KeyboardEvent("keydown", init));
+      for (const init of up)
+        target.dispatchEvent(new KeyboardEvent("keyup", init));
     } finally {
       sendingKeyRef.current = false;
     }
@@ -779,7 +843,8 @@ function DesktopCanvas() {
       enterFocus();
       return;
     }
-    if (zoom <= MIN_ZOOM && e.key !== "+" && e.key !== "=" && e.key !== "0") return;
+    if (zoom <= MIN_ZOOM && e.key !== "+" && e.key !== "=" && e.key !== "0")
+      return;
     switch (e.key) {
       case "ArrowLeft":
         e.preventDefault();
@@ -851,9 +916,11 @@ function DesktopCanvas() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {request.desktopUser ?? request.desktopHostname ? (
+          {(request.desktopUser ?? request.desktopHostname) ? (
             <span className={CARD_SUB}>
-              {request.desktopUser ? `Signed in as ${request.desktopUser}` : null}
+              {request.desktopUser
+                ? `Signed in as ${request.desktopUser}`
+                : null}
               {request.desktopUser && request.desktopHostname ? " · " : null}
               {request.desktopHostname ?? null}
             </span>
@@ -993,7 +1060,9 @@ function DesktopCanvas() {
           >
             Ctrl+Alt+Del
           </button>
-          <span className={CARD_SUB}>Modifiers arm once, for the next key only.</span>
+          <span className={CARD_SUB}>
+            Modifiers arm once, for the next key only.
+          </span>
         </div>
       ) : null}
       {fullError ? (
@@ -1065,7 +1134,10 @@ function DesktopCanvas() {
             onMouseMove={(e) => {
               const r = wrapRef.current?.getBoundingClientRect();
               if (!r) return;
-              cursorRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+              cursorRef.current = {
+                x: e.clientX - r.left,
+                y: e.clientY - r.top,
+              };
             }}
             onMouseLeave={() => {
               cursorRef.current = null;

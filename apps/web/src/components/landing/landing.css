@@ -1,0 +1,507 @@
+/* Landing-only visuals. Every base (un-animated) style is the finished state,
+   so reduced motion shows a complete page. Only transform/opacity animate;
+   the lifecycle loop is one shared 8s cycle and everything pauses offscreen
+   (data-paused, set by usePauseOffscreen). */
+
+.lc {
+  --lc-cycle: 8s;
+}
+
+.lc[data-paused] *,
+.lc[data-paused] *::after {
+  animation-play-state: paused;
+}
+
+.lc-ambient {
+  position: absolute;
+  inset: -24px 0 0;
+  z-index: -1;
+  pointer-events: none;
+  contain: paint;
+}
+
+.lc-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(232, 240, 242, 0.035) 1px, transparent 1px) 0
+      0 / 48px 48px,
+    linear-gradient(to bottom, rgba(232, 240, 242, 0.035) 1px, transparent 1px)
+      0 0 / 48px 48px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 60% at 60% 40%,
+    #000 30%,
+    transparent 75%
+  );
+  mask-image: radial-gradient(
+    ellipse 70% 60% at 60% 40%,
+    #000 30%,
+    transparent 75%
+  );
+}
+
+.lc-glow {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    closest-side,
+    rgba(44, 196, 173, 0.16),
+    transparent
+  );
+  animation: lc-drift 18s var(--ease-in-out-soft) infinite alternate;
+}
+
+.lc-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  opacity: 0;
+  animation: lc-ring 2.4s ease-out infinite;
+}
+
+.lc-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}
+
+.lc-line-in {
+  display: block;
+  animation: lc-slide 720ms var(--ease-out-quint) both;
+}
+
+.lc-hl {
+  position: relative;
+}
+
+.lc-hl::before {
+  content: "";
+  position: absolute;
+  inset: 0 20px auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent-line),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out-quint);
+}
+
+.lc-hl-on::before {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .lc-hl:hover::before {
+    opacity: 1;
+  }
+}
+
+.lc-anim {
+  animation-duration: var(--lc-cycle);
+  animation-iteration-count: infinite;
+  animation-timing-function: var(--ease-in-out-soft);
+}
+
+.lc-fill {
+  transform-origin: top;
+  animation-name: lc-fill;
+  animation-timing-function: linear;
+}
+
+.lc-pulse {
+  opacity: 0;
+  animation-name: lc-pulse;
+  animation-timing-function: linear;
+}
+
+.lc-term {
+  animation-name: lc-term;
+}
+
+.lc-cover {
+  transform: scaleX(0);
+  transform-origin: right;
+  animation-name: lc-cover;
+}
+
+.lc-cursor {
+  opacity: 0;
+  animation-name: lc-cursor;
+}
+
+.lc-blink {
+  animation: lc-blink 1.1s steps(1, end) infinite;
+}
+
+.lc-cmd {
+  animation-name: lc-cmd;
+}
+
+.lc-out {
+  animation-name: lc-out;
+}
+
+.lc-st1 {
+  animation-name: lc-st1;
+}
+.lc-st2 {
+  animation-name: lc-st2;
+}
+.lc-st3 {
+  animation-name: lc-st3;
+}
+.lc-row1 {
+  animation-name: lc-row1;
+}
+.lc-row2 {
+  animation-name: lc-row2;
+}
+.lc-row3 {
+  animation-name: lc-row3;
+}
+.lc-dot1 {
+  animation-name: lc-dot1;
+}
+.lc-dot2 {
+  animation-name: lc-dot2;
+}
+.lc-dot3 {
+  animation-name: lc-dot3;
+}
+
+@keyframes lc-slide {
+  from {
+    transform: translateY(105%);
+  }
+}
+@keyframes lc-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes lc-drift {
+  from {
+    transform: translate3d(-24px, 12px, 0);
+  }
+  to {
+    transform: translate3d(24px, -12px, 0);
+  }
+}
+@keyframes lc-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes lc-row1 {
+  0% {
+    opacity: 0.45;
+  }
+  8%,
+  91% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+@keyframes lc-row2 {
+  0%,
+  24% {
+    opacity: 0.45;
+  }
+  29%,
+  91% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+@keyframes lc-row3 {
+  0%,
+  42% {
+    opacity: 0.45;
+  }
+  47%,
+  91% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+@keyframes lc-dot1 {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  6% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  10%,
+  91% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lc-dot2 {
+  0%,
+  24%,
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  29% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  32%,
+  91% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lc-dot3 {
+  0%,
+  42%,
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  47% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  50%,
+  91% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lc-fill {
+  0%,
+  10%,
+  100% {
+    transform: scaleY(0);
+  }
+  45%,
+  91% {
+    transform: scaleY(1);
+  }
+}
+@keyframes lc-pulse {
+  0%,
+  9% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(128px);
+  }
+  48%,
+  100% {
+    opacity: 0;
+    transform: translateY(128px);
+  }
+}
+@keyframes lc-st1 {
+  0%,
+  24%,
+  98%,
+  100% {
+    opacity: 1;
+  }
+  28%,
+  91% {
+    opacity: 0;
+  }
+}
+@keyframes lc-st2 {
+  0%,
+  24%,
+  46%,
+  100% {
+    opacity: 0;
+  }
+  28%,
+  42% {
+    opacity: 1;
+  }
+}
+@keyframes lc-st3 {
+  0%,
+  42%,
+  98%,
+  100% {
+    opacity: 0;
+  }
+  46%,
+  91% {
+    opacity: 1;
+  }
+}
+@keyframes lc-term {
+  0%,
+  43%,
+  100% {
+    opacity: 0.5;
+  }
+  47%,
+  91% {
+    opacity: 1;
+  }
+}
+@keyframes lc-cover {
+  0%,
+  47.5% {
+    transform: scaleX(1);
+    animation-timing-function: steps(27, end);
+  }
+  70%,
+  99.9% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes lc-cursor {
+  0%,
+  47.5% {
+    opacity: 1;
+    transform: translateX(0);
+    animation-timing-function: steps(27, end);
+  }
+  70%,
+  91% {
+    opacity: 1;
+    transform: translateX(27ch);
+  }
+  98%,
+  99.9% {
+    opacity: 0;
+    transform: translateX(27ch);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes lc-cmd {
+  0%,
+  91% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes lc-out {
+  0%,
+  72%,
+  98%,
+  100% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  76%,
+  91% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lc-cta {
+  position: relative;
+  isolation: isolate;
+  transition:
+    background-color var(--duration-fast),
+    transform var(--duration-fast) var(--ease-out-quint);
+}
+
+.lc-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 4px var(--color-accent-dim),
+    0 10px 30px rgba(44, 196, 173, 0.28);
+  opacity: 0;
+  transition: opacity var(--duration-base);
+}
+
+.lc-cta:focus-visible::before {
+  opacity: 1;
+}
+
+.lc-cta:active {
+  transform: scale(0.98);
+}
+
+.lc-sheen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.lc-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.32) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform 700ms var(--ease-out-quint);
+}
+
+.lc-arrow {
+  transition: transform var(--duration-base) var(--ease-out-quint);
+}
+
+@media (hover: hover) {
+  .lc-cta:hover::before {
+    opacity: 1;
+  }
+  .lc-cta:hover .lc-sheen::after {
+    transform: translateX(120%);
+  }
+  .lc-cta:hover .lc-arrow {
+    transform: translateX(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-anim,
+  .lc-blink,
+  .lc-glow,
+  .lc-ring::after {
+    animation: none !important;
+  }
+}

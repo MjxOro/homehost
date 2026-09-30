@@ -1,3 +1,5 @@
+import { BUTTON_OUTLINE_SM } from "./primitives";
+import { useListEntrance } from "../lib/app-motion";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { ActivityEvent, ActivityPageResponse } from "@homehost/shared";
@@ -65,6 +67,7 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
     }
   }
   const visible = [...firstPage, ...appended];
+  const entrance = useListEntrance(visible);
   // Terminal actions end provisioning for a request. `visible` is newest
   // first, so a provisioning row is superseded when a terminal event for the
   // same request was already seen above it. A paged-out successor is simply
@@ -144,7 +147,11 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
             : ACTION_META[event.action];
           const Icon = meta.icon;
           return (
-            <li key={event.id} className="flex items-start gap-3 px-0.5 py-3">
+            <li
+              key={event.id}
+              className={`${entrance(event.id).className} flex items-start gap-3 px-0.5 py-3`}
+              style={entrance(event.id).style}
+            >
               <Icon
                 className={`mt-0.5 size-[18px] shrink-0 ${meta.className}`}
               />
@@ -172,7 +179,7 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
         })}
       </ul>
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] text-bad">
+        <p role="alert" className="animate-fade-in mt-2 text-[13px] text-bad">
           {error}
         </p>
       ) : null}
@@ -182,7 +189,7 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
           onClick={() => void handleShowMore()}
           disabled={loading}
           aria-busy={loading}
-          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-control border border-line bg-ink-2 px-4 text-[14px] font-semibold disabled:cursor-wait disabled:opacity-60"
+          className={`${BUTTON_OUTLINE_SM} mt-3 w-full`}
         >
           {loading ? (
             <>

@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import { useVisibleSpinner } from "../lib/app-motion";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
@@ -215,8 +216,10 @@ export function DashboardIcon(props: IconProps) {
 }
 
 export function Spinner({ className }: { className?: string }) {
+  const ref = useVisibleSpinner();
   return (
     <span
+      ref={ref}
       className={className ? `spinner ${className}` : "spinner"}
       aria-hidden="true"
     >

@@ -1,3 +1,4 @@
+import { useListEntrance } from "../lib/app-motion";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -430,7 +431,7 @@ const NON_TERMINAL_STATUSES = new Set([
 ]);
 
 const LIVE_PILL_BASE =
-  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-semibold";
+  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors duration-(--duration-fast)";
 
 /**
  * Live status for rows that are about to flip. Awaiting approval is static
@@ -475,6 +476,7 @@ function focusRequestsHeading() {
 }
 
 export function RequestList({ requests, onAnnounce }: RequestListProps) {
+  const entrance = useListEntrance(requests);
   const plansQuery = usePlans();
   const planNames = useMemo(() => {
     const map = new Map<string, string>();
@@ -536,7 +538,8 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
         {requests.map((request) => (
           <li
             key={request.id}
-            className="flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start"
+            className={`${entrance(request.id).className} flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start`}
+            style={entrance(request.id).style}
           >
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">

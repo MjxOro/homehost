@@ -160,7 +160,9 @@ export function ModerationDialog({
       closeWith(true);
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : "Moderation failed.",
+        submitError instanceof Error
+          ? submitError.message
+          : "Moderation failed.",
       );
       setAnnouncement(null);
       setPending(false);
@@ -173,15 +175,13 @@ export function ModerationDialog({
     }
   };
 
-  const confirmClass =
-    action === "reject" ? BUTTON_DANGER : BUTTON_PRIMARY;
-  const confirmDisabled =
-    pending || (action === "reject" && !confirmed);
+  const confirmClass = action === "reject" ? BUTTON_DANGER : BUTTON_PRIMARY;
+  const confirmDisabled = pending || (action === "reject" && !confirmed);
 
   return (
     <dialog
       ref={dialogRef}
-      className="m-auto w-full max-w-[480px] bg-transparent p-0 text-text-1 backdrop:bg-[rgba(4,8,10,0.72)]"
+      className="m-auto w-full max-w-[480px] bg-transparent p-0 text-text-1 backdrop:bg-[rgba(4,8,10,0.72)] backdrop:animate-fade-in"
       aria-labelledby="moderation-dialog-title"
       aria-describedby="moderation-dialog-desc"
       onClick={(event) => {
@@ -190,7 +190,7 @@ export function ModerationDialog({
         }
       }}
     >
-      <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-line-strong bg-ink-1 p-5 shadow-pop">
+      <div className="animate-scale-in max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-line-strong bg-ink-1 p-5 shadow-pop">
         <div className="flex items-start justify-between gap-3">
           <h2 id="moderation-dialog-title" className="text-[18px] font-bold">
             {TITLES[action]}
@@ -218,9 +218,7 @@ export function ModerationDialog({
 
         {action !== "reject" ? (
           <fieldset ref={levelGroupRef} className="mt-4">
-            <legend className="text-[14px] font-[650]">
-              Technical level
-            </legend>
+            <legend className="text-[14px] font-[650]">Technical level</legend>
             <div className="mt-2 flex flex-col gap-2">
               {(
                 [
@@ -230,7 +228,7 @@ export function ModerationDialog({
               ).map((option) => (
                 <label
                   key={option.value}
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-control border border-line-strong bg-ink-2 px-3 py-2 text-[14px]"
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-control border border-line-strong bg-ink-2 px-3 py-2 text-[14px] transition-colors duration-(--duration-fast) has-checked:border-accent-line has-checked:bg-accent-dim"
                 >
                   <input
                     type="radio"
@@ -251,11 +249,9 @@ export function ModerationDialog({
         {action === "reject" ? (
           <>
             <div className="mt-4">
-              <label
-                htmlFor={reasonId}
-                className="text-[14px] font-[650]"
-              >
-                Reason <span className="font-normal text-text-3">(optional)</span>
+              <label htmlFor={reasonId} className="text-[14px] font-[650]">
+                Reason{" "}
+                <span className="font-normal text-text-3">(optional)</span>
               </label>
               <textarea
                 id={reasonId}
@@ -281,8 +277,8 @@ export function ModerationDialog({
                 disabled={pending}
                 className="mt-0.5 size-[18px] shrink-0 accent-[var(--color-accent)]"
               />
-              Yes, reject this account. I understand this blocks their access
-              to requests.
+              Yes, reject this account. I understand this blocks their access to
+              requests.
             </label>
           </>
         ) : null}

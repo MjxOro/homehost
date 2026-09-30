@@ -3,7 +3,7 @@ import { BUTTON_OUTLINE } from "./primitives";
 import { Spinner } from "./icons";
 
 const SELECT_CLASS =
-  "min-h-11 max-w-[128px] cursor-pointer appearance-none rounded-full border border-line-strong bg-ink-1 bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%237e939a%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27m6%209%206%206%206-6%27/%3E%3C/svg%3E)] bg-[position:right_12px_center] bg-[size:16px] bg-no-repeat py-2 pe-[38px] ps-3.5 text-[14px] font-semibold text-text-1 transition-colors enabled:hover:border-text-3 disabled:cursor-wait disabled:opacity-60 sm:max-w-60";
+  "min-h-11 max-w-[128px] cursor-pointer appearance-none rounded-full border border-line-strong bg-ink-1 bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%237e939a%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27m6%209%206%206%206-6%27/%3E%3C/svg%3E)] bg-[position:right_12px_center] bg-[size:16px] bg-no-repeat py-2 pe-[38px] ps-3.5 text-[14px] font-semibold text-text-1 transition-colors duration-(--duration-fast) ease-out-quint enabled:hover:border-text-3 disabled:cursor-wait disabled:opacity-60 sm:max-w-60";
 
 /**
  * Topbar persona switcher built on a native <select> — keyboard, screen-reader
@@ -36,9 +36,11 @@ export function PersonaMenu() {
   return (
     <div className="flex min-w-0 flex-col items-end gap-1">
       <div className="flex min-w-0 items-center gap-2.5">
-        {switchPersona.isPending ? (
-          <Spinner className="spinner-sm" aria-hidden="true" />
-        ) : null}
+        <span className="inline-flex size-4 shrink-0 items-center justify-center">
+          {switchPersona.isPending ? (
+            <Spinner className="spinner-sm" aria-hidden="true" />
+          ) : null}
+        </span>
         <label className="sr-only" htmlFor="persona-select">
           Demo persona
         </label>
@@ -72,7 +74,7 @@ export function PersonaMenu() {
       </div>
       {switchPersona.isError ? (
         <p
-          className="m-0 max-w-[min(70vw,320px)] text-right text-[12.5px] text-[#f0a8a8]"
+          className="animate-fade-in m-0 max-w-[min(70vw,320px)] text-right text-[12.5px] text-[#f0a8a8]"
           role="alert"
         >
           Persona switch failed — is the API running?

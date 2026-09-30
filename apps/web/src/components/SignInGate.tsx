@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
 import { useSession } from "../lib/query";
+import { CheckIcon } from "./icons";
 import { PersonaPicker } from "./PersonaPicker";
-import { BUTTON_OUTLINE, LINK_PRIMARY } from "./primitives";
+import { PrimaryCta } from "./landing/PrimaryCta";
+import { BUTTON_OUTLINE } from "./primitives";
 
 interface ProviderTarget {
   href: string;
   label: string;
 }
 
-const STEPS: Array<{ title: string; copy: string }> = [
+export const STEPS: Array<{ title: string; copy: string }> = [
   { title: "Request a box.", copy: "Pick a plan and send a request." },
   {
     title: "Operator approves.",
@@ -32,7 +34,11 @@ const LIVE_FACTS = [
  * buttons. Rendered wherever sign-in is offered; the buttons are plain
  * anchors so the provider dance runs outside the SPA.
  */
-export function OAuthButtons() {
+export function OAuthButtons({
+  variant = "gate",
+}: {
+  variant?: "gate" | "landing";
+}) {
   const { data: session, isPending } = useSession();
   const providers = session?.providers;
   const targets: ProviderTarget[] = [
@@ -44,56 +50,77 @@ export function OAuthButtons() {
       : null,
   ].filter((t): t is ProviderTarget => t !== null);
   const [primary, ...secondary] = targets;
+  const landing = variant === "landing";
+
+  const facts = (
+    <ul
+      aria-label="Connection facts"
+      className={`m-0 flex list-none flex-wrap p-0 ${
+        landing ? "animate-fade-up gap-x-5 gap-y-2" : "gap-2"
+      }`}
+      style={landing ? { animationDelay: "420ms" } : undefined}
+    >
+      {LIVE_FACTS.map((fact) => (
+        <li
+          key={fact}
+          className={
+            landing
+              ? "flex items-center gap-1.5 text-[13px] text-text-2"
+              : "rounded-full border border-line bg-ink-2 px-2.5 py-1 text-[12.5px] font-[600] text-text-2"
+          }
+        >
+          {landing ? (
+            <CheckIcon className="size-3.5 shrink-0 text-accent" />
+          ) : null}
+          {fact}
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <div className="flex w-full flex-col gap-4 text-left">
-      <p className="m-0 text-[15.5px] font-[700] tracking-[-0.005em] text-text-1">
-        Your personal homelab control panel.
-      </p>
-      <ol
-        aria-label="How it works"
-        className="m-0 flex list-none flex-col gap-2.5 p-0"
-      >
-        {STEPS.map((step, i) => (
-          <li
-            key={step.title}
-            className="flex gap-3 text-[14px] leading-[1.55]"
+      {landing ? null : (
+        <>
+          <p className="m-0 text-[15.5px] font-[700] tracking-[-0.005em] text-text-1">
+            Your personal homelab control panel.
+          </p>
+          <ol
+            aria-label="How it works"
+            className="m-0 flex list-none flex-col gap-2.5 p-0"
           >
-            <span aria-hidden="true" className="font-[750] text-accent">
-              {i + 1}
-            </span>
-            <span className="text-text-2">
-              <strong className="font-[650] text-text-1">{step.title}</strong>{" "}
-              {step.copy}
-            </span>
-          </li>
-        ))}
-      </ol>
-      <ul
-        aria-label="Connection facts"
-        className="m-0 flex list-none flex-wrap gap-2 p-0"
-      >
-        {LIVE_FACTS.map((fact) => (
-          <li
-            key={fact}
-            className="rounded-full border border-line bg-ink-2 px-2.5 py-1 text-[12.5px] font-[600] text-text-2"
-          >
-            {fact}
-          </li>
-        ))}
-      </ul>
+            {STEPS.map((step, i) => (
+              <li
+                key={step.title}
+                className="flex gap-3 text-[14px] leading-[1.55]"
+              >
+                <span aria-hidden="true" className="font-[750] text-accent">
+                  {i + 1}
+                </span>
+                <span className="text-text-2">
+                  <strong className="font-[650] text-text-1">
+                    {step.title}
+                  </strong>{" "}
+                  {step.copy}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {facts}
+        </>
+      )}
       {primary ? (
-        <div className="flex w-full flex-col gap-2.5">
-          <a
-            className={`${LINK_PRIMARY} min-h-12 w-full text-[15px]`}
-            href={primary.href}
-          >
+        <div
+          className={`flex w-full flex-col gap-2.5 ${landing ? "animate-fade-up sm:flex-row sm:flex-wrap sm:items-center" : ""}`}
+          style={landing ? { animationDelay: "320ms" } : undefined}
+        >
+          <PrimaryCta href={primary.href} landing={landing}>
             {primary.label}
-          </a>
+          </PrimaryCta>
           {secondary.map((t) => (
             <a
               key={t.href}
-              className={`${BUTTON_OUTLINE} w-full`}
+              className={`${BUTTON_OUTLINE} w-full ${landing ? "min-h-12 px-6 sm:w-auto" : ""}`}
               href={t.href}
             >
               {t.label}
@@ -110,6 +137,7 @@ export function OAuthButtons() {
           enable a sign-in provider.
         </p>
       )}
+      {landing ? facts : null}
     </div>
   );
 }
