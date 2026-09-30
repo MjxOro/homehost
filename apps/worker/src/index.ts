@@ -241,10 +241,41 @@ async function setDesktopPassword(
 }
 
 async function setIpv6(requestId: string, ipv6: string): Promise<void> {
+  await sql.begin(async (tx) => {
+    // Lock the request so simultaneous retries cannot rotate its ledger twice.
+    const request = await tx`
+      UPDATE server_requests SET ipv6 = ${ipv6}, updated_at = now()
+      WHERE id = ${requestId} RETURNING id
+    `;
+    if (request.length === 0) throw new Error("IPv6 assignment request missing");
+    await tx`
+      UPDATE ip_assignments SET released_at = now()
+      WHERE request_id = ${requestId} AND released_at IS NULL
+        AND address <> ${ipv6}::inet
+    `;
+    const assignment = await tx`
+      INSERT INTO ip_assignments
+        (request_id, user_id, owner_name, owner_email, address, subdomain, prefix)
+      SELECT r.id, r.owner_id, u.name, u.email, ${ipv6}::inet, r.subdomain,
+        network(set_masklen(${ipv6}::inet, 64))::text
+      FROM server_requests r JOIN users u ON u.id = r.owner_id
+      WHERE r.id = ${requestId}
+      ON CONFLICT (address) WHERE released_at IS NULL
+      DO UPDATE SET address = EXCLUDED.address
+        WHERE ip_assignments.request_id = EXCLUDED.request_id
+      RETURNING id
+    `;
+    // A retry retains the original timestamp/contact snapshot; another owner
+    // must never silently inherit an address. Roll back the request update too.
+    if (assignment.length === 0)
+      throw new Error("IPv6 address already assigned or owner missing");
+  });
+}
+
+async function releaseIpv6(requestId: string): Promise<void> {
   await sql`
-    UPDATE server_requests
-    SET ipv6 = ${ipv6}, updated_at = now()
-    WHERE id = ${requestId}
+    UPDATE ip_assignments SET released_at = now()
+    WHERE request_id = ${requestId} AND released_at IS NULL
   `;
 }
 interface DesktopFields {
@@ -751,11 +782,13 @@ async function failProvision(
 
 async function handleTeardown(job: Job): Promise<void> {
   const req = await loadRequest(job.requestId);
-  const name = req?.instanceName;
-  if (!req || !name) {
+  if (!req) {
     await finishJob(job.id, "done", "nothing to tear down");
     return;
   }
+  // A terminal provision failure can clear instance_name after allocation.
+  // Use the same deterministic name as launch before closing its history.
+  const name = req.instanceName ?? instanceNameOf(req.id, req.subdomain);
   try {
     const project = projectForReq(req);
     try {
@@ -769,7 +802,7 @@ async function handleTeardown(job: Job): Promise<void> {
         project,
         "--format",
         "csv",
-      ]).catch(() => "");
+      ]);
       if (out.includes(name)) throw e;
     }
     if (cfToken) await deleteAAAA(req.subdomain);
@@ -785,6 +818,7 @@ async function handleTeardown(job: Job): Promise<void> {
         console.error("desktop route remove failed", e);
       });
     }
+    await releaseIpv6(req.id);
     await finishJob(job.id, "done", null);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
