@@ -1,7 +1,10 @@
 import {
+  bigint,
+  char,
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -183,5 +186,109 @@ export const provisionJobs = pgTable(
       .where(sql`${t.status} IN ('queued','leased')`),
     index("provision_jobs_status_idx").on(t.status),
     index("provision_jobs_request_id_idx").on(t.requestId),
+  ],
+);
+
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").references(() => users.id),
+    kind: text("kind").notNull(),
+    purpose: text("purpose").notNull(),
+    refType: text("ref_type"),
+    refId: text("ref_id"),
+    status: text("status").notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  },
+  (t) => [
+    check(
+      "agent_runs_kind_check",
+      sql`${t.kind} IN ('site_build','site_edit','site_import','concierge','bench')`,
+    ),
+    check("agent_runs_purpose_check", sql`${t.purpose} IN ('prod','bench','dev')`),
+    check(
+      "agent_runs_status_check",
+      sql`${t.status} IN ('running','succeeded','failed','cancelled')`,
+    ),
+    index("agent_runs_user_id_started_at_idx").on(t.userId, t.startedAt),
+  ],
+);
+
+export const llmCalls = pgTable(
+  "llm_calls",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    agentRunId: uuid("agent_run_id").references(() => agentRuns.id),
+    userId: text("user_id").references(() => users.id),
+    purpose: text("purpose").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    providerRequestId: text("provider_request_id"),
+    promptHash: text("prompt_hash").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    cachedInputTokens: integer("cached_input_tokens").notNull(),
+    cacheWriteTokens: integer("cache_write_tokens").notNull(),
+    costMicroUsd: bigint("cost_micro_usd", { mode: "bigint" }).notNull(),
+    priceTableVersion: text("price_table_version").notNull(),
+    latencyMs: integer("latency_ms").notNull(),
+    status: text("status").notNull(),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    check("llm_calls_purpose_check", sql`${t.purpose} IN ('prod','bench','dev')`),
+    check("llm_calls_prompt_hash_check", sql`${t.promptHash} ~ '^[0-9a-f]{64}$'`),
+    check("llm_calls_input_tokens_check", sql`${t.inputTokens} >= 0`),
+    check("llm_calls_output_tokens_check", sql`${t.outputTokens} >= 0`),
+    check("llm_calls_cached_input_tokens_check", sql`${t.cachedInputTokens} >= 0`),
+    check("llm_calls_cache_write_tokens_check", sql`${t.cacheWriteTokens} >= 0`),
+    check("llm_calls_cost_micro_usd_check", sql`${t.costMicroUsd} >= 0`),
+    check("llm_calls_latency_ms_check", sql`${t.latencyMs} >= 0`),
+    check("llm_calls_status_check", sql`${t.status} IN ('ok','error')`),
+    index("llm_calls_user_id_created_at_idx").on(t.userId, t.createdAt),
+    index("llm_calls_agent_run_id_idx").on(t.agentRunId),
+    uniqueIndex("llm_calls_provider_request_unique")
+      .on(t.provider, t.providerRequestId)
+      .where(sql`${t.providerRequestId} IS NOT NULL`),
+  ],
+);
+
+// Append-only, hash-chained; see docs/ledger.md. Rows are written only through
+// domain/ledger.ts, which owns the hash formula and the append lock.
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    delta: bigint("delta", { mode: "bigint" }).notNull(),
+    balanceAfter: bigint("balance_after", { mode: "bigint" }).notNull(),
+    reason: text("reason").notNull(),
+    refType: text("ref_type"),
+    refId: text("ref_id"),
+    confirmId: uuid("confirm_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    prevHash: char("prev_hash", { length: 64 }).notNull(),
+    hash: char("hash", { length: 64 }).notNull().unique(),
+  },
+  (t) => [
+    check("credit_ledger_delta_check", sql`${t.delta} <> 0`),
+    check("credit_ledger_balance_after_check", sql`${t.balanceAfter} >= 0`),
+    check(
+      "credit_ledger_reason_check",
+      sql`${t.reason} IN ('purchase','usage','refund','grant','adjustment')`,
+    ),
+    check("credit_ledger_prev_hash_check", sql`${t.prevHash} ~ '^[0-9a-f]{64}$'`),
+    check("credit_ledger_hash_check", sql`${t.hash} ~ '^[0-9a-f]{64}$'`),
+    index("credit_ledger_user_id_id_idx").on(t.userId, t.id),
   ],
 );
