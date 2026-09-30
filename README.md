@@ -24,7 +24,7 @@ API: `http://127.0.0.1:3000/api/health`. Postgres: `127.0.0.1:55432` (throwaway 
 
 1. Choose **Alice Chen** (untrusted): request a Game Small workload. Pending approval consumes her one-server quota.
 2. Switch to **Lab Operator**: open Approvals and approve or reject it, optionally recording a reason.
-3. Return to Alice: see the decision and activity. **Approved is not provisioned.** Cancel the request to release its reservation.
+3. Return to Alice: see the decision and activity. **Approved is not provisioned.** Delete the request to release its reservation.
 4. Choose **Bob Martin** (trusted): larger plans are available. Total CPU/RAM/disk quotas apply across plans, not just a server count.
 
 Persona switching is an explicit showcase feature. Anyone using this demo can select the operator. It is **not production authentication** and must never have access to real infrastructure or customer data.
