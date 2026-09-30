@@ -40,8 +40,9 @@ never attach the host Docker socket to tenant workloads.
 `ip_assignments` records each public address, routed prefix, request/user IDs,
 hostname, owner name/email at assignment time, and assignment/release timestamps.
 The worker opens history atomically with `server_requests.ipv6`, preserves the
-first snapshot on provision retries, and closes it only after successful
-instance/DNS teardown (not on stop). IDs have no foreign keys: deleting or
+first snapshot on provision retries, and closes it as soon as teardown confirms
+the instance is gone (an Incus "not found" counts as gone), before DNS and route
+cleanup, never on stop. IDs have no foreign keys: deleting or
 truncating live requests/users cannot erase or block this historical record.
 Lookups LEFT JOIN live rows, retaining snapshot attribution if those rows vanish.
 Keep history indefinitely for now; the owner will decide a retention period later.
@@ -58,6 +59,14 @@ network masks return 400; non-operators get 403. Dates in responses are UTC ISO.
 Legacy backfill is approximate: earliest recorded `running` event, falling back
 to request creation, clamped to `updated_at`; deleted requests close at
 `updated_at`. New assignments use the actual worker write/teardown time.
+Only well-formed IPv6 text (`^[0-9a-fA-F:]+$`) is backfilled.
+
+Deploy order matters because the API migration and the host worker unit ship
+separately: merge, then deploy (applies `0013_ip_assignments.sql`), then restart
+the worker unit. A worker started before 0013 fails on `ip_assignments`. On
+every start the worker runs a reconcile that inserts an open assignment for
+each live request with an `ipv6` but none open (boxes an old worker provisioned
+between the migration and its restart), and logs how many rows it inserted.
 
 ## Desktop GUI exception (per-desktop HTTPS via Traefik) + worker topology
 SSH stays direct-v6 (above). Desktop hostnames resolve via wildcard DNS
