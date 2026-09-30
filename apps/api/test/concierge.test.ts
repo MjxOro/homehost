@@ -22,7 +22,7 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const JEV_MODEL_REPORTED = "typesafe/jev-1.13-20260901";
 
-type Reply = { status: number; body: unknown } | "hang";
+type Reply = { status: number; body: unknown; onServe?: () => void } | "hang";
 
 interface SentCall {
   url: string;
@@ -48,6 +48,7 @@ function fakeTransport(replies: Reply[]) {
         );
       });
     }
+    reply.onServe?.();
     return new Response(JSON.stringify(reply.body), { status: reply.status });
   }) as typeof globalThis.fetch;
   return { fetch, calls };
@@ -63,50 +64,56 @@ interface JevOverrides {
   cost?: number;
 }
 
-function jevReply(o: JevOverrides = {}): Reply {
+function jevReply(o: JevOverrides = {}): Exclude<Reply, "hang"> {
+  return { status: 200, body: jevBody(o) };
+}
+
+function jevBody(o: JevOverrides = {}) {
   return {
-    status: 200,
-    body: {
-      id: `dec-${randomUUID()}`,
-      model: JEV_MODEL_REPORTED,
-      answers: {
-        use_case: {
-          type: "choice",
-          choice: "game_server",
-          probabilities: { game_server: 0.93, always_on: 0.04 },
-          confidence: o.useCaseConfidence ?? 0.93,
-        },
-        plan: {
-          type: "choice",
-          choice: o.planChoice ?? "game-small",
-          probabilities: { "game-small": 0.88, none: 0.1 },
-          confidence: o.planConfidence ?? 0.88,
-        },
-        recipe: {
-          type: "choice",
-          choice: "minecraft_java",
-          probabilities: { minecraft_java: 0.9, minecraft_bedrock: 0.08 },
-          confidence: o.recipeConfidence ?? 0.9,
-        },
-        wants_gui: { type: "noul", noul: 0.02 },
-        players_connect: { type: "noul", noul: 0.95 },
-        console_player: { type: "noul", noul: 0.03 },
-        abuse: { type: "noul", noul: o.abuse ?? 0.01 },
-        scraping: { type: "noul", noul: 0.02 },
-        is_english: { type: "noul", noul: o.isEnglish ?? 0.99 },
+    id: `dec-${randomUUID()}`,
+    model: JEV_MODEL_REPORTED,
+    answers: {
+      use_case: {
+        type: "choice",
+        choice: "game_server",
+        probabilities: { game_server: 0.93, always_on: 0.04 },
+        confidence: o.useCaseConfidence ?? 0.93,
       },
-      usage: { input_tokens: 812, output_tokens: 9, cost: o.cost ?? 0.0000312 },
+      plan: {
+        type: "choice",
+        choice: o.planChoice ?? "game-small",
+        probabilities: { "game-small": 0.88, none: 0.1 },
+        confidence: o.planConfidence ?? 0.88,
+      },
+      recipe: {
+        type: "choice",
+        choice: "minecraft_java",
+        probabilities: { minecraft_java: 0.9, minecraft_bedrock: 0.08 },
+        confidence: o.recipeConfidence ?? 0.9,
+      },
+      wants_gui: { type: "noul", noul: 0.02 },
+      players_connect: { type: "noul", noul: 0.95 },
+      console_player: { type: "noul", noul: 0.03 },
+      abuse: { type: "noul", noul: o.abuse ?? 0.01 },
+      scraping: { type: "noul", noul: 0.02 },
+      is_english: { type: "noul", noul: o.isEnglish ?? 0.99 },
     },
+    usage: { input_tokens: 812, output_tokens: 9, cost: o.cost ?? 0.0000312 },
   };
 }
 
-function chatReply(content: string): Reply {
+function chatReply(content: string, finishReason = "stop"): Reply {
   return {
     status: 200,
     body: {
       id: `gen-${randomUUID()}`,
       model: "deepseek/deepseek-v4.1-flash",
-      choices: [{ message: { role: "assistant", content } }],
+      choices: [
+        {
+          message: { role: "assistant", content },
+          finish_reason: finishReason,
+        },
+      ],
       usage: {
         prompt_tokens: 61,
         completion_tokens: 12,
@@ -274,8 +281,12 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       "/api/alpha/decisions",
     ]);
     const chat = JSON.parse(t.calls[1]!.body);
-    expect(chat.model).toBe("deepseek/deepseek-v4.1-flash");
-    expect(chat.temperature).toBe(0);
+    expect(chat).toMatchObject({
+      model: "deepseek/deepseek-v4.1-flash",
+      temperature: 0,
+      max_tokens: 600,
+      provider: { data_collection: "deny" },
+    });
     expect(JSON.parse(t.calls[2]!.body).state.request).toBe(english);
 
     const runs = await runsOf(user.id);
@@ -305,6 +316,103 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
     );
     expect(result.translated).toBe(false);
     expect(t.calls).toHaveLength(1);
+  });
+
+  test("an unsure plan or recipe also triggers the translation", async () => {
+    for (const unsure of [{ planConfidence: 0.2 }, { recipeConfidence: 0.2 }]) {
+      const user = await newUser("technical");
+      const t = fakeTransport([
+        jevReply({ isEnglish: 0.01, ...unsure }),
+        chatReply("a minecraft server"),
+        jevReply(),
+      ]);
+      const result = await succeeds(
+        { user, text: "un serveur minecraft" },
+        config(t.fetch),
+      );
+      expect(result.translated).toBe(true);
+      expect(t.calls).toHaveLength(3);
+    }
+  });
+
+  test("a refusal on the original text is final and never translated", async () => {
+    const user = await newUser();
+    const t = fakeTransport([
+      jevReply({ isEnglish: 0.01, useCaseConfidence: 0.2, abuse: 0.9 }),
+    ]);
+    const result = await succeeds(
+      { user, text: "miner du monero" },
+      config(t.fetch),
+    );
+    expect(result).toMatchObject({ outcome: "refused", translated: false });
+    expect(t.calls).toHaveLength(1);
+  });
+
+  test("policy signals keep the stricter of the two passes", async () => {
+    const unsureFrench = { isEnglish: 0.01, useCaseConfidence: 0.2 };
+    const review = fakeTransport([
+      jevReply({ ...unsureFrench, abuse: 0.5 }),
+      chatReply("a server"),
+      jevReply({ abuse: 0.01 }),
+    ]);
+    const kept = await succeeds(
+      { user: await newUser(), text: "un serveur" },
+      config(review.fetch),
+    );
+    expect(kept.warnings).toContain("needs_review");
+    const refuse = fakeTransport([
+      jevReply(unsureFrench),
+      chatReply("a server"),
+      jevReply({ abuse: 0.95 }),
+    ]);
+    const refused = await succeeds(
+      { user: await newUser(), text: "un serveur" },
+      config(refuse.fetch),
+    );
+    expect(refused.outcome).toBe("refused");
+  });
+
+  test("a truncated translation fails but keeps its billed usage", async () => {
+    const user = await newUser();
+    const t = fakeTransport([
+      jevReply({ isEnglish: 0.01, useCaseConfidence: 0.2 }),
+      chatReply("I want a Mine", "length"),
+    ]);
+    expect(
+      await fails({ user, text: "je veux un serveur" }, config(t.fetch)),
+    ).toMatchObject({ code: "translation_incomplete" });
+    const translation = (await callsOf(user.id)).find(
+      (c) => c.model === "deepseek/deepseek-v4.1-flash",
+    )!;
+    expect(translation).toMatchObject({
+      status: "error",
+      error_code: "translation_incomplete",
+      input_tokens: 61,
+    });
+    expect(String(translation.cost_micro_usd)).toBe("11");
+    expect((await runsOf(user.id))[0]).toMatchObject({ status: "failed" });
+  });
+
+  test("one deadline covers every provider call of a suggestion", async () => {
+    const user = await newUser();
+    let nowMs = Date.now();
+    const t = fakeTransport([
+      {
+        ...jevReply({ isEnglish: 0.01, useCaseConfidence: 0.2 }),
+        // The first answer arrives just after the whole budget is spent.
+        onServe: () => {
+          nowMs += 1_001;
+        },
+      },
+      chatReply("never sent"),
+    ]);
+    const error = await fails(
+      { user, text: "je veux un serveur" },
+      config(t.fetch, { deadlineMs: 1_000, now: () => new Date(nowMs) }),
+    );
+    expect(error).toMatchObject({ code: "timeout" });
+    expect(t.calls).toHaveLength(1);
+    expect(await callsOf(user.id)).toHaveLength(1);
   });
 
   test("the daily cap refuses the call after the cap and resets at UTC midnight", async () => {
@@ -364,16 +472,21 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
     expect(runs[0]!.finished_at).not.toBeNull();
     const calls = await callsOf(user.id);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ status: "error", error_code: "http_500" });
+    // No usage came back, so the cost is unknown rather than a proven $0.
+    expect(calls[0]).toMatchObject({
+      status: "error",
+      error_code: "cost_unknown",
+    });
     expect(String(calls[0]!.cost_micro_usd)).toBe("0");
   });
 
   test("a hung provider times out and a malformed answer is rejected", async () => {
     const user = await newUser();
     const hung = fakeTransport(["hang"]);
+    // Real 50 ms wait: this exercises the abort of an in-flight request.
     const timedOut = await fails(
       { user, text: "a website" },
-      config(hung.fetch, { timeoutMs: 50 }),
+      config(hung.fetch, { deadlineMs: 50 }),
     );
     expect(timedOut).toMatchObject({
       _tag: "ConciergeUpstream",
@@ -387,8 +500,24 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       _tag: "ConciergeUpstream",
       code: "bad_response",
     });
+    const billedButBroken = fakeTransport([
+      {
+        status: 200,
+        body: { ...jevBody(), answers: { use_case: "yes" } },
+      },
+    ]);
+    expect(
+      await fails({ user, text: "a website" }, config(billedButBroken.fetch)),
+    ).toMatchObject({ code: "bad_response" });
     const runs = await runsOf(user.id);
-    expect(runs.map((r) => r.status)).toEqual(["failed", "failed"]);
+    expect(runs.map((r) => r.status)).toEqual(["failed", "failed", "failed"]);
+    const calls = await callsOf(user.id);
+    expect(calls.map((c) => c.error_code)).toEqual([
+      "cost_unknown",
+      "cost_unknown",
+      "bad_response",
+    ]);
+    expect(String(calls[2]!.cost_micro_usd)).toBe("32");
   });
 
   test("the user's text never reaches the database", async () => {
