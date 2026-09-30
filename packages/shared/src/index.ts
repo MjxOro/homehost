@@ -33,3 +33,4 @@ export type {
   StreamTier,
 } from "./streaming.js";
 export * from "./ledger.js";
+export * from "./concierge.js";
