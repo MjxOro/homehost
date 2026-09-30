@@ -1,7 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
+import { createConnection } from "node:net";
 import postgres from "postgres";
-import { PLANS, ipv6ForInstance, toDesktopHostname } from "@homehost/shared";
+import {
+  PLANS,
+  dohHasAaaa,
+  ipv6ForInstance,
+  pollChecks,
+  toDesktopHostname,
+} from "@homehost/shared";
 import type { Plan, ProvisionAction } from "@homehost/shared";
 import {
   appendDesktopToUserData,
@@ -20,6 +27,7 @@ const provisionAttempts = Number(process.env.WORKER_PROVISION_ATTEMPTS ?? 5);
 const teardownAttempts = Number(process.env.WORKER_TEARDOWN_ATTEMPTS ?? 25);
 const powerAttempts = Number(process.env.WORKER_POWER_ATTEMPTS ?? 5);
 const bootTimeoutMs = Number(process.env.WORKER_BOOT_TIMEOUT_MS ?? 240000);
+const readyTimeoutMs = Number(process.env.WORKER_READY_TIMEOUT_MS ?? 120000);
 const ipv6Prefix = process.env.IPV6_PREFIX ?? "";
 const cfToken = process.env.CF_DNS_API_TOKEN ?? "";
 const workerEnv = process.env.WORKER_ENV ?? "prod";
@@ -147,8 +155,7 @@ function projectForReq(req: RequestState): string {
 function envMatches(subdomain: string): boolean {
   if (workerBaseDomain === "") return true;
   return (
-    subdomain === workerBaseDomain ||
-    subdomain.endsWith(`.${workerBaseDomain}`)
+    subdomain === workerBaseDomain || subdomain.endsWith(`.${workerBaseDomain}`)
   );
 }
 
@@ -252,7 +259,8 @@ async function setIpv6(requestId: string, ipv6: string): Promise<void> {
       UPDATE server_requests SET ipv6 = ${ipv6}, updated_at = now()
       WHERE id = ${requestId} RETURNING id
     `;
-    if (request.length === 0) throw new Error("IPv6 assignment request missing");
+    if (request.length === 0)
+      throw new Error("IPv6 assignment request missing");
     await tx`
       UPDATE ip_assignments SET released_at = now()
       WHERE request_id = ${requestId} AND released_at IS NULL
@@ -417,6 +425,65 @@ async function ensureAAAA(subdomain: string, ipv6: string): Promise<void> {
   });
   if (!response.ok)
     throw new Error(`cf AAAA create failed: ${response.status}`);
+}
+
+function tcpConnects(host: string, port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host, port, timeout: 3000 });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+// Cloudflare DoH, not the user's resolvers. Only called after ensureAAAA, so
+// the name already has a record and this lookup cannot negative-cache it.
+async function aaaaVisible(fqdn: string, ipv6: string): Promise<boolean> {
+  const response = await fetch(
+    `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(fqdn)}&type=AAAA`,
+    {
+      headers: { accept: "application/dns-json" },
+      signal: AbortSignal.timeout(5000),
+    },
+  );
+  return response.ok && dohHasAaaa(await response.json(), ipv6);
+}
+
+// A box is only "running" once it answers on its public v6 address: catches a
+// lost bridge gateway/route or a dead sshd, and a record resolvers can't see yet.
+async function waitForReachable(
+  req: RequestState,
+  ipv6: string,
+): Promise<void> {
+  await emit(
+    req.id,
+    "Homehost worker",
+    "provisioning",
+    req.name,
+    "Checking network reachability",
+  );
+  const checks = [
+    {
+      failure: `box not reachable over IPv6 at [${ipv6}]:22 (check the incusbr0 gateway)`,
+      run: () => tcpConnects(ipv6, 22),
+    },
+  ];
+  if (cfToken) {
+    checks.push({
+      failure: "AAAA not visible on public DNS",
+      run: () => aaaaVisible(req.subdomain, ipv6),
+    });
+  }
+  await pollChecks(checks, { timeoutMs: readyTimeoutMs, intervalMs: 2000 });
 }
 
 async function deleteAAAA(subdomain: string): Promise<void> {
@@ -769,6 +836,7 @@ async function handleProvision(job: Job): Promise<void> {
       await setIpv6(req.id, ipv6);
       if (cfToken) await ensureAAAA(req.subdomain, ipv6);
       else console.error("CF_DNS_API_TOKEN unset: skipping AAAA");
+      await waitForReachable(req, ipv6);
     }
     if (
       desktop &&
