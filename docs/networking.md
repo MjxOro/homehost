@@ -10,6 +10,19 @@ not publish DNS or provision instances. The production worker publishes each
 box's AAAA, installs the requester's SSH key for root, and derives the
 address deterministically from the request ID so relaunches converge.
 
+Data path (prod host): Route64 routes the /64 to the host over the
+WireGuard tunnel `r64lan` (`wg-quick@r64lan`, which also carries the host's
+default IPv6 route). The host is the /64's gateway on the Incus bridge:
+`<IPV6_PREFIX>::ffff/64` on `incusbr0`, and each box gets a static address
+plus that gateway through cloud-init. Incus runs the bridge with
+`ipv6.address=none`, so every Incus daemon (re)start (unattended upgrades
+restart it too) brings `incusbr0` back with IPv6 disabled, which removes
+the gateway and cuts every box off at once while DNS and the tunnel still
+look healthy. `homehost-brnet.service` + `.timer` restore it after every
+Incus start and within 30s of any other removal; see `infra/host/README.md`
+("Tenant IPv6 gateway"). Quick check: `ip -6 addr show dev incusbr0` must
+list `<IPV6_PREFIX>::ffff/64`.
+
 Panel edge: Traefik serves the panel hostname with Let's Encrypt DNS-01
 (`CF_DNS_API_TOKEN`, `ACME_EMAIL` in `infra/private/traefik.env`, never
 committed; see `infra/traefik/compose.yml`). `infra/traefik/routes/panel.yml`
