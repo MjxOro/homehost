@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { CheckIcon } from "../icons";
 import "./landing.css";
+import { usePauseOffscreen } from "./usePauseOffscreen";
 
 const STEPS = [
   { n: 1, title: "Request", sub: "Pick a plan and send it" },
@@ -7,38 +8,30 @@ const STEPS = [
   { n: 3, title: "Provisioned", sub: "A real box on the homelab" },
 ] as const;
 
-const SUMMARY =
-  "How it works: you request a server, a lab operator approves it, the box is provisioned on the homelab, and you connect with ssh root@<box>.<domain> over its own IPv6 address.";
+const PILL = "col-start-1 row-start-1 text-center";
 
-/**
- * Product lifecycle as a calm 8s loop: nodes light up as a pulse travels the
- * rail, then a terminal types the ssh command and reports the IPv6
- * connection. The graphic is decorative (aria-hidden) with the same story as
- * text for assistive tech. Animations pause while offscreen.
- */
 export function LifecycleDiagram({ showcase }: { showcase: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([entry]) => {
-      if (entry) el.toggleAttribute("data-paused", !entry.isIntersecting);
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
+  const ref = usePauseOffscreen<HTMLDivElement>();
   return (
-    <div
-      ref={ref}
-      className="lc w-full max-w-[520px] justify-self-center lg:justify-self-end"
-    >
-      <p className="sr-only">{SUMMARY}</p>
+    <div ref={ref} className="lc w-full max-w-[520px]">
       <div
         aria-hidden="true"
-        className="rounded-card border border-line bg-ink-1/80 p-5 shadow-pop sm:p-6"
+        className="lc-hl lc-hl-on rounded-card border border-line bg-ink-1/80 p-5 shadow-pop backdrop-blur-sm sm:p-6"
       >
+        <div className="mb-4 flex items-center justify-between gap-3 font-mono text-[12px]">
+          <span className="text-text-2">
+            request <span className="ml-1 text-text-3">#a1f3</span>
+          </span>
+          <span className="inline-grid rounded-full border border-line-strong px-2.5 py-0.5 text-[11.5px]">
+            <span className={`lc-anim lc-st1 ${PILL} text-pending opacity-0`}>
+              pending
+            </span>
+            <span className={`lc-anim lc-st2 ${PILL} text-accent opacity-0`}>
+              approved
+            </span>
+            <span className={`lc-anim lc-st3 ${PILL} text-ok`}>running</span>
+          </span>
+        </div>
         <div className="relative h-48">
           <div className="absolute left-[13px] top-8 h-32 w-0.5 bg-line" />
           <div className="lc-anim lc-fill absolute left-[13px] top-8 h-32 w-0.5 bg-accent" />
@@ -51,7 +44,7 @@ export function LifecycleDiagram({ showcase }: { showcase: boolean }) {
               <span className="relative inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-line-strong bg-ink-2 font-mono text-[12px] text-text-3">
                 {step.n}
                 <span
-                  className={`lc-anim lc-dot${step.n} absolute -inset-px inline-flex items-center justify-center rounded-full border border-accent bg-ink-2 text-accent`}
+                  className={`lc-anim lc-dot${step.n} absolute -inset-px inline-flex items-center justify-center rounded-full border border-accent bg-accent-dim text-accent`}
                 >
                   {step.n}
                 </span>
@@ -70,14 +63,20 @@ export function LifecycleDiagram({ showcase }: { showcase: boolean }) {
         <div className="lc-anim lc-term mt-4 rounded-control border border-line-strong bg-ink-0 px-4 py-3 font-mono text-[13px] leading-5">
           <div className="flex items-center gap-2">
             <span className="text-accent">$</span>
-            <span className="relative inline-block h-5 w-[26ch] whitespace-pre text-text-1">
-              ssh root@mybox.example.com
+            <span className="relative inline-block h-5 w-[27ch] whitespace-pre text-text-1">
+              <span className="lc-anim lc-cmd">
+                ssh root@mybox.homehost.dev
+              </span>
               <span className="lc-anim lc-cover absolute inset-0 bg-ink-0" />
-              <span className="lc-anim lc-cursor absolute left-0 top-0.5 h-4 w-[0.6ch] bg-accent" />
+              <span className="lc-anim lc-cursor absolute left-0 top-0.5 h-4 w-[0.6ch]">
+                <span className="lc-blink block size-full bg-accent" />
+              </span>
             </span>
           </div>
           <div className="lc-anim lc-out">
-            <div className="text-accent">✓ connected over IPv6</div>
+            <div className="flex items-center gap-1.5 text-accent">
+              <CheckIcon className="size-3.5" /> connected over IPv6
+            </div>
             <div className="text-text-3">2001:db8:a1::7c</div>
           </div>
         </div>
