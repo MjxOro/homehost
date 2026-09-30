@@ -29,6 +29,18 @@ Fill schemas are page-specific and smaller. This is an observed compatibility
 limit of this request/model/provider combination, not a claim that all Gemini
 structured-output requests fail. No generator code or schema is changed here.
 
+The follow-up three-task bench smoke on the reviewed generator still had Google
+HTTP 400 / `INVALID_ARGUMENT` on its page-fill schemas; Qwen's escalations returned
+objects missing page fields. Consequently its quality score was **0/3**, not a
+successful-site claim. Record spent **$0.002226**; replay reproduced all grades,
+errors, calls, tokens, original latencies and recorded cost for **$0**, with 10/10
+cache hits. Those fill errors were truncated by the shipped client's redacted
+error formatter, so the exact fill-schema constraint is not confirmed. These
+models worked on the earlier smaller generation smoke but are not yet a reliable
+stack for this corpus. Further candidate/schema tuning is separate work; no
+additional live calls were made after the two authorized record runs and the
+zero-cost planner diagnostic.
+
 ## Run
 
 From the repository root, with `OPENROUTER_API_KEY` in the environment:
