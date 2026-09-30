@@ -1,0 +1,30 @@
+{
+  "id": "photographer-thunder-bay",
+  "suite": "site-build",
+  "tags": ["photographer", "headshots", "hours", "address"],
+  "brief": {
+    "businessName": "Lakehead Portrait Co.",
+    "niche": "Headshot and portrait studio",
+    "description": "Professional headshots for teams, LinkedIn and actors, plus family and graduation portraits in our downtown studio. Team headshot days at your office from $95 a person, minimum six people. Retouched digital images within 48 hours.",
+    "city": "Thunder Bay",
+    "phone": "(807) 555-0152",
+    "email": "studio@lakeheadportrait.ca",
+    "address": {
+      "street": "1010 Memorial Avenue",
+      "city": "Thunder Bay",
+      "region": "ON",
+      "postalCode": "P7B 4A2",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": ["tue", "wed", "thu", "fri"],
+        "opens": "10:00",
+        "closes": "17:00"
+      }
+    ]
+  },
+  "expect": {
+    "requiredFacts": ["$95"]
+  }
+}

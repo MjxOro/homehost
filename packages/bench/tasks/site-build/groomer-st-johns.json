@@ -1,0 +1,16 @@
+{
+  "id": "groomer-st-johns",
+  "suite": "site-build",
+  "tags": ["pet-groomer", "mobile", "no-phone", "no-address"],
+  "brief": {
+    "businessName": "Signal Hill Dog Grooming",
+    "niche": "Mobile dog grooming",
+    "description": "Mobile grooming van that comes to your driveway. Bookings by email only, and we reply within one business day. Small and medium breeds, double coats and matted-coat rescues. Please tell us about your dog's temperament when you book.",
+    "city": "St. John's",
+    "email": "bookings@signalhillgrooming.ca",
+    "serviceArea": ["St. John's", "Mount Pearl", "Paradise"]
+  },
+  "expect": {
+    "forbidden": ["call us", "call now", "phone us"]
+  }
+}

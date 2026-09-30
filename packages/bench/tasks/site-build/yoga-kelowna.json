@@ -1,0 +1,17 @@
+{
+  "id": "yoga-kelowna",
+  "suite": "site-build",
+  "tags": ["trainer", "yoga", "no-address"],
+  "brief": {
+    "businessName": "Still Water Yoga",
+    "niche": "Yoga studio",
+    "description": "Vinyasa, yin and restorative classes in a bright studio near the lake. Our beginner-friendly series starts the first Monday of every month. Your first class is by donation. Mats and props provided.",
+    "city": "Kelowna",
+    "phone": "250-555-0149",
+    "email": "namaste@stillwateryoga.ca",
+    "tone": "gentle"
+  },
+  "expect": {
+    "requiredFacts": ["by donation"]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "dental-london",
+  "suite": "site-build",
+  "tags": ["clinic", "dental", "hours", "address"],
+  "brief": {
+    "businessName": "Wortley Village Dental",
+    "niche": "Family dental clinic",
+    "description": "Family dentistry in Old South: checkups, cleanings, fillings, crowns, Invisalign and emergency appointments. We're accepting new patients, including children. Sedation dentistry is available for anxious patients. We direct bill insurance and accept the Canadian Dental Care Plan.",
+    "city": "London",
+    "phone": "519-555-0136",
+    "email": "smile@wortleydental.ca",
+    "address": {
+      "street": "150 Wortley Road",
+      "city": "London",
+      "region": "ON",
+      "postalCode": "N6C 3P5",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu"],
+        "opens": "08:00",
+        "closes": "17:00"
+      },
+      {
+        "days": ["fri"],
+        "opens": "08:00",
+        "closes": "13:00"
+      }
+    ]
+  },
+  "expect": {
+    "requiredFacts": ["Canadian Dental Care Plan"],
+    "forbidden": ["painless"]
+  }
+}

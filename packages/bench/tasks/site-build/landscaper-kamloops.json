@@ -1,0 +1,27 @@
+{
+  "id": "landscaper-kamloops",
+  "suite": "site-build",
+  "tags": ["landscaper", "six-pages", "address"],
+  "brief": {
+    "businessName": "Sagebrush Garden Design",
+    "niche": "Garden design and maintenance",
+    "description": "Drought-tolerant and xeriscape garden design for Kamloops and the Thompson Valley. Native plants, drip irrigation, rock gardens and low-maintenance lawns. We'd like a site with Home, Services, Projects, About, Blog and Contact pages so we can show our before-and-after projects and post seasonal planting tips.",
+    "city": "Kamloops",
+    "phone": "(250) 555-0116",
+    "email": "hello@sagebrushgardens.ca",
+    "address": {
+      "street": "1400 Tranquille Road",
+      "city": "Kamloops",
+      "region": "BC",
+      "postalCode": "V2B 3G8",
+      "country": "Canada"
+    },
+    "pagesWanted": ["Home", "Services", "Projects", "About", "Blog", "Contact"],
+    "tone": "knowledgeable and down-to-earth"
+  },
+  "expect": {
+    "requiredFacts": ["xeriscape"],
+    "minPages": 6,
+    "maxPages": 6
+  }
+}

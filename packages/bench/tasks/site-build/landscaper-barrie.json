@@ -1,0 +1,25 @@
+{
+  "id": "landscaper-barrie",
+  "suite": "site-build",
+  "tags": ["landscaper", "hardscape", "hours"],
+  "brief": {
+    "businessName": "Kempenfelt Landscape & Stone",
+    "niche": "Landscaping and hardscaping",
+    "description": "Interlock patios, retaining walls, flagstone walkways and garden design. We also do spring and fall cleanups. Design consultations are booked from March through October, and we take snow removal contracts for commercial lots in winter.",
+    "city": "Barrie",
+    "phone": "705-555-0184",
+    "email": "design@kempenfeltlandscape.ca",
+    "serviceArea": ["Barrie", "Innisfil", "Orillia"],
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "07:00",
+        "closes": "16:00"
+      }
+    ],
+    "tone": "practical"
+  },
+  "expect": {
+    "requiredFacts": ["interlock"]
+  }
+}

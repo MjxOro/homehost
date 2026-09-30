@@ -1,0 +1,27 @@
+{
+  "id": "roofer-moncton",
+  "suite": "site-build",
+  "tags": ["trades", "roofing", "french-canadian", "bilingual", "address"],
+  "brief": {
+    "businessName": "Toitures Léger Roofing",
+    "niche": "Residential roofing",
+    "description": "Family roofing company in Moncton with bilingual service in English and French. Asphalt shingle replacement, metal roofing, ice dam repair and chimney flashing. Three generations on the roof, licensed and insured, with a written workmanship warranty on every job.",
+    "city": "Moncton",
+    "phone": "(506) 555-0142",
+    "email": "info@toituresleger.ca",
+    "address": {
+      "street": "1290 Mountain Road",
+      "city": "Moncton",
+      "region": "NB",
+      "postalCode": "E1C 2T6",
+      "country": "Canada"
+    },
+    "serviceArea": ["Moncton", "Dieppe", "Riverview"],
+    "pagesWanted": ["Services", "About", "Contact"],
+    "tone": "trustworthy"
+  },
+  "expect": {
+    "requiredFacts": ["Dieppe", "French"],
+    "minPages": 3
+  }
+}

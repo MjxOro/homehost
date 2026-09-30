@@ -1,0 +1,17 @@
+{
+  "id": "tutor-music-edmonton",
+  "suite": "site-build",
+  "tags": ["tutor", "music", "no-address"],
+  "brief": {
+    "businessName": "Bright Notes Piano Studio",
+    "niche": "Piano and voice lessons",
+    "description": "Piano, voice and beginner theory for kids and adults. RCM exam prep if you want it, no pressure if you don't. Recitals twice a year. Lessons in my Strathcona studio, 30 or 45 minutes.",
+    "city": "Edmonton",
+    "phone": "780-555-0138",
+    "email": "lessons@brightnotespiano.ca",
+    "serviceArea": ["Strathcona", "Edmonton"]
+  },
+  "expect": {
+    "requiredFacts": ["RCM"]
+  }
+}

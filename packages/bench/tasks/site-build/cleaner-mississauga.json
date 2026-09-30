@@ -1,0 +1,25 @@
+{
+  "id": "cleaner-mississauga",
+  "suite": "site-build",
+  "tags": ["cleaner", "residential", "hours"],
+  "brief": {
+    "businessName": "Maple Fresh Cleaning",
+    "niche": "Residential cleaning",
+    "description": "Weekly, bi-weekly and one-time house cleaning, plus move-in and move-out cleans. Bonded and insured, background-checked staff, eco-friendly products on request. Flat-rate pricing based on the size of your home, and we give you a quote online in about five minutes.",
+    "city": "Mississauga",
+    "phone": "(905) 555-0172",
+    "email": "book@maplefreshcleaning.ca",
+    "serviceArea": ["Mississauga", "Oakville", "Brampton"],
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat"],
+        "opens": "08:00",
+        "closes": "18:00"
+      }
+    ]
+  },
+  "expect": {
+    "requiredFacts": ["move-out"],
+    "forbidden": ["free quote"]
+  }
+}

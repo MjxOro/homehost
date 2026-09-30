@@ -1,0 +1,32 @@
+{
+  "id": "florist-kitchener",
+  "suite": "site-build",
+  "tags": ["florist", "hours", "address"],
+  "brief": {
+    "businessName": "Bloom & Barrow Florist",
+    "niche": "Florist",
+    "description": "Neighbourhood florist doing everyday bouquets, sympathy arrangements, weddings and weekly subscriptions for offices and restaurants. Everything is designed to order, we don't use pre-made arrangements. Same-day delivery in Kitchener-Waterloo if you order before 1 pm.",
+    "city": "Kitchener",
+    "phone": "519-555-0141",
+    "email": "orders@bloomandbarrow.ca",
+    "address": {
+      "street": "205 King Street West",
+      "city": "Kitchener",
+      "region": "ON",
+      "postalCode": "N2G 1B1",
+      "country": "Canada"
+    },
+    "serviceArea": ["Kitchener", "Waterloo"],
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat"],
+        "opens": "09:00",
+        "closes": "17:30"
+      }
+    ],
+    "tone": "cheerful"
+  },
+  "expect": {
+    "requiredFacts": ["Waterloo"]
+  }
+}

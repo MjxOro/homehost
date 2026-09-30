@@ -1,0 +1,37 @@
+{
+  "id": "trainer-vancouver",
+  "suite": "site-build",
+  "tags": ["trainer", "strength", "hours", "address"],
+  "brief": {
+    "businessName": "Kits Strength Lab",
+    "niche": "Personal training studio",
+    "description": "Small-group and one-on-one strength training in a private Kitsilano studio. Maximum six people per class. Programs for beginners, over-50s and people returning from injury. Free 30-minute intro session so you can see if we're a fit before you commit.",
+    "city": "Vancouver",
+    "phone": "604-555-0182",
+    "email": "train@kitsstrengthlab.ca",
+    "address": {
+      "street": "2201 West 4th Avenue",
+      "city": "Vancouver",
+      "region": "BC",
+      "postalCode": "V6K 1N8",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "06:00",
+        "closes": "20:00"
+      },
+      {
+        "days": ["sat"],
+        "opens": "08:00",
+        "closes": "12:00"
+      }
+    ],
+    "tone": "encouraging, no hype"
+  },
+  "expect": {
+    "requiredFacts": ["30-minute"],
+    "forbidden": ["guaranteed results"]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "hvac-calgary",
+  "suite": "site-build",
+  "tags": ["trades", "hvac", "hours", "address"],
+  "brief": {
+    "businessName": "Chinook Heating & Air",
+    "niche": "Furnace and air conditioning",
+    "description": "Furnace repair, replacement and yearly tune-ups for Calgary homes. We install high-efficiency furnaces and heat pumps, and we do air conditioning too. Free quotes on replacements. Same-day service on no-heat calls if you phone before noon.",
+    "city": "Calgary",
+    "phone": "403-555-0166",
+    "email": "book@chinookheatingair.ca",
+    "address": {
+      "street": "2210 Centre Street NW",
+      "city": "Calgary",
+      "region": "AB",
+      "postalCode": "T2E 2S7",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "08:00",
+        "closes": "18:00"
+      }
+    ],
+    "tone": "reassuring"
+  },
+  "expect": {
+    "requiredFacts": ["heat pump"],
+    "forbidden": ["24/7"]
+  }
+}

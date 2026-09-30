@@ -1,0 +1,10 @@
+{
+  "id": "mid",
+  "models": {
+    "plan": "google/gemini-2.5-pro",
+    "fill": "google/gemini-2.5-flash",
+    "escalate": "anthropic/claude-sonnet-4"
+  },
+  "concurrency": 1,
+  "notes": "Mid-tier stack: strong planner, fast filler, frontier model for retries. Serialize page calls to limit in-flight spend in capped smokes; task concurrency is controlled separately. Model IDs are a starting point to be tuned."
+}

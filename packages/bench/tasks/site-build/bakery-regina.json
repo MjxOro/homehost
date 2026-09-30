@@ -1,0 +1,31 @@
+{
+  "id": "bakery-regina",
+  "suite": "site-build",
+  "tags": ["bakery", "hours", "address"],
+  "brief": {
+    "businessName": "Crumb & Kettle Bakery",
+    "niche": "Bakery and tea room",
+    "description": "Cinnamon knots, saskatoon berry pie, rye bread and gluten-free banana loaves. The tea room seats twenty. Custom cakes and wedding dessert tables, see us for tastings.",
+    "city": "Regina",
+    "phone": "306-555-0111",
+    "email": "orders@crumbandkettle.ca",
+    "address": {
+      "street": "2046 Albert Street",
+      "city": "Regina",
+      "region": "SK",
+      "postalCode": "S4P 2T9",
+      "country": "Canada"
+    },
+    "hours": [
+      {
+        "days": ["wed", "thu", "fri", "sat"],
+        "opens": "08:00",
+        "closes": "17:00"
+      }
+    ]
+  },
+  "expect": {
+    "requiredFacts": ["saskatoon berry pie"],
+    "forbidden": ["vegan"]
+  }
+}
