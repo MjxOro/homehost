@@ -3,9 +3,27 @@ import { Section, SiteSpec, siteSpecJsonSchema } from "../schema";
 import { canonicalJson, sha256 } from "./hash";
 import { SiteBrief, type LlmRequest } from "./types";
 
-const ids = Section.options.map((option) => option.shape.type.value) as [
+// SiteBrief carries no structured quotes, prices or staff, so the planner may
+// not choose sections that could only be filled with invented facts.
+// Hand-authored specs may still use them.
+const UNGROUNDED_SECTIONS = [
+  "testimonials.cards",
+  "pricing.table",
+  "team.cards",
+] as const satisfies readonly Section["type"][];
+type PlannableSection = Exclude<
   Section["type"],
-  ...Section["type"][],
+  (typeof UNGROUNDED_SECTIONS)[number]
+>;
+const plannable = Section.options.filter(
+  (option) =>
+    !(UNGROUNDED_SECTIONS as readonly string[]).includes(
+      option.shape.type.value,
+    ),
+);
+const ids = plannable.map((option) => option.shape.type.value) as [
+  PlannableSection,
+  ...PlannableSection[],
 ];
 export const Plan = z.strictObject({
   theme: SiteSpec.shape.theme,
@@ -30,8 +48,8 @@ const pageCopy = z.object({
 });
 
 export function pageFillSchema(page: PlannedPage) {
-  const options = Section.options.filter((option) =>
-    page.sectionTypes.includes(option.shape.type.value),
+  const options = plannable.filter((option) =>
+    (page.sectionTypes as readonly string[]).includes(option.shape.type.value),
   );
   const selected = z.discriminatedUnion(
     "type",
@@ -50,21 +68,17 @@ export function pageFillSchema(page: PlannedPage) {
   });
 }
 
-const purposes: Record<Section["type"], string> = {
+const purposes: Record<PlannableSection, string> = {
   "hero.split-image":
     "Opening message with a supplied image and optional action",
   "hero.centered": "Opening message with an optional action",
   "services.grid": "Services supported by the business description",
   "about.text": "Business introduction using supplied facts",
-  "testimonials.cards":
-    "Actual customer quotations supplied in the description",
   "gallery.grid": "Gallery of supplied image URLs",
   "hours.table": "Opening hours drawn from customer facts by code",
   "contact.details": "Contact details drawn from customer facts by code",
   "cta.banner": "A clear next step with a safe destination",
   "faq.list": "Questions answered from supplied information",
-  "pricing.table": "Prices explicitly supplied in the description",
-  "team.cards": "People explicitly supplied in the description",
   "map.embed": "Map built by code from the supplied address",
 };
 
@@ -96,7 +110,7 @@ function limits(node: SchemaNode): string {
     return `[${limits(node.items!)}] ${node.minItems ?? 0}..${node.maxItems} items`;
   return `${node.type ?? "value"}${node.maxLength !== undefined ? ` <=${node.maxLength} chars` : ""}${node.pattern ? ` pattern ${node.pattern}` : ""}`;
 }
-const sectionSchemas = Section.options.map((option) => z.toJSONSchema(option));
+const sectionSchemas = plannable.map((option) => z.toJSONSchema(option));
 export const SECTION_CATALOG = sectionSchemas
   .map((schema, i) => {
     const id = ids[i]!;

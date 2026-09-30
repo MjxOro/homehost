@@ -193,6 +193,27 @@ test("unknown section ID escalates the plan once then succeeds", async () => {
     "pages.0.sectionTypes.0",
   );
 });
+test.each(["testimonials.cards", "pricing.table", "team.cards"])(
+  "a plan choosing %s, which needs facts the brief cannot supply, is escalated",
+  async (type) => {
+    const bad = plan();
+    (bad.pages[0]!.sectionTypes as string[]).push(type);
+    const llm = new ScriptedClient([bad, plan(), fill()]);
+    const result = await generateSite(brief(), options(llm));
+    expect(result.ok).toBe(true);
+    expect(result.escalated).toBe(true);
+    expect(result.calls.map((call) => [call.stage, call.errorCode])).toEqual([
+      ["plan", "schema_error"],
+      ["escalate", null],
+      ["fill", null],
+    ]);
+    expect(llm.requests[1]!.messages.at(-1)!.content).toContain(
+      "pages.0.sectionTypes.1",
+    );
+    for (const request of llm.requests)
+      expect(JSON.stringify(request)).not.toContain(type);
+  },
+);
 test.each([
   "duplicate slug",
   "missing home",

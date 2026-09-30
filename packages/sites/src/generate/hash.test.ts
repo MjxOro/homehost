@@ -74,9 +74,12 @@ test("prompt version is deterministic and templates/schema changes affect hashes
   changedSchema.schemas.fill.properties.description.maxLength = 100;
   expect(PROMPT_VERSION).not.toBe(sha256(changedSchema).slice(0, 12));
 });
-test("catalog includes every schema ID and actual nested field limits", () => {
+test("catalog lists every plannable schema ID with nested field limits and omits ungrounded sections", () => {
+  const ungrounded = ["testimonials.cards", "pricing.table", "team.cards"];
   for (const option of Section.options)
-    expect(SECTION_CATALOG).toContain(`${option.shape.type.value}:`);
+    if (ungrounded.includes(option.shape.type.value))
+      expect(SECTION_CATALOG).not.toContain(option.shape.type.value);
+    else expect(SECTION_CATALOG).toContain(`${option.shape.type.value}:`);
   expect(SECTION_CATALOG).toContain("heading:string <=160 chars");
   expect(SECTION_CATALOG).toContain("answer:string <=2000 chars");
   expect(SECTION_CATALOG).toContain("1..24 items");
