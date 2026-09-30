@@ -1,0 +1,339 @@
+/* Landing-only visuals. Every base (un-animated) style below is the finished
+   state, so reduced motion shows a complete diagram. Only transform/opacity
+   animate; the cycle is 8s and pauses while offscreen (data-paused). */
+
+.lc-backdrop {
+  position: absolute;
+  inset: -40px -24px auto;
+  height: min(680px, 100%);
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      55% 50% at 72% 28%,
+      rgba(44, 196, 173, 0.17),
+      transparent 70%
+    ),
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0
+      0 / 48px 48px,
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px)
+      0 0 / 48px 48px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    #000 30%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    #000 30%,
+    transparent 100%
+  );
+}
+
+.lc-anim {
+  animation-duration: 8s;
+  animation-iteration-count: infinite;
+  animation-timing-function: var(--ease-in-out-soft);
+}
+
+.lc[data-paused] .lc-anim {
+  animation-play-state: paused;
+}
+
+.lc-cover {
+  transform: scaleX(0);
+  transform-origin: right;
+  animation-name: lc-cover;
+}
+
+.lc-cursor {
+  opacity: 0;
+  animation-name: lc-cursor;
+}
+
+.lc-fill {
+  transform-origin: top;
+  animation-name: lc-fill;
+  animation-timing-function: linear;
+}
+
+.lc-pulse {
+  opacity: 0;
+  animation-name: lc-pulse;
+  animation-timing-function: linear;
+}
+
+.lc-term {
+  animation-name: lc-term;
+}
+
+.lc-out {
+  animation-name: lc-out;
+}
+
+.lc-row1 {
+  animation-name: lc-row1;
+}
+.lc-row2 {
+  animation-name: lc-row2;
+}
+.lc-row3 {
+  animation-name: lc-row3;
+}
+.lc-dot1 {
+  animation-name: lc-dot1;
+}
+.lc-dot2 {
+  animation-name: lc-dot2;
+}
+.lc-dot3 {
+  animation-name: lc-dot3;
+}
+
+@keyframes lc-row1 {
+  0%,
+  3% {
+    opacity: 0.45;
+  }
+  6%,
+  94% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0.45;
+  }
+}
+@keyframes lc-row2 {
+  0%,
+  19% {
+    opacity: 0.45;
+  }
+  22%,
+  94% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0.45;
+  }
+}
+@keyframes lc-row3 {
+  0%,
+  35% {
+    opacity: 0.45;
+  }
+  38%,
+  94% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0.45;
+  }
+}
+@keyframes lc-dot1 {
+  0%,
+  3%,
+  98%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  6%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lc-dot2 {
+  0%,
+  19%,
+  98%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  22%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lc-dot3 {
+  0%,
+  35%,
+  98%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  38%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lc-fill {
+  0%,
+  4%,
+  98%,
+  100% {
+    transform: scaleY(0);
+  }
+  36%,
+  94% {
+    transform: scaleY(1);
+  }
+}
+@keyframes lc-pulse {
+  0%,
+  3% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  5% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  36% {
+    opacity: 1;
+    transform: translateY(128px);
+  }
+  39%,
+  100% {
+    opacity: 0;
+    transform: translateY(128px);
+  }
+}
+@keyframes lc-term {
+  0%,
+  37%,
+  98%,
+  100% {
+    opacity: 0.5;
+  }
+  40%,
+  94% {
+    opacity: 1;
+  }
+}
+@keyframes lc-cover {
+  0%,
+  44% {
+    transform: scaleX(1);
+    animation-timing-function: steps(26, end);
+  }
+  60%,
+  97.9% {
+    transform: scaleX(0);
+  }
+  98%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes lc-cursor {
+  0%,
+  37%,
+  63%,
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  40%,
+  44% {
+    opacity: 1;
+    transform: translateX(0);
+    animation-timing-function: steps(26, end);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(26ch);
+  }
+  63% {
+    transform: translateX(26ch);
+  }
+}
+@keyframes lc-out {
+  0%,
+  63%,
+  98%,
+  100% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  68%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Primary call to action: accent glow + a single sheen sweep on hover,
+   press scale on active. Plain <a>; all decoration is pseudo/child. */
+.lc-cta {
+  position: relative;
+  isolation: isolate;
+  transition:
+    background-color var(--duration-fast),
+    transform var(--duration-fast) var(--ease-out-quint);
+}
+
+.lc-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 4px var(--color-accent-dim),
+    0 10px 30px rgba(44, 196, 173, 0.28);
+  opacity: 0;
+  transition: opacity var(--duration-base);
+}
+
+.lc-cta:focus-visible::before {
+  opacity: 1;
+}
+
+.lc-cta:active {
+  transform: scale(0.98);
+}
+
+.lc-sheen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.lc-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.32) 50%,
+    transparent 65%
+  );
+  transform: translateX(-110%);
+  transition: transform var(--duration-reveal) var(--ease-out-quint);
+}
+
+@media (hover: hover) {
+  .lc-cta:hover::before {
+    opacity: 1;
+  }
+  .lc-cta:hover .lc-sheen::after {
+    transform: translateX(110%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-anim {
+    animation: none !important;
+  }
+}
