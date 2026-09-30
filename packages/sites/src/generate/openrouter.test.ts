@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { randomBytes } from "node:crypto";
 import { createOpenRouterClient, LlmClientError } from "./openrouter";
 import type { LlmRequest } from "./types";
@@ -160,6 +160,84 @@ test.each([429, 503])("retries HTTP %i with backoff", async (status) => {
   }).complete(request);
   expect(attempts).toBe(2);
   expect(response.providerRequestId).toBe("gen-recorded");
+});
+// Records every backoff wait and runs it immediately; only the call deadline
+// timer (timeoutMs) keeps its real duration.
+async function recordWaits(
+  timeoutMs: number,
+  run: () => unknown,
+): Promise<number[]> {
+  const real = globalThis.setTimeout,
+    waits: number[] = [];
+  const spy = spyOn(globalThis, "setTimeout").mockImplementation(((
+    fn: () => void,
+    ms?: number,
+  ) => {
+    if (ms === timeoutMs) return real(fn, ms);
+    waits.push(ms ?? 0);
+    return real(fn, 0);
+  }) as typeof setTimeout);
+  try {
+    await run();
+  } finally {
+    spy.mockRestore();
+  }
+  return waits;
+}
+test.each([
+  { status: 429, header: "2", min: 2000, max: 2000 },
+  {
+    status: 503,
+    header: new Date(Date.now() + 5000).toUTCString(),
+    min: 3000,
+    max: 5000,
+  },
+  { status: 429, header: "3600", min: 10_000, max: 10_000 },
+  { status: 503, header: null, min: 250, max: 250 },
+  { status: 502, header: "2", min: 250, max: 250 },
+])(
+  "HTTP $status with Retry-After $header waits between $min and $max ms",
+  async ({ status, header, min, max }) => {
+    let attempts = 0;
+    const client = createOpenRouterClient({
+      apiKey: key(),
+      timeoutMs: 30_000,
+      fetch: transport(async () =>
+        ++attempts === 1
+          ? new Response("Try later", {
+              status,
+              headers: header ? { "Retry-After": header } : {},
+            })
+          : Response.json(recorded()),
+      ),
+    });
+    const waits = await recordWaits(30_000, () => client.complete(request));
+    expect(attempts).toBe(2);
+    expect(waits).toHaveLength(1);
+    expect(waits[0]!).toBeGreaterThanOrEqual(min);
+    expect(waits[0]!).toBeLessThanOrEqual(max);
+  },
+);
+test("a Retry-After beyond the call deadline fails with the HTTP status instead of waiting", async () => {
+  let attempts = 0;
+  const client = createOpenRouterClient({
+    apiKey: key(),
+    timeoutMs: 5000,
+    fetch: transport(async () => {
+      attempts++;
+      return new Response("Slow down", {
+        status: 429,
+        headers: { "Retry-After": "8" },
+      });
+    }),
+  });
+  const waits = await recordWaits(5000, () =>
+    expect(client.complete(request)).rejects.toMatchObject({
+      code: "http_429",
+    }),
+  );
+  expect(attempts).toBe(1);
+  expect(waits).toEqual([]);
 });
 test("retries network failures and body-stream failures", async () => {
   let attempts = 0;

@@ -23,6 +23,8 @@ const envelope = z.object({
   usage: usageSchema,
 });
 
+const RETRY_AFTER_CAP_MS = 10_000;
+
 /** Carries known billed usage even if the provider returned no usable content. */
 export class LlmClientError extends Error {
   constructor(
@@ -158,8 +160,27 @@ export function createOpenRouterClient(
               (response.status === 429 || response.status >= 500) &&
               attempt < maxRetries
             ) {
-              await delay(250 * 2 ** attempt, signal);
-              continue;
+              const header =
+                response.status === 429 || response.status === 503
+                  ? response.headers.get("retry-after")
+                  : null;
+              // Retry-After is delay-seconds or an HTTP date.
+              const requested = !header
+                ? NaN
+                : /^\s*\d+\s*$/.test(header)
+                  ? Number(header) * 1000
+                  : Date.parse(header) - Date.now();
+              if (Number.isNaN(requested)) {
+                await delay(250 * 2 ** attempt, signal);
+                continue;
+              }
+              const wait = Math.min(Math.max(requested, 0), RETRY_AFTER_CAP_MS);
+              // A wait that outlasts the call deadline would only end in a
+              // timeout; report the provider's status instead.
+              if (wait < timeoutMs - (performance.now() - started)) {
+                await delay(wait, signal);
+                continue;
+              }
             }
             throw new LlmClientError(
               `OpenRouter HTTP ${response.status}: ${redact(body).replace(/\s+/g, " ").slice(0, 300)}`,
