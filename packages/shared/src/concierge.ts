@@ -254,36 +254,22 @@ export function decideSuggestion(
   });
   if (useCase === "not_offered") return notOffered();
 
-  // 3. Plan.
-  if (answers.plan.choice === PLAN_NONE) return notOffered();
-  let plan = PLANS.find((p) => p.id === answers.plan.choice);
-  if (!plan) return notOffered();
-  const planProbability = (p: Plan) => probabilityOf(answers.plan, p.id);
-  if (
-    plan.desktop &&
-    useCase !== "remote_desktop" &&
-    answers.wants_gui < GUI_MIN
-  ) {
-    plan = byProbability(
-      PLANS.filter((p) => !p.desktop),
-      planProbability,
-    )[0]!;
-  }
+  // 3. Plan. A confident `none` means nothing fits; an unsure one (like any
+  // unsure plan) becomes a plan follow-up below.
+  const topPlan = PLANS.find((p) => p.id === answers.plan.choice);
+  const planSure = answers.plan.confidence >= PLAN_MIN;
+  if (!topPlan && planSure) return notOffered();
   const recipeId = answers.recipe.choice;
   const needsVm = RECIPES[recipeId].requiresVm;
-  if (needsVm && plan.kind === "container") {
-    plan = PLANS.filter((p) => p.kind === "vm" && !p.desktop).reduce(smaller);
-    warnings.add("upgraded_for_recipe");
-  }
+  const planProbability = (p: Plan) => probabilityOf(answers.plan, p.id);
 
   if (answers.players_connect >= PLAYERS_MIN) warnings.add("players_need_ipv6");
 
   // 4. Low confidence: one follow-up slot, plan first.
-  if (answers.plan.confidence < PLAN_MIN) {
+  if (!topPlan || !planSure) {
     const candidates = PLANS.filter(
       (p) => !(needsVm && p.kind === "container"),
     );
-    warnings.delete("upgraded_for_recipe");
     return {
       outcome: "choose",
       useCase,
@@ -301,6 +287,22 @@ export function decideSuggestion(
       },
       warnings: orderWarnings(warnings),
     };
+  }
+
+  let plan = topPlan;
+  if (
+    plan.desktop &&
+    useCase !== "remote_desktop" &&
+    answers.wants_gui < GUI_MIN
+  ) {
+    plan = byProbability(
+      PLANS.filter((p) => !p.desktop),
+      planProbability,
+    )[0]!;
+  }
+  if (needsVm && plan.kind === "container") {
+    plan = PLANS.filter((p) => p.kind === "vm" && !p.desktop).reduce(smaller);
+    warnings.add("upgraded_for_recipe");
   }
 
   // 5. Tier lock: still suggested, the create endpoint enforces tiers.

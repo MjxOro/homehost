@@ -105,15 +105,37 @@ describe("decideSuggestion", () => {
     });
   });
 
-  test("plan none is treated as not offered", () => {
+  test("a confident plan none is treated as not offered", () => {
     const d = decideSuggestion(
-      answers({ plan: { choice: "none", confidence: 0.3 } }),
+      answers({ plan: { choice: "none", confidence: PLAN_MIN } }),
       technical,
     );
     expect(d.outcome).toBe("not_offered");
+    expect(d.useCase).toBe("game_server");
     expect(d.planId).toBeNull();
     expect(d.recipeId).toBeNull();
     expect(d.choice).toBeUndefined();
+  });
+
+  test("an unsure plan none asks for a real plan instead", () => {
+    const d = decideSuggestion(
+      answers({
+        plan: {
+          choice: "none",
+          confidence: PLAN_MIN - 0.01,
+          probabilities: { none: 0.56, "game-small": 0.3 },
+        },
+      }),
+      technical,
+    );
+    expect(d.outcome).toBe("choose");
+    expect(d.choice?.slot).toBe("plan");
+    expect(d.choice?.options[0]).toEqual({
+      id: "game-small",
+      label: "Game Small",
+      probability: 0.3,
+    });
+    expect(d.choice?.options.map((o) => o.id)).not.toContain("none");
   });
 
   test("an unrequested desktop plan is demoted to the best headless plan", () => {
