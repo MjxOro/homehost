@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "business": {
+    "name": "Juniper & Shears",
+    "tagline": "Good hair, at your own pace.",
+    "niche": "Neighbourhood hair salon",
+    "phone": "+1 (613) 555-0182",
+    "email": "bookings@juniperandshears.ca",
+    "address": "72 Willow Lane, Ottawa, ON K1S 3B4, Canada",
+    "serviceArea": ["Old Ottawa South", "The Glebe", "Centretown"],
+    "hours": [
+      { "days": ["tue", "wed", "fri"], "opens": "09:00", "closes": "18:00" },
+      { "days": ["thu"], "opens": "10:00", "closes": "20:00" },
+      { "days": ["sat"], "opens": "09:00", "closes": "16:00" }
+    ],
+    "socials": [
+      {
+        "kind": "Instagram",
+        "url": "https://www.instagram.com/juniperandshears/"
+      }
+    ]
+  },
+  "theme": { "preset": "rose", "fonts": "editorial" },
+  "pages": [
+    {
+      "slug": "",
+      "title": "Juniper & Shears",
+      "description": "An unhurried Ottawa hair salon for thoughtful cuts, dimensional colour and everyday styling. Find us in Old Ottawa South.",
+      "sections": [
+        {
+          "type": "hero.split-image",
+          "heading": "A fresh cut. A little time for yourself.",
+          "text": "Settle into our welcoming neighbourhood salon. We listen to your routine, talk through your ideas and shape a look that feels like you.",
+          "image": {
+            "src": "https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=1200&q=80",
+            "alt": "A bright salon with styling chairs and mirrors"
+          },
+          "action": { "label": "See services and prices", "href": "/services/" }
+        },
+        {
+          "type": "about.text",
+          "heading": "A quieter kind of salon",
+          "text": "Founded by stylist Amélie Roy in 2019, Juniper & Shears makes room for a real consultation. Ask for a quiet appointment if you prefer less conversation. Our entrance is step-free, and we welcome questions about access before your visit."
+        },
+        {
+          "type": "gallery.grid",
+          "heading": "Inside the salon",
+          "images": [
+            {
+              "src": "https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=1000&q=80",
+              "alt": "Comfortable styling stations in a light-filled salon"
+            },
+            {
+              "src": "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1000&q=80",
+              "alt": "Salon workspace prepared for a hair appointment"
+            }
+          ]
+        },
+        {
+          "type": "testimonials.cards",
+          "heading": "What our guests say",
+          "items": [
+            {
+              "quote": "Amélie asked about my morning routine and gave me a cut I can style in five minutes. Such a calm, welcoming space.",
+              "author": "Nora T.",
+              "detail": "The Glebe"
+            }
+          ]
+        },
+        {
+          "type": "cta.banner",
+          "heading": "Ready for your next appointment?",
+          "text": "Call or email with your preferred stylist, service and a few dates that work for you. We will reply during opening hours.",
+          "action": { "label": "Meet the team and book", "href": "/team/" }
+        }
+      ]
+    },
+    {
+      "slug": "services",
+      "title": "Services",
+      "description": "Haircuts, colour and styling at Juniper & Shears in Ottawa. Transparent starting prices and consultations for every colour appointment.",
+      "sections": [
+        {
+          "type": "hero.centered",
+          "heading": "Your hair, your style",
+          "text": "Our pricing follows the service and time required, rather than gender. All prices are in Canadian dollars, before HST."
+        },
+        {
+          "type": "pricing.table",
+          "heading": "Cuts, colour and styling",
+          "items": [
+            {
+              "name": "Cut and finish",
+              "price": "From $68",
+              "description": "Consultation, wash, precision cut and styling. Allow 60 minutes."
+            },
+            {
+              "name": "Clipper cut",
+              "price": "From $38",
+              "description": "A tailored short cut with clippers and finishing work. Allow 30 minutes."
+            },
+            {
+              "name": "Root colour",
+              "price": "From $95",
+              "description": "Colour touch-up with a wash and finish. A consultation confirms the final price."
+            },
+            {
+              "name": "Partial highlights",
+              "price": "From $145",
+              "description": "Face-framing dimension, toner and a finish. Extra product or time is quoted before we start."
+            }
+          ]
+        },
+        {
+          "type": "faq.list",
+          "heading": "Planning your appointment",
+          "items": [
+            {
+              "question": "Do I need a colour consultation?",
+              "answer": "New colour guests receive a complimentary 15-minute consultation before booking. We discuss your goals, maintenance and any required patch test."
+            },
+            {
+              "question": "What is your cancellation policy?",
+              "answer": "Please give at least 24 hours' notice if you need to change your appointment. Late cancellations may incur a fee of 50% of the booked service."
+            },
+            {
+              "question": "Can I ask for a quiet appointment?",
+              "answer": "Absolutely. Mention it when booking and we will keep conversation to the consultation and anything needed for your comfort."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "team",
+      "title": "Team and booking",
+      "description": "Meet Amélie and Devin, the stylists at Juniper & Shears, and book your Ottawa salon appointment by phone or email.",
+      "sections": [
+        {
+          "type": "team.cards",
+          "heading": "People who listen first",
+          "items": [
+            {
+              "name": "Amélie Roy",
+              "role": "Owner and senior stylist",
+              "bio": "Amélie loves lived-in colour and versatile cuts. She has spent twelve years helping guests find a style that fits their everyday life."
+            },
+            {
+              "name": "Devin Patel",
+              "role": "Stylist",
+              "bio": "Devin specialises in textured cuts, short styles and careful finishing. Their appointments start with a conversation about how you want your hair to feel."
+            }
+          ]
+        },
+        {
+          "type": "contact.details",
+          "heading": "Book a little time for yourself",
+          "text": "Call or email to request an appointment. Please include your preferred service, stylist and availability. We are closed on Sundays and Mondays."
+        },
+        { "type": "hours.table", "heading": "Salon hours" },
+        { "type": "map.embed", "heading": "Visit us in Old Ottawa South" }
+      ]
+    }
+  ]
+}
