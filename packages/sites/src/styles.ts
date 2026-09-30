@@ -2,7 +2,8 @@ import { FONT_PAIRINGS, THEME_PRESETS } from "./themes";
 import type { SiteSpec } from "./schema";
 
 export function styles(theme: SiteSpec["theme"]): string {
-  const palette = THEME_PRESETS[theme.preset], fonts = FONT_PAIRINGS[theme.fonts];
+  const palette = THEME_PRESETS[theme.preset],
+    fonts = FONT_PAIRINGS[theme.fonts];
   return `:root {
   --bg: ${palette.bg}; --surface: ${palette.surface}; --text: ${palette.text};
   --muted: ${palette.muted}; --primary: ${palette.primary}; --primary-text: ${palette.primaryText}; --accent: ${palette.accent};
