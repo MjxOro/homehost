@@ -1,0 +1,12 @@
+# Self-heals the tenant IPv6 gateway if anything else (an Incus network
+# change, a manual flush) removes it between Incus restarts.
+[Unit]
+Description=Check the Homehost tenant bridge IPv6 gateway every 30s
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

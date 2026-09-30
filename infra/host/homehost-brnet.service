@@ -1,14 +1,15 @@
+# Tenant IPv6 gateway on incusbr0. Installed with homehost-brnet.timer; see
+# infra/host/README.md ("Tenant IPv6 gateway") and docs/networking.md.
 [Unit]
-Description=Homehost tenant bridge IPv6 address
-After=incus.service wg-quick@r64lan.service
-Wants=incus.service
-BindsTo=sys-subsystem-net-devices-incusbr0.device
-After=sys-subsystem-net-devices-incusbr0.device
+Description=Homehost tenant bridge IPv6 gateway
+After=incus.service wg-quick@r64lan.service sys-subsystem-net-devices-incusbr0.device
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
-ExecStart=/sbin/ip -6 addr replace 2a11:6c7:f35:ea::ffff/64 dev incusbr0
+ExecStart=/usr/local/sbin/homehost-brnet /home/mjxoro/projects/homehost/infra/private/worker.env
+# The timer runs this every 30s: keep the journal to repairs and failures.
+LogLevelMax=notice
 
 [Install]
-WantedBy=multi-user.target
+# Re-run on every Incus (re)start, which disables IPv6 on the bridge.
+WantedBy=multi-user.target incus.service

@@ -59,3 +59,22 @@ CF_DNS_API_TOKEN=<Edit-zone-DNS token, same as infra/private/traefik.env>
 Deploys (`prod:deploy`) don't restart this unit. After a merge that changes
 `apps/worker`, run `sudo systemctl restart homehost-worker` and check
 `journalctl -u homehost-worker -n 20` for `worker up (prod)`.
+
+## Tenant IPv6 gateway
+
+Boxes reach the internet over IPv6 only while `incusbr0` holds the /64
+gateway (`<IPV6_PREFIX>::ffff/64`, see `docs/networking.md`). Incus disables
+IPv6 on the bridge on every daemon start, so a checker keeps it in place:
+`homehost-brnet.sh` reads `IPV6_PREFIX` from `infra/private/worker.env`,
+re-enables IPv6 on the bridge and re-adds the address when missing. It runs
+after every Incus start and every 30s, and logs only when it repairs
+something. Install or update:
+
+```bash
+sudo install -m 0755 infra/host/homehost-brnet.sh /usr/local/sbin/homehost-brnet
+sudo install -m 0644 infra/host/homehost-brnet.service infra/host/homehost-brnet.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl reenable homehost-brnet.service homehost-brnet.timer
+sudo systemctl start homehost-brnet.timer homehost-brnet.service
+journalctl -u homehost-brnet -n 5   # "incusbr0: restored ..." after a repair
+```
