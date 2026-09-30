@@ -6,6 +6,7 @@ import {
   withSpendGuard,
 } from "./spend";
 import { withCache } from "./cache";
+import { LlmClientError } from "./pipeline";
 import { request, response, temporary } from "./fixtures.test-helper";
 
 test("spend guard blocks the call starting at the cap", async () => {
@@ -73,4 +74,28 @@ test("known billed errors count toward spend; invalid amounts are rejected", asy
   expect(usdToMicro(0.123456)).toBe(123456n);
   for (const usd of [-1, Infinity, NaN])
     expect(() => usdToMicro(usd)).toThrow();
+});
+
+test("unknown usage cost blocks further live calls rather than treating them as free", async () => {
+  const guard = new SpendGuard(100000n);
+  let calls = 0;
+  const llm = withSpendGuard(
+    {
+      complete: async () => {
+        calls++;
+        throw new LlmClientError(
+          "Missing provider cost",
+          "missing_usage",
+          response(0n),
+        );
+      },
+    },
+    guard,
+  );
+  await expect(llm.complete(request)).rejects.toThrow("Missing provider cost");
+  await expect(llm.complete(request)).rejects.toThrow(
+    "actual spend is unknown",
+  );
+  expect(calls).toBe(1);
+  expect(guard.unknownSpend).toBe(true);
 });

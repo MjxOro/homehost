@@ -18,6 +18,7 @@ import {
 import {
   SpendGuard,
   SpendCapExceeded,
+  UnknownSpend,
   usdToMicro,
   withSpendGuard,
 } from "./spend";
@@ -232,9 +233,12 @@ export async function runBench(
               if (source === "hit" || source === "live") status = source;
               if (
                 error instanceof SpendCapExceeded ||
+                error instanceof UnknownSpend ||
                 error instanceof CacheMiss
               )
                 stopped = error.message;
+              if ((error as { code?: string })?.code === "missing_usage")
+                stopped = new UnknownSpend().message;
               throw error;
             } finally {
               const queue = responses.get(hash) ?? [];

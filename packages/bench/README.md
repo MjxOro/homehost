@@ -78,6 +78,9 @@ client and needs no key. Unit tests use scripted clients and never contact model
   starts once known billed spend reaches the cap. The last call and calls already
   in flight can overshoot: unknown future provider cost cannot be reserved exactly.
   This is a known-spend stop threshold, not a provider-side hard dollar limit.
+  Missing provider usage cost stops the run explicitly as unknown spend and
+  blocks subsequent live calls; reported numeric totals then cover known costs
+  only, not a claim that the incomplete run was free.
 - Save completed attempts in deterministic task/repeat order to `results.jsonl`,
   checkpoint after each completion, and stop cleanly with partial results on a
   spend cap or replay miss (CLI exit 2). Other failed attempts do not stop the suite.

@@ -60,6 +60,45 @@ async function scripted(
 }
 const git = async () => ({ sha: "pinned-test-sha", dirty: true });
 
+test("missing usage stops the runner with explicit unknown-spend partial results", async () => {
+  const temp = await temporary();
+  try {
+    let calls = 0;
+    const run = await runBench(
+      {
+        candidate,
+        tasks: [
+          { ...task, id: "first" },
+          { ...task, id: "second" },
+        ],
+        repeats: 1,
+        concurrency: 1,
+        cache: "live",
+        outputRoot: temp.dir,
+      },
+      {
+        git,
+        generate: scripted,
+        llm: {
+          complete: async () => {
+            calls++;
+            throw new LlmClientError(
+              "Provider omitted cost",
+              "missing_usage",
+              response(0n),
+            );
+          },
+        },
+      },
+    );
+    expect(calls).toBe(1);
+    expect(run.results).toHaveLength(1);
+    expect(run.manifest.stopped).toContain("actual spend is unknown");
+  } finally {
+    await temp.cleanup();
+  }
+});
+
 test("the shipped generator reproduces provider-failure escalation and parallel calls offline", async () => {
   const temp = await temporary();
   try {
