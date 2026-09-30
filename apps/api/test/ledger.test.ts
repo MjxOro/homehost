@@ -162,6 +162,40 @@ describe.skipIf(!databaseUrl)("usage ledger", () => {
     expect(await run(getBalance(user))).toBe(5n);
   });
 
+  test("database rejects two rows with the same prev_hash instead of forking", async () => {
+    const user = await newUser();
+    const hex = () => createHash("sha256").update(randomUUID()).digest("hex");
+    const prev = hex();
+    const insert = (tx: postgres.TransactionSql, hash: string) =>
+      tx`INSERT INTO credit_ledger
+           (user_id, delta, balance_after, reason, created_at, prev_hash, hash)
+         VALUES (${user}, 1, 1, 'grant', now(), ${prev}, ${hash})`;
+    // Roll back on failure so no stray rows reach the shared chain.
+    await expect(
+      client.begin(async (tx) => {
+        await insert(tx, hex());
+        await insert(tx, hex());
+      }),
+    ).rejects.toMatchObject({ code: "23505" });
+  });
+
+  test("database ties reason to the sign of delta", async () => {
+    const user = await newUser();
+    const insert = (reason: string, delta: number) =>
+      Promise.resolve(
+        client`INSERT INTO credit_ledger
+                 (user_id, delta, balance_after, reason, created_at, prev_hash, hash)
+               VALUES (${user}, ${delta}, 5, ${reason}, now(),
+                 ${createHash("sha256").update(randomUUID()).digest("hex")},
+                 ${createHash("sha256").update(randomUUID()).digest("hex")})`,
+      );
+    await expect(insert("usage", 1)).rejects.toMatchObject({ code: "23514" });
+    for (const reason of ["purchase", "grant", "refund"])
+      await expect(insert(reason, -1)).rejects.toMatchObject({
+        code: "23514",
+      });
+  });
+
   test("verifyLedger pinpoints a tampered row", async () => {
     const user = await newUser();
     const row = await run(
