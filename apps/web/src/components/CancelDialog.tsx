@@ -113,7 +113,7 @@ export function CancelDialog({ request, trigger, onClose }: CancelDialogProps) {
   return (
     <dialog
       ref={dialogRef}
-      className="m-auto w-full max-w-[480px] bg-transparent p-0 text-text-1 backdrop:bg-[rgba(4,8,10,0.72)]"
+      className="m-auto w-full max-w-[480px] bg-transparent p-0 text-text-1 backdrop:bg-[rgba(4,8,10,0.72)] backdrop:animate-fade-in"
       aria-labelledby="cancel-dialog-title"
       onClick={(event) => {
         // Clicks on the backdrop/canvas are delivered with the dialog itself
@@ -123,7 +123,7 @@ export function CancelDialog({ request, trigger, onClose }: CancelDialogProps) {
         }
       }}
     >
-      <div className="rounded-xl border border-line-strong bg-ink-1 p-5 shadow-pop">
+      <div className="animate-scale-in rounded-xl border border-line-strong bg-ink-1 p-5 shadow-pop">
         <div className="flex items-start justify-between gap-3">
           <h2 id="cancel-dialog-title" className="text-[18px] font-bold">
             {copy.title}

@@ -17,7 +17,7 @@ import { PersonaMenu } from "./PersonaMenu";
 import { ErrorState, PageLoading } from "./primitives";
 
 const NAV_ITEM_BASE =
-  "flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-[14.5px] font-medium no-underline transition-colors hover:bg-ink-2";
+  "flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-[14.5px] font-medium no-underline transition-colors duration-(--duration-fast) ease-out-quint hover:bg-ink-2";
 const NAV_ITEM_IDLE = `${NAV_ITEM_BASE} text-text-2 hover:text-text-1`;
 const NAV_ITEM_ACTIVE = `${NAV_ITEM_BASE} bg-accent-dim text-accent`;
 
@@ -101,7 +101,9 @@ function SidebarNav({
       {isOperator ? (
         <Link
           to="/admin"
-          className={pathname.startsWith("/admin") ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE}
+          className={
+            pathname.startsWith("/admin") ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE
+          }
           onClick={onNavigate}
         >
           <UserIcon className="size-[18px] shrink-0" />
@@ -194,7 +196,7 @@ export function AppLayout() {
     return (
       <div className="flex min-h-dvh flex-col">
         <a
-          className="absolute left-3 top-[-56px] z-[100] rounded-control bg-accent px-4 py-2.5 font-[650] text-on-accent no-underline transition-[top] duration-[0.15s] ease-[ease] focus:top-3"
+          className="absolute left-3 top-[-56px] z-[100] rounded-control bg-accent px-4 py-2.5 font-[650] text-on-accent no-underline transition-colors duration-(--duration-fast) focus:top-3"
           href="#main"
         >
           Skip to content
@@ -211,7 +213,7 @@ export function AppLayout() {
         )}
         <main
           id="main"
-          className="mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
+          className="vt-page mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
           tabIndex={-1}
         >
           <Outlet />
@@ -221,17 +223,17 @@ export function AppLayout() {
   }
 
   const asideClass = navOpen
-    ? "visible fixed inset-y-0 left-0 z-50 flex w-[280px] translate-x-0 flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-[0.22s] ease-[ease] motion-reduce:transition-none lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none"
-    : "invisible fixed inset-y-0 left-0 z-50 flex w-[280px] -translate-x-[108%] flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-[0.22s] ease-[ease] [transition-delay:0s,0.22s] motion-reduce:transition-none lg:visible lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none";
+    ? "visible fixed inset-y-0 left-0 z-50 flex w-[280px] translate-x-0 flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-(--duration-base) ease-out-quint motion-reduce:transition-none lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none"
+    : "invisible fixed inset-y-0 left-0 z-50 flex w-[280px] -translate-x-[108%] flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-(--duration-base) ease-out-quint [transition-delay:0s,var(--duration-base)] motion-reduce:transition-none lg:visible lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none";
 
   const scrimClass = navOpen
-    ? "visible fixed inset-0 z-[45] cursor-pointer bg-[rgba(4,8,10,0.6)] opacity-100 transition-[opacity,visibility] duration-200 ease-[ease] motion-reduce:transition-none lg:hidden"
-    : "invisible pointer-events-none fixed inset-0 z-[45] cursor-pointer bg-[rgba(4,8,10,0.6)] opacity-0 transition-[opacity,visibility] duration-200 ease-[ease] [transition-delay:0s,0.2s] motion-reduce:transition-none lg:hidden";
+    ? "app-nav-scrim visible fixed inset-0 z-[45] cursor-pointer bg-[rgba(4,8,10,0.6)] opacity-100 transition-[opacity,visibility] duration-(--duration-base) ease-out-quint motion-reduce:transition-none lg:hidden"
+    : "app-nav-scrim invisible pointer-events-none fixed inset-0 z-[45] cursor-pointer bg-[rgba(4,8,10,0.6)] opacity-0 transition-[opacity,visibility] duration-(--duration-base) ease-out-quint [transition-delay:0s,var(--duration-base)] motion-reduce:transition-none lg:hidden";
 
   return (
     <div className="flex min-h-dvh">
       <a
-        className="absolute left-3 top-[-56px] z-[100] rounded-control bg-accent px-4 py-2.5 font-[650] text-on-accent no-underline transition-[top] duration-[0.15s] ease-[ease] focus:top-3"
+        className="absolute left-3 top-[-56px] z-[100] rounded-control bg-accent px-4 py-2.5 font-[650] text-on-accent no-underline transition-colors duration-(--duration-fast) focus:top-3"
         href="#main"
       >
         Skip to content
@@ -261,7 +263,7 @@ export function AppLayout() {
               if (event.detail !== 0) event.currentTarget.blur();
               else navToggleRef.current?.focus();
             }}
-            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors [-webkit-tap-highlight-color:transparent] hover:bg-ink-2 lg:hidden"
+            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors duration-(--duration-fast) ease-out-quint [-webkit-tap-highlight-color:transparent] hover:bg-ink-2 active:scale-[0.98] motion-reduce:active:scale-100 lg:hidden"
           >
             <XIcon width={20} height={20} className="h-5 w-5" />
           </button>
@@ -296,7 +298,7 @@ export function AppLayout() {
             ref={navToggleRef}
             aria-controls="primary-navigation"
             type="button"
-            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors [-webkit-tap-highlight-color:transparent] hover:bg-ink-2 lg:hidden"
+            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors duration-(--duration-fast) ease-out-quint [-webkit-tap-highlight-color:transparent] hover:bg-ink-2 active:scale-[0.98] motion-reduce:active:scale-100 lg:hidden"
             aria-label={navOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={navOpen}
             onClick={(event) => {
@@ -323,7 +325,7 @@ export function AppLayout() {
         )}
         <main
           id="main"
-          className="mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
+          className="vt-page mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
           tabIndex={-1}
         >
           {isPending ? (

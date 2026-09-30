@@ -1,3 +1,4 @@
+import { useListEntrance } from "../lib/app-motion";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PortalUser, ServerRequest } from "@homehost/shared";
@@ -37,7 +38,7 @@ const CODE_BADGE =
   "rounded-md border border-line bg-ink-2 px-1.5 py-0.5 font-mono text-[12.5px] text-accent [overflow-wrap:anywhere]";
 const FIELD_LABEL = "text-[13.5px] font-semibold text-text-1";
 const TEXTAREA_FIELD =
-  "min-h-24 w-full resize-y rounded-control border border-line-strong bg-ink-2 px-3 py-2.5 text-[14.5px] leading-[1.5] text-text-1 transition-colors placeholder:text-text-3 focus:border-accent aria-invalid:border-bad disabled:opacity-60";
+  "min-h-24 w-full resize-y rounded-control border border-line-strong bg-ink-2 px-3 py-2.5 text-[14.5px] leading-[1.5] text-text-1 transition-colors duration-(--duration-fast) ease-out-quint placeholder:text-text-3 focus:border-accent aria-invalid:border-bad disabled:opacity-60";
 const FIELD_HINT = "m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-text-3";
 const COUNTER_BASE = "m-0 whitespace-nowrap font-mono text-[12px]";
 
@@ -45,7 +46,9 @@ function ApprovalRow({
   request,
   planName,
   onDecided,
+  entrance,
 }: {
+  entrance: ReturnType<ReturnType<typeof useListEntrance>>;
   request: ServerRequest;
   planName: string;
   onDecided: (message: string) => void;
@@ -74,7 +77,10 @@ function ApprovalRow({
   };
 
   return (
-    <li className="flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start">
+    <li
+      className={`${entrance.className} flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start`}
+      style={entrance.style}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-[15.5px] font-[650]">{request.name}</h3>
@@ -110,7 +116,7 @@ function ApprovalRow({
           </p>
         ) : null}
         {rejecting ? (
-          <div className="mt-3.5 flex w-full max-w-[520px] flex-col gap-2">
+          <div className="animate-fade-in mt-3.5 flex w-full max-w-[520px] flex-col gap-2">
             <label htmlFor={`reason-${request.id}`} className={FIELD_LABEL}>
               Reason for rejection{" "}
               <span className="font-normal text-text-3">(optional)</span>
@@ -194,6 +200,7 @@ function ApprovalRow({
 function ProvisionedSection({ user }: { user: PortalUser }) {
   const instances = useInstances(user);
   const retry = useRetryProvision();
+  const entrance = useListEntrance(instances.data?.requests ?? []);
   const [message, setMessage] = useState<string | null>(null);
   if (instances.isPending) {
     return (
@@ -228,7 +235,8 @@ function ProvisionedSection({ user }: { user: PortalUser }) {
           {rows.map((request) => (
             <li
               key={request.id}
-              className="flex flex-col gap-2 px-0.5 py-4 sm:flex-row sm:items-center sm:justify-between"
+              className={`${entrance(request.id).className} flex flex-col gap-2 px-0.5 py-4 sm:flex-row sm:items-center sm:justify-between`}
+              style={entrance(request.id).style}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
@@ -281,6 +289,7 @@ function ProvisionedSection({ user }: { user: PortalUser }) {
 
 function ApprovalsQueue({ user }: { user: PortalUser }) {
   const approvals = useApprovals(user);
+  const entrance = useListEntrance(approvals.data?.requests ?? []);
   const queryClient = useQueryClient();
   const plans = usePlans();
   const [liveMessage, setLiveMessage] = useState<string | null>(null);
@@ -361,6 +370,7 @@ function ApprovalsQueue({ user }: { user: PortalUser }) {
               <ApprovalRow
                 key={request.id}
                 request={request}
+                entrance={entrance(request.id)}
                 planName={planNames.get(request.planId) ?? request.planId}
                 onDecided={setLiveMessage}
               />

@@ -13,6 +13,7 @@ import { AuditTrail } from "../components/admin/AuditTrail";
 import { SignInGate } from "../components/SignInGate";
 import { Spinner } from "../components/icons";
 import {
+  BUTTON_OUTLINE_SM,
   CARD,
   CARD_HEAD,
   CARD_SUB,
@@ -34,7 +35,7 @@ const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
 ];
 
 const TAB_BASE =
-  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full px-4 py-2 text-[14px] font-[650] no-underline transition-colors [-webkit-tap-highlight-color:transparent] disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full px-4 py-2 text-[14px] font-[650] no-underline transition-colors duration-(--duration-fast) ease-out-quint enabled:active:scale-[0.98] motion-reduce:enabled:active:scale-100 [-webkit-tap-highlight-color:transparent] disabled:cursor-not-allowed disabled:opacity-55";
 const TAB_IDLE = `${TAB_BASE} border border-line-strong bg-ink-2 text-text-2 enabled:hover:border-accent-line enabled:hover:text-accent`;
 const TAB_ACTIVE = `${TAB_BASE} border border-transparent bg-accent text-on-accent`;
 
@@ -83,11 +84,13 @@ function AdminPanel({ user }: { user: PortalUser }) {
   });
 
   const seenIds = new Set<string>();
-  const users = (usersQuery.data?.pages ?? []).flatMap((page) => page.users).filter((u) => {
-    if (seenIds.has(u.id)) return false;
-    seenIds.add(u.id);
-    return true;
-  });
+  const users = (usersQuery.data?.pages ?? [])
+    .flatMap((page) => page.users)
+    .filter((u) => {
+      if (seenIds.has(u.id)) return false;
+      seenIds.add(u.id);
+      return true;
+    });
 
   // A 401 means the server no longer honors the cookie — ask /api/session for
   // the truth so the whole shell (topbar included) flips to signed out.
@@ -166,7 +169,10 @@ function AdminPanel({ user }: { user: PortalUser }) {
             }}
           />
           {usersQuery.isFetchNextPageError ? (
-            <p role="alert" className="mt-2 text-[13px] text-bad">
+            <p
+              role="alert"
+              className="animate-fade-in mt-2 text-[13px] text-bad"
+            >
               Could not load more users. Try again.
             </p>
           ) : null}
@@ -176,7 +182,7 @@ function AdminPanel({ user }: { user: PortalUser }) {
               onClick={() => void usersQuery.fetchNextPage()}
               disabled={usersQuery.isFetchingNextPage}
               aria-busy={usersQuery.isFetchingNextPage}
-              className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-control border border-line bg-ink-2 px-4 text-[14px] font-semibold disabled:cursor-wait disabled:opacity-60"
+              className={`${BUTTON_OUTLINE_SM} mt-3 w-full`}
             >
               {usersQuery.isFetchingNextPage ? (
                 <>
