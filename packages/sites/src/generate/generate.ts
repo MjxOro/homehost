@@ -194,10 +194,10 @@ export async function generateSite(
     if (opts.signal?.aborted)
       throw new CheckError("aborted", ["Site generation aborted"]);
   };
-  const publish = (call: LlmCallRecord) => {
+  const publish = async (call: LlmCallRecord) => {
     calls.push(call);
     try {
-      opts.onCall?.(call);
+      await opts.onCall?.(call);
     } catch {
       observerFailed = true;
     }
@@ -221,7 +221,7 @@ export async function generateSite(
       throw error;
     } finally {
       const usage = response?.usage;
-      publish({
+      await publish({
         stage,
         provider: response?.provider ?? "unknown",
         model: response?.model ?? request.model,

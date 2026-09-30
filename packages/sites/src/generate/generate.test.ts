@@ -351,7 +351,7 @@ test("still-failing fill returns false with all calls and billed error usage", a
   const seen: LlmCallRecord[] = [];
   const result = await generateSite(
     brief(),
-    options(llm, { onCall: (call) => seen.push(call) }),
+    options(llm, { onCall: (call) => void seen.push(call) }),
   );
   expect(result.ok).toBe(false);
   expect(result.escalated).toBe(true);
@@ -375,7 +375,7 @@ test("onCall sees transport failures as well as successful escalation", async ()
   ]);
   const result = await generateSite(
     brief(),
-    options(llm, { onCall: (call) => seen.push(call) }),
+    options(llm, { onCall: (call) => void seen.push(call) }),
   );
   expect(result.ok).toBe(true);
   expect(seen).toEqual(result.calls);
@@ -418,7 +418,7 @@ test("an OpenRouter response without cost is recorded as a missing_usage error",
   const seen: LlmCallRecord[] = [];
   const result = await generateSite(
     brief(),
-    options(llm, { onCall: (call) => seen.push(call) }),
+    options(llm, { onCall: (call) => void seen.push(call) }),
   );
   expect(result.ok).toBe(false);
   expect(seen[0]).toMatchObject({
@@ -476,7 +476,7 @@ test("all in-flight page calls are recorded even when one page cannot be repaire
   const seen: LlmCallRecord[] = [];
   const result = await generateSite(
     brief(),
-    options(llm, { onCall: (call) => seen.push(call), concurrency: 2 }),
+    options(llm, { onCall: (call) => void seen.push(call), concurrency: 2 }),
   );
   expect(result.ok).toBe(false);
   expect(result.calls).toHaveLength(4);
@@ -513,24 +513,34 @@ test("abort during fill stops subsequent pages and escalation without dropping b
   expect(llm.requests).toHaveLength(2);
   expect(result.escalated).toBe(false);
 });
-test("an onCall exception fails generation without billing a cascade", async () => {
-  const llm = new ScriptedClient([plan()]);
-  const result = await generateSite(
-    brief(),
-    options(llm, {
-      onCall: () => {
-        throw new Error("Ledger unavailable");
-      },
-    }),
-  );
-  expect(result).toMatchObject({
-    ok: false,
-    error: "onCall callback failed",
-    escalated: false,
-  });
-  expect(result.calls).toHaveLength(1);
-  expect(llm.requests).toHaveLength(1);
-});
+test.each([
+  {
+    kind: "sync throw",
+    onCall: () => {
+      throw new Error("Ledger unavailable");
+    },
+  },
+  {
+    kind: "async rejection",
+    onCall: async () => {
+      await Promise.resolve();
+      throw new Error("Ledger unavailable");
+    },
+  },
+])(
+  "an onCall $kind fails generation without billing a cascade",
+  async ({ onCall }) => {
+    const llm = new ScriptedClient([plan()]);
+    const result = await generateSite(brief(), options(llm, { onCall }));
+    expect(result).toMatchObject({
+      ok: false,
+      error: "onCall callback failed",
+      escalated: false,
+    });
+    expect(result.calls).toHaveLength(1);
+    expect(llm.requests).toHaveLength(1);
+  },
+);
 test("optional customer facts remain absent and escaped factual text passes checks", async () => {
   const input: SiteBrief = {
     businessName: 'Birch <Brook> & "Co"',

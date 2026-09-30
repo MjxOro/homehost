@@ -113,8 +113,11 @@ export type GenerateOptions = {
   models: GenerateModels;
   /** Max parallel fill calls. Default 4. */
   concurrency?: number;
-  /** Called after every model call, success or failure. */
-  onCall?: (call: LlmCallRecord) => void;
+  /**
+   * Called after every model call, success or failure, and awaited before the
+   * call's result is used. A throw or rejection fails generation.
+   */
+  onCall?: (call: LlmCallRecord) => void | Promise<void>;
   signal?: AbortSignal;
 };
 
