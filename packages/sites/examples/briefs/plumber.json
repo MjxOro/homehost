@@ -1,0 +1,26 @@
+{
+  "businessName": "Cedar Grove Plumbing",
+  "niche": "Residential plumbing and drain service",
+  "description": "We are a small, locally owned plumbing team serving homeowners in Greater Victoria. We repair leaking taps and toilets, clear household drains, and install and maintain tank water heaters. Every visit includes an explanation of the work and a written estimate before we begin. We protect floors and clean up the work area. Customers can email photos of a problem to help us prepare, but final estimates follow an on-site inspection. We take appointments during our listed opening hours and do not offer overnight emergency service. Please call before visiting the office. Do not quote prices, invent reviews, staff biographies or images: none are supplied.",
+  "city": "Victoria",
+  "phone": "+1 (250) 555-0147",
+  "email": "hello@cedargroveplumbing.ca",
+  "address": {
+    "street": "184 Alder Street",
+    "city": "Victoria",
+    "region": "BC",
+    "postalCode": "V8V 2A1",
+    "country": "Canada"
+  },
+  "serviceArea": ["Victoria", "Oak Bay", "Saanich", "Esquimalt"],
+  "hours": [
+    {
+      "days": ["mon", "tue", "wed", "thu", "fri"],
+      "opens": "08:00",
+      "closes": "17:00"
+    },
+    { "days": ["sat"], "opens": "09:00", "closes": "13:00" }
+  ],
+  "pagesWanted": ["Services"],
+  "tone": "Warm, clear, reassuring and practical"
+}

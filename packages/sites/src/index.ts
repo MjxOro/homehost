@@ -18,3 +18,19 @@ export {
   findPlaceholders,
   type PlaceholderMatch,
 } from "./render";
+export {
+  SiteBrief,
+  type GenerateModels,
+  type GenerateOptions,
+  type GenerateResult,
+  type LlmCallRecord,
+  type LlmClient,
+  type LlmMessage,
+  type LlmRequest,
+  type LlmResponse,
+  type LlmUsage,
+} from "./generate/types";
+export { generateSite } from "./generate/generate";
+export { createOpenRouterClient } from "./generate/openrouter";
+export { hashLlmRequest } from "./generate/hash";
+export { PROMPT_VERSION } from "./generate/prompts";

@@ -1,0 +1,263 @@
+import { z } from "zod/v4";
+import type { LlmClient, LlmRequest, LlmResponse } from "./types";
+
+const count = z.number().int().nonnegative().optional();
+const usageSchema = z
+  .object({
+    prompt_tokens: count,
+    completion_tokens: count,
+    cost: z.number().nonnegative().optional(),
+    cache_write_tokens: count,
+    prompt_tokens_details: z
+      .object({ cached_tokens: count, cache_write_tokens: count })
+      .optional(),
+  })
+  .optional();
+const envelope = z.object({
+  id: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  choices: z
+    .array(z.object({ message: z.object({ content: z.string().nullable() }) }))
+    .min(1),
+  usage: usageSchema,
+});
+
+const RETRY_AFTER_CAP_MS = 10_000;
+
+/** Carries known billed usage even if the provider returned no usable content. */
+export class LlmClientError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly response?: LlmResponse,
+  ) {
+    super(message);
+    this.name = "LlmClientError";
+  }
+}
+
+export type OpenRouterClientOptions = {
+  apiKey: string;
+  baseUrl?: string;
+  timeoutMs?: number;
+  maxRetries?: number;
+  /** Test transport or a caller's HTTP-attempt budget. */
+  fetch?: typeof globalThis.fetch;
+  /** The contract's complete(request) stays unchanged; bind cancellation here. */
+  signal?: AbortSignal;
+};
+
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", abort, { once: true });
+  });
+}
+
+export function createOpenRouterClient(
+  opts: OpenRouterClientOptions,
+): LlmClient {
+  if (!opts.apiKey) throw new Error("OpenRouter API key is required");
+  const timeoutMs = opts.timeoutMs ?? 60_000,
+    maxRetries = opts.maxRetries ?? 2;
+  if (
+    !Number.isFinite(timeoutMs) ||
+    timeoutMs <= 0 ||
+    !Number.isInteger(maxRetries) ||
+    maxRetries < 0
+  )
+    throw new Error("Invalid OpenRouter timeout or retry count");
+  const endpoint = `${(opts.baseUrl ?? "https://openrouter.ai/api/v1").replace(/\/+$/, "")}/chat/completions`;
+  const transport = opts.fetch ?? globalThis.fetch;
+  const redact = (text: string) =>
+    text
+      .split(opts.apiKey)
+      .join("[redacted]")
+      .replace(/Bearer\s+[^\s"'<>]+/gi, "Bearer [redacted]");
+
+  return {
+    async complete(request: LlmRequest): Promise<LlmResponse> {
+      const started = performance.now();
+      const controller = new AbortController();
+      const timer = setTimeout(
+        () => controller.abort(new Error("OpenRouter call timed out")),
+        timeoutMs,
+      );
+      const signal = opts.signal
+        ? AbortSignal.any([opts.signal, controller.signal])
+        : controller.signal;
+      try {
+        for (let attempt = 0; ; attempt++) {
+          if (signal.aborted)
+            throw new LlmClientError(
+              controller.signal.aborted
+                ? "OpenRouter call timed out"
+                : "OpenRouter call aborted",
+              controller.signal.aborted ? "timeout" : "aborted",
+            );
+          let response: Response, body: string;
+          try {
+            response = await transport(endpoint, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${opts.apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: request.model,
+                messages: request.messages,
+                temperature: request.temperature,
+                max_tokens: request.maxOutputTokens,
+                usage: { include: true },
+                ...(request.jsonSchema
+                  ? {
+                      response_format: {
+                        type: "json_schema",
+                        json_schema: {
+                          name: request.jsonSchema.name,
+                          strict: true,
+                          schema: request.jsonSchema.schema,
+                        },
+                      },
+                      provider: { require_parameters: true },
+                    }
+                  : {}),
+              }),
+              signal,
+            });
+            body = await response.text();
+          } catch (error) {
+            if (signal.aborted)
+              throw new LlmClientError(
+                controller.signal.aborted
+                  ? "OpenRouter call timed out"
+                  : "OpenRouter call aborted",
+                controller.signal.aborted ? "timeout" : "aborted",
+              );
+            if (attempt < maxRetries) {
+              await delay(250 * 2 ** attempt, signal);
+              continue;
+            }
+            throw new LlmClientError(
+              `OpenRouter network error: ${redact(error instanceof Error ? error.message : String(error)).slice(0, 300)}`,
+              "network_error",
+            );
+          }
+          if (!response.ok) {
+            if (
+              (response.status === 429 || response.status >= 500) &&
+              attempt < maxRetries
+            ) {
+              const header =
+                response.status === 429 || response.status === 503
+                  ? response.headers.get("retry-after")
+                  : null;
+              // Retry-After is delay-seconds or an HTTP date.
+              const requested = !header
+                ? NaN
+                : /^\s*\d+\s*$/.test(header)
+                  ? Number(header) * 1000
+                  : Date.parse(header) - Date.now();
+              if (Number.isNaN(requested)) {
+                await delay(250 * 2 ** attempt, signal);
+                continue;
+              }
+              const wait = Math.min(Math.max(requested, 0), RETRY_AFTER_CAP_MS);
+              // A wait that outlasts the call deadline would only end in a
+              // timeout; report the provider's status instead.
+              if (wait < timeoutMs - (performance.now() - started)) {
+                await delay(wait, signal);
+                continue;
+              }
+            }
+            throw new LlmClientError(
+              `OpenRouter HTTP ${response.status}: ${redact(body).replace(/\s+/g, " ").slice(0, 300)}`,
+              `http_${response.status}`,
+            );
+          }
+          let json: unknown;
+          try {
+            json = JSON.parse(body);
+          } catch {
+            throw new LlmClientError(
+              "OpenRouter returned an invalid response envelope",
+              "invalid_response",
+            );
+          }
+          // Usage is read before the rest of the envelope so a billed call
+          // keeps its tokens and cost even when other fields are unusable.
+          const raw: Record<string, unknown> =
+            typeof json === "object" && json !== null
+              ? (json as Record<string, unknown>)
+              : {};
+          const text = (value: unknown) =>
+            typeof value === "string" ? value : undefined;
+          const usage = usageSchema.safeParse(raw.usage).data;
+          const billed = (content: string): LlmResponse => ({
+            content,
+            provider: text(raw.provider) ?? "openrouter",
+            model: text(raw.model) ?? request.model,
+            providerRequestId: text(raw.id) ?? null,
+            usage: {
+              inputTokens: usage?.prompt_tokens ?? 0,
+              outputTokens: usage?.completion_tokens ?? 0,
+              cachedInputTokens:
+                usage?.prompt_tokens_details?.cached_tokens ?? 0,
+              cacheWriteTokens:
+                usage?.prompt_tokens_details?.cache_write_tokens ??
+                usage?.cache_write_tokens ??
+                0,
+              costMicroUsd: BigInt(Math.round((usage?.cost ?? 0) * 1e6)),
+            },
+            latencyMs: Math.round(performance.now() - started),
+          });
+          const data = envelope.safeParse(json);
+          if (!data.success)
+            throw new LlmClientError(
+              "OpenRouter returned an invalid response envelope",
+              "invalid_response",
+              usage ? billed("") : undefined,
+            );
+          const result = billed(data.data.choices[0]!.message.content ?? "");
+          // An absent cost is unknown, not free: never meter it as $0 ok.
+          if (usage?.cost === undefined)
+            throw new LlmClientError(
+              "OpenRouter response did not report usage cost",
+              "missing_usage",
+              result,
+            );
+          if (!result.content)
+            throw new LlmClientError(
+              "OpenRouter returned no text content",
+              "empty_response",
+              result,
+            );
+          return result;
+        }
+      } catch (error) {
+        if (signal.aborted && !(error instanceof LlmClientError))
+          throw new LlmClientError(
+            controller.signal.aborted
+              ? "OpenRouter call timed out"
+              : "OpenRouter call aborted",
+            controller.signal.aborted ? "timeout" : "aborted",
+          );
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  };
+}
