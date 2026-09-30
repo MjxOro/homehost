@@ -118,6 +118,11 @@ export type GenerateOptions = {
    * call's result is used. A throw or rejection fails generation.
    */
   onCall?: (call: LlmCallRecord) => void | Promise<void>;
+  /**
+   * Checked only between model calls: aborting stops scheduling new work but
+   * does not cancel calls already in flight. To cancel those too, pass the
+   * same signal to the client (`createOpenRouterClient({ signal })`).
+   */
   signal?: AbortSignal;
 };
 
