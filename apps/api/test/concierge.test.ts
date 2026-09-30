@@ -100,7 +100,7 @@ function chatReply(content: string): Reply {
         prompt_tokens: 61,
         completion_tokens: 12,
         cost: 0.000011,
-        prompt_tokens_details: { cached_tokens: 20 },
+        prompt_tokens_details: { cached_tokens: 20, cache_write_tokens: 5 },
       },
     },
   };
@@ -279,6 +279,7 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       input_tokens: 61,
       output_tokens: 12,
       cached_input_tokens: 20,
+      cache_write_tokens: 5,
       status: "ok",
     });
     expect(String(translation.cost_micro_usd)).toBe("11");

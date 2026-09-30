@@ -85,10 +85,7 @@ const JEV_QUESTIONS = {
       question:
         "Which `plans` entry is the smallest one that comfortably fits `request`?",
     },
-    criteria: Object.fromEntries([
-      ...PLANS.map((p) => [p.id, null]),
-      [PLAN_NONE, "No plan fits the request"],
-    ]),
+    criteria: Object.fromEntries(PLAN_OPTIONS.map((id) => [id, null])),
   },
   recipe: {
     type: "choice",
@@ -160,7 +157,10 @@ const ChatResponse = z.object({
     completion_tokens: tokens,
     cost: z.number().nonnegative(),
     prompt_tokens_details: z
-      .object({ cached_tokens: tokens.optional() })
+      .object({
+        cached_tokens: tokens.optional(),
+        cache_write_tokens: tokens.optional(),
+      })
       .nullish(),
   }),
 });
@@ -172,6 +172,7 @@ interface Billed<A> {
   inputTokens: number;
   outputTokens: number;
   cachedInputTokens: number;
+  cacheWriteTokens: number;
   /** Provider-reported USD. */
   cost: number;
 }
@@ -247,7 +248,6 @@ const callOpenRouter = <A>(
       purpose: "prod",
       provider: "openrouter",
       promptHash,
-      cacheWriteTokens: 0,
       priceTableVersion: PRICE_TABLE_VERSION,
       latencyMs,
     } as const;
@@ -258,6 +258,7 @@ const callOpenRouter = <A>(
         inputTokens: 0,
         outputTokens: 0,
         cachedInputTokens: 0,
+        cacheWriteTokens: 0,
         costMicroUsd: 0n,
         status: "error",
         errorCode: outcome.left,
@@ -272,6 +273,7 @@ const callOpenRouter = <A>(
       inputTokens: billed.inputTokens,
       outputTokens: billed.outputTokens,
       cachedInputTokens: billed.cachedInputTokens,
+      cacheWriteTokens: billed.cacheWriteTokens,
       costMicroUsd: usdToMicroUsd(billed.cost),
       status: "ok",
     });
@@ -297,6 +299,7 @@ const askJev = (ctx: CallContext, text: string) =>
         inputTokens: r.data.usage.input_tokens,
         outputTokens: r.data.usage.output_tokens,
         cachedInputTokens: 0,
+        cacheWriteTokens: 0,
         cost: r.data.usage.cost,
       };
     },
@@ -331,6 +334,8 @@ const translate = (ctx: CallContext, text: string) =>
         outputTokens: r.data.usage.completion_tokens,
         cachedInputTokens:
           r.data.usage.prompt_tokens_details?.cached_tokens ?? 0,
+        cacheWriteTokens:
+          r.data.usage.prompt_tokens_details?.cache_write_tokens ?? 0,
         cost: r.data.usage.cost,
       };
     },
