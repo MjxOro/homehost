@@ -264,16 +264,20 @@ describe("decideSuggestion", () => {
     });
 
     test("a remote desktop without an eligible desktop plan is tier locked", () => {
-      expect(
-        decideSuggestion(
-          answers({
-            use_case: { choice: "remote_desktop" },
-            recipe: { choice: "none" },
-            wants_gui: 0.95,
-          }),
-          nontechnical,
-        ),
-      ).toMatchObject({ outcome: "not_offered", reason: "tier_locked" });
+      // Jev sees only game-small here, so it may answer it or a confident none.
+      for (const plan of [{ choice: "game-small" }, { choice: "none" }]) {
+        expect(
+          decideSuggestion(
+            answers({
+              use_case: { choice: "remote_desktop" },
+              plan,
+              recipe: { choice: "none" },
+              wants_gui: 0.95,
+            }),
+            nontechnical,
+          ),
+        ).toMatchObject({ outcome: "not_offered", reason: "tier_locked" });
+      }
     });
   });
 

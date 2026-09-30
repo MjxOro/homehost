@@ -463,9 +463,12 @@ export function decideSuggestion(
     plan = eligible.find((p) => p.id === picks.planId);
     if (!plan) return notOffered(lockReason((p) => p.id === picks.planId));
   } else if (answers.plan.confidence >= PLAN_MIN) {
-    if (answers.plan.choice === PLAN_NONE) return notOffered("no_fitting_plan");
     plan = eligible.find((p) => p.id === answers.plan.choice);
   }
+  const planNoneSure =
+    !planPinned &&
+    answers.plan.confidence >= PLAN_MIN &&
+    answers.plan.choice === PLAN_NONE;
   let recipe: RecipeId | null =
     picks.recipeId ??
     (answers.recipe.confidence >= RECIPE_MIN ? answers.recipe.choice : null);
@@ -482,8 +485,11 @@ export function decideSuggestion(
   const fits = (p: Plan) =>
     fitsWorkload(p) && (recipe === null || planFitsRecipe(p, recipe));
   const candidates = eligible.filter(fits);
+  // Jev only sees eligible plans: when none of them fits but a tier-locked
+  // one would, say so instead of "nothing fits".
   if (!planPinned && candidates.length === 0)
     return notOffered(lockReason(fits));
+  if (planNoneSure) return notOffered("no_fitting_plan");
 
   const game = recipe !== null && RECIPES[recipe].game;
   if (game || answers.players_connect >= PLAYERS_MIN) {
