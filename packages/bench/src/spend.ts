@@ -21,10 +21,18 @@ export class SpendCapExceeded extends Error {
 export class SpendGuard {
   spentMicroUsd = 0n;
   tripped = false;
-  constructor(readonly capMicroUsd: bigint) {}
+  constructor(readonly capMicroUsd: bigint) {
+    if (capMicroUsd < 0n) throw new Error("Spend cap must be nonnegative");
+  }
 }
 
 export function usdToMicro(usd: number): bigint {
+  if (
+    !Number.isFinite(usd) ||
+    usd < 0 ||
+    !Number.isSafeInteger(Math.round(usd * 1_000_000))
+  )
+    throw new Error("Invalid USD amount");
   return BigInt(Math.round(usd * 1_000_000));
 }
 
@@ -36,9 +44,17 @@ export function withSpendGuard(inner: LlmClient, guard: SpendGuard): LlmClient {
         guard.tripped = true;
         throw new SpendCapExceeded(guard.spentMicroUsd, guard.capMicroUsd);
       }
-      const response = await inner.complete(request);
-      guard.spentMicroUsd += response.usage.costMicroUsd;
-      return response;
+      try {
+        const response = await inner.complete(request);
+        guard.spentMicroUsd += response.usage.costMicroUsd;
+        return response;
+      } catch (error) {
+        const billed = (
+          error as { response?: { usage?: { costMicroUsd?: bigint } } }
+        )?.response?.usage?.costMicroUsd;
+        if (typeof billed === "bigint") guard.spentMicroUsd += billed;
+        throw error;
+      }
     },
   };
 }

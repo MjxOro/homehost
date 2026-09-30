@@ -55,7 +55,10 @@ function toStored(key: string, r: LlmResponse): z.infer<typeof StoredResponse> {
 
 function fromStored(stored: z.infer<typeof StoredResponse>): LlmResponse {
   const { usage, ...rest } = stored.response;
-  return { ...rest, usage: { ...usage, costMicroUsd: BigInt(usage.costMicroUsd) } };
+  return {
+    ...rest,
+    usage: { ...usage, costMicroUsd: BigInt(usage.costMicroUsd) },
+  };
 }
 
 /**
@@ -80,6 +83,8 @@ export function withCache(
       const file = Bun.file(fileFor(key));
       if (await file.exists()) {
         const stored = StoredResponse.parse(await file.json());
+        if (stored.key !== key)
+          throw new Error(`cache key mismatch for ${key}`);
         return { ...fromStored(stored), cacheStatus: "hit" };
       }
       if (opts.mode === "replay") throw new CacheMiss(key);

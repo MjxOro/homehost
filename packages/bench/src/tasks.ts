@@ -59,7 +59,12 @@ async function readJsonDir<T>(
 }
 
 export function loadAllTasks(suite = "site-build"): Promise<Task[]> {
-  return readJsonDir(new URL(`tasks/${suite}/`, PACKAGE_DIR), Task, (t) => t.id);
+  if (suite !== "site-build") throw new Error(`unknown suite "${suite}"`);
+  return readJsonDir(
+    new URL(`tasks/${suite}/`, PACKAGE_DIR),
+    Task,
+    (t) => t.id,
+  );
 }
 
 export async function selectTasks(opts: {
@@ -69,6 +74,8 @@ export async function selectTasks(opts: {
 }): Promise<Task[]> {
   let tasks = await loadAllTasks(opts.suite);
   if (opts.ids) {
+    if (new Set(opts.ids).size !== opts.ids.length)
+      throw new Error("task ids must be unique");
     const byId = new Map(tasks.map((t) => [t.id, t]));
     tasks = opts.ids.map((id) => {
       const task = byId.get(id);
@@ -80,7 +87,8 @@ export async function selectTasks(opts: {
 }
 
 export async function loadCandidate(id: string): Promise<Candidate> {
-  if (!Id.safeParse(id).success) throw new Error(`invalid candidate id "${id}"`);
+  if (!Id.safeParse(id).success)
+    throw new Error(`invalid candidate id "${id}"`);
   const file = Bun.file(new URL(`candidates/${id}.json`, PACKAGE_DIR));
   if (!(await file.exists())) throw new Error(`unknown candidate "${id}"`);
   const parsed = Candidate.safeParse(await file.json());
