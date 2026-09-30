@@ -35,7 +35,7 @@ const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
 ];
 
 const TAB_BASE =
-  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full px-4 py-2 text-[14px] font-[650] no-underline transition-colors duration-(--duration-fast) ease-out-quint enabled:active:scale-[0.98] motion-reduce:active:scale-100 [-webkit-tap-highlight-color:transparent] disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full px-4 py-2 text-[14px] font-[650] no-underline transition-colors duration-(--duration-fast) ease-out-quint enabled:active:scale-[0.98] motion-reduce:enabled:active:scale-100 [-webkit-tap-highlight-color:transparent] disabled:cursor-not-allowed disabled:opacity-55";
 const TAB_IDLE = `${TAB_BASE} border border-line-strong bg-ink-2 text-text-2 enabled:hover:border-accent-line enabled:hover:text-accent`;
 const TAB_ACTIVE = `${TAB_BASE} border border-transparent bg-accent text-on-accent`;
 
