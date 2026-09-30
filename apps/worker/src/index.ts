@@ -63,6 +63,11 @@ class IncusError extends Error {
   }
 }
 
+/** Incus reports a missing instance or project as "... not found". */
+function isIncusNotFound(e: unknown): boolean {
+  return e instanceof IncusError && /not found/i.test(e.message);
+}
+
 /**
  * --config/-c values carry user-data (passwords, keys), and the `sh -euc`
  * guest script carries the container root password. Failed commands
@@ -241,11 +246,70 @@ async function setDesktopPassword(
 }
 
 async function setIpv6(requestId: string, ipv6: string): Promise<void> {
+  await sql.begin(async (tx) => {
+    // Lock the request so simultaneous retries cannot rotate its ledger twice.
+    const request = await tx`
+      UPDATE server_requests SET ipv6 = ${ipv6}, updated_at = now()
+      WHERE id = ${requestId} RETURNING id
+    `;
+    if (request.length === 0) throw new Error("IPv6 assignment request missing");
+    await tx`
+      UPDATE ip_assignments SET released_at = now()
+      WHERE request_id = ${requestId} AND released_at IS NULL
+        AND address <> ${ipv6}::inet
+    `;
+    const assignment = await tx`
+      INSERT INTO ip_assignments
+        (request_id, user_id, owner_name, owner_email, address, subdomain, prefix)
+      SELECT r.id, r.owner_id, u.name, u.email, ${ipv6}::inet, r.subdomain,
+        network(set_masklen(${ipv6}::inet, 64))::text
+      FROM server_requests r JOIN users u ON u.id = r.owner_id
+      WHERE r.id = ${requestId}
+      ON CONFLICT (address) WHERE released_at IS NULL
+      DO UPDATE SET address = EXCLUDED.address
+        WHERE ip_assignments.request_id = EXCLUDED.request_id
+      RETURNING id
+    `;
+    // A retry retains the original timestamp/contact snapshot; another owner
+    // must never silently inherit an address. Roll back the request update too.
+    if (assignment.length === 0)
+      throw new Error("IPv6 address already assigned or owner missing");
+  });
+}
+
+async function releaseIpv6(requestId: string): Promise<void> {
   await sql`
-    UPDATE server_requests
-    SET ipv6 = ${ipv6}, updated_at = now()
-    WHERE id = ${requestId}
+    UPDATE ip_assignments SET released_at = now()
+    WHERE request_id = ${requestId} AND released_at IS NULL
   `;
+}
+
+/**
+ * Startup reconcile: the migration backfill runs on deploy, before the host
+ * worker unit restarts, so boxes the old worker provisioned in between have an
+ * ipv6 but no ledger row. Same idempotent insert as the 0013 backfill, limited
+ * to live requests with no open assignment. Returns the rows inserted.
+ */
+async function reconcileIpv6Assignments(): Promise<number> {
+  const rows = await sql`
+    INSERT INTO ip_assignments
+      (request_id, user_id, owner_name, owner_email, address, subdomain, prefix,
+       assigned_at)
+    SELECT r.id, r.owner_id, COALESCE(u.name, r.owner_name), u.email,
+           r.ipv6::inet, r.subdomain, network(set_masklen(r.ipv6::inet, 64))::text,
+           LEAST(COALESCE((SELECT MIN(e.created_at) FROM activity_events e
+                          WHERE e.request_id = r.id AND e.action = 'running'),
+                         r.created_at), r.updated_at)
+    FROM server_requests r
+    LEFT JOIN users u ON u.id = r.owner_id
+    WHERE r.ipv6 IS NOT NULL AND r.ipv6 ~ '^[0-9a-fA-F:]+$'
+      AND r.status NOT IN ('rejected', 'deleted')
+      AND NOT EXISTS (SELECT 1 FROM ip_assignments a
+                      WHERE a.request_id = r.id AND a.released_at IS NULL)
+    ON CONFLICT (address) WHERE released_at IS NULL DO NOTHING
+    RETURNING id
+  `;
+  return rows.length;
 }
 interface DesktopFields {
   env: string | null;
@@ -751,27 +815,42 @@ async function failProvision(
 
 async function handleTeardown(job: Job): Promise<void> {
   const req = await loadRequest(job.requestId);
-  const name = req?.instanceName;
-  if (!req || !name) {
+  if (!req) {
+    // Purged request: nothing else to clean, but never leave its history open.
+    await releaseIpv6(job.requestId);
     await finishJob(job.id, "done", "nothing to tear down");
     return;
   }
+  // A terminal provision failure can clear instance_name after allocation.
+  // Use the same deterministic name as launch before closing its history.
+  const name = req.instanceName ?? instanceNameOf(req.id, req.subdomain);
   try {
     const project = projectForReq(req);
     try {
       await incus(["delete", name, "--project", project, "--force"]);
     } catch (e) {
-      // Already gone is the desired end state.
-      const out = await incus([
-        "list",
-        name,
-        "--project",
-        project,
-        "--format",
-        "csv",
-      ]).catch(() => "");
-      if (out.includes(name)) throw e;
+      // Already gone is the desired end state. A missing instance or project
+      // counts as gone; any other failure (daemon down) must retry.
+      if (!isIncusNotFound(e)) {
+        let out = "";
+        try {
+          out = await incus([
+            "list",
+            name,
+            "--project",
+            project,
+            "--format",
+            "csv",
+          ]);
+        } catch (listError) {
+          if (!isIncusNotFound(listError)) throw listError;
+        }
+        if (out.includes(name)) throw e;
+      }
     }
+    // The instance is confirmed gone: close its history before DNS and route
+    // cleanup so a failing cleanup cannot leave the address assigned.
+    await releaseIpv6(req.id);
     if (cfToken) await deleteAAAA(req.subdomain);
     // Desktop VMs only: best-effort route-file cleanup. Desktop DNS is
     // wildcard-only (no per-VM desktop record exists to delete); SSH AAAA
@@ -875,6 +954,8 @@ async function main(): Promise<void> {
   // Crash recovery: leases die with the process; requeue so jobs resume.
   // Instance names make relaunches idempotent.
   await sql`UPDATE provision_jobs SET status = 'queued', updated_at = now() WHERE status = 'leased'`;
+  const reconciled = await reconcileIpv6Assignments();
+  console.log(`ip_assignments reconcile: inserted ${reconciled} row(s)`);
 
   console.log(`worker up (${workerEnv}): polling provision_jobs`);
   while (!shuttingDown) {

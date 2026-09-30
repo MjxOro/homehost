@@ -3,6 +3,7 @@ import {
   char,
   check,
   index,
+  inet,
   integer,
   jsonb,
   pgTable,
@@ -312,5 +313,40 @@ export const creditLedger = pgTable(
     ),
     check("credit_ledger_hash_check", sql`${t.hash} ~ '^[0-9a-f]{64}$'`),
     index("credit_ledger_user_id_id_idx").on(t.userId, t.id),
+  ],
+);
+
+// Historical IDs intentionally have no foreign keys: history survives even
+// physical deletion/truncation of its request and owner. Contact is snapshotted.
+export const ipAssignments = pgTable(
+  "ip_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: uuid("request_id").notNull(),
+    userId: text("user_id").notNull(),
+    ownerName: text("owner_name").notNull(),
+    ownerEmail: text("owner_email"),
+    address: inet("address").notNull(),
+    subdomain: text("subdomain").notNull(),
+    prefix: text("prefix").notNull(),
+    assignedAt: timestamp("assigned_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+  },
+  (t) => [
+    check(
+      "ip_assignments_release_check",
+      sql`${t.releasedAt} IS NULL OR ${t.releasedAt} >= ${t.assignedAt}`,
+    ),
+    check(
+      "ip_assignments_host_check",
+      sql`masklen(${t.address}) = CASE family(${t.address}) WHEN 6 THEN 128 ELSE 32 END`,
+    ),
+    uniqueIndex("ip_assignments_open_address_unique")
+      .on(t.address)
+      .where(sql`${t.releasedAt} IS NULL`),
+    index("ip_assignments_address_assigned_at_idx").on(t.address, t.assignedAt),
+    index("ip_assignments_request_id_idx").on(t.requestId),
   ],
 );
