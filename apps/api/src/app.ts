@@ -52,6 +52,7 @@ import {
   type UserRow,
 } from "./domain/users.js";
 import { listActions, type AuditCursor } from "./domain/audit.js";
+import { lookupAddress } from "./domain/ipAssignments.js";
 
 import {
   clearedSessionCookie,
@@ -155,6 +156,13 @@ const AdminActionsQuery = z
       .default(ADMIN_USERS_PAGE_DEFAULT),
     cursor: z.string().min(1).max(1000).optional(),
     targetUserId: z.string().min(1).max(128).optional(),
+  })
+  .strict();
+
+const IpLookupQuery = z
+  .object({
+    address: z.string().trim().min(1).max(128),
+    at: z.string().datetime({ offset: true }).optional(),
   })
   .strict();
 
@@ -671,6 +679,37 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       return { ok: true };
     },
   );
+
+  app.get("/api/admin/ip-lookup", async (req, reply) => {
+    const operator = await requireOperator(req, reply);
+    if (!operator) return;
+    const parsed = IpLookupQuery.safeParse(req.query);
+    if (!parsed.success)
+      return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+    const result = await runtime.runPromise(
+      Effect.either(lookupAddress(parsed.data.address, parsed.data.at)),
+    );
+    return Either.match(result, {
+      onLeft: (error) =>
+        error._tag === "InvalidAddress" || error._tag === "InvalidLookupTime"
+          ? sendErr(
+              reply,
+              400,
+              error._tag === "InvalidAddress"
+                ? "invalid IP address"
+                : "invalid lookup time",
+              "invalid",
+            )
+          : sendDomainError(reply, error),
+      onRight: (assignments) => ({
+        assignments: assignments.map((row) => ({
+          ...row,
+          assignedAt: row.assignedAt.toISOString(),
+          releasedAt: row.releasedAt?.toISOString() ?? null,
+        })),
+      }),
+    });
+  });
 
   app.get("/api/admin/users", async (req, reply) => {
     const operator = await requireOperator(req, reply);
