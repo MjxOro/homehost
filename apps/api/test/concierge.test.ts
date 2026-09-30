@@ -317,6 +317,28 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
     expect(next.outcome).toBe("suggested");
   });
 
+  test("concurrent suggestions with one slot left admit exactly one", async () => {
+    const user = await newUser();
+    const t = fakeTransport(Array.from({ length: 8 }, () => jevReply()));
+    const cfg = config(t.fetch, { dailyCap: 3 });
+    await succeeds({ user, text: "a bot" }, cfg);
+    await succeeds({ user, text: "a bot" }, cfg);
+    // Open every pooled connection first: otherwise connection setup, not the
+    // cap, serializes the burst.
+    await Promise.all(
+      Array.from({ length: 8 }, () => client`SELECT pg_sleep(0.05)`),
+    );
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () => run({ user, text: "a bot" }, cfg)),
+    );
+    expect(results.filter(Either.isRight)).toHaveLength(1);
+    const refused = results.filter(Either.isLeft).map((r) => r.left);
+    expect(refused).toHaveLength(5);
+    expect(refused.every((e) => e instanceof ConciergeCapReached)).toBe(true);
+    expect(await runsOf(user.id)).toHaveLength(3);
+    expect(t.calls).toHaveLength(3);
+  });
+
   test("an upstream 500 fails the run and ledgers an error call", async () => {
     const user = await newUser();
     const t = fakeTransport([

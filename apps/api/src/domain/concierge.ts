@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, count, eq, gte } from "drizzle-orm";
+import { and, count, eq, gte, sql } from "drizzle-orm";
 import { Context, Data, Duration, Effect, Either } from "effect";
 import { z } from "zod/v4";
 import {
@@ -15,7 +15,7 @@ import type { PortalUser, Suggestion } from "@homehost/shared";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
 import { DbFailure } from "./errors.js";
-import { finishAgentRun, recordLlmCall, startAgentRun } from "./ledger.js";
+import { finishAgentRun, recordLlmCall, startAgentRunInTx } from "./ledger.js";
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api";
 export const JEV_MODEL = "typesafe/jev-1.13";
@@ -366,29 +366,36 @@ export const suggest = (
     const dayStart = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
     );
-    const used = yield* Effect.tryPromise({
+    // Admission and reservation commit together before any network I/O: the
+    // user's row lock serializes concurrent suggestions, so a burst cannot
+    // all observe a count below the cap.
+    const run = yield* Effect.tryPromise({
       try: () =>
-        db
-          .select({ n: count() })
-          .from(schema.agentRuns)
-          .where(
-            and(
-              eq(schema.agentRuns.userId, input.user.id),
-              eq(schema.agentRuns.kind, "concierge"),
-              gte(schema.agentRuns.startedAt, dayStart),
-            ),
-          ),
+        db.transaction(async (tx) => {
+          await tx.execute(
+            sql`SELECT 1 FROM users WHERE id = ${input.user.id} FOR UPDATE`,
+          );
+          const used = await tx
+            .select({ n: count() })
+            .from(schema.agentRuns)
+            .where(
+              and(
+                eq(schema.agentRuns.userId, input.user.id),
+                eq(schema.agentRuns.kind, "concierge"),
+                gte(schema.agentRuns.startedAt, dayStart),
+              ),
+            );
+          if ((used[0]?.n ?? 0) >= config.dailyCap) return null;
+          return startAgentRunInTx(tx, {
+            kind: "concierge",
+            purpose: "prod",
+            userId: input.user.id,
+            startedAt: now,
+          });
+        }),
       catch: (cause) => new DbFailure({ cause }),
     });
-    if ((used[0]?.n ?? 0) >= config.dailyCap) {
-      return yield* new ConciergeCapReached({ cap: config.dailyCap });
-    }
-
-    const run = yield* startAgentRun({
-      kind: "concierge",
-      purpose: "prod",
-      userId: input.user.id,
-    });
+    if (!run) return yield* new ConciergeCapReached({ cap: config.dailyCap });
     const ctx: CallContext = {
       config,
       agentRunId: run.id,
