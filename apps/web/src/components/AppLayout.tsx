@@ -13,6 +13,7 @@ import {
   UserIcon,
   XIcon,
 } from "./icons";
+import { useScrollLock } from "../lib/useScrollLock";
 import { PersonaMenu } from "./PersonaMenu";
 import { ErrorState, PageLoading } from "./primitives";
 
@@ -123,6 +124,7 @@ function SidebarNav({
  */
 export function AppLayout() {
   const [navOpen, setNavOpen] = useState(false);
+  useScrollLock(navOpen);
   const sidebarRef = useRef<HTMLElement>(null);
   const navToggleRef = useRef<HTMLButtonElement>(null);
   const { data: session, isPending, isError, error, refetch } = useSession();
@@ -133,8 +135,6 @@ export function AppLayout() {
 
   useEffect(() => {
     if (!navOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setNavOpen(false);
@@ -177,7 +177,6 @@ export function AppLayout() {
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = originalOverflow;
     };
   }, [navOpen]);
   useEffect(() => {
@@ -192,6 +191,9 @@ export function AppLayout() {
   // no sidebar, no topbar, no drawer toggle. Authenticated layout below is
   // untouched: drawer-only below lg, persistent sidebar at lg.
   const signedOut = !isPending && !isError && !session?.user;
+  useEffect(() => {
+    if (signedOut) setNavOpen(false);
+  }, [signedOut]);
   if (signedOut) {
     return (
       <div className="flex min-h-dvh flex-col">
@@ -213,7 +215,7 @@ export function AppLayout() {
         )}
         <main
           id="main"
-          className="vt-page mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
+          className="vt-page [overflow-wrap:anywhere] mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
           tabIndex={-1}
         >
           <Outlet />
@@ -223,8 +225,8 @@ export function AppLayout() {
   }
 
   const asideClass = navOpen
-    ? "visible fixed inset-y-0 left-0 z-50 flex w-[280px] translate-x-0 flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-(--duration-base) ease-out-quint motion-reduce:transition-none lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none"
-    : "invisible fixed inset-y-0 left-0 z-50 flex w-[280px] -translate-x-[108%] flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-(--duration-base) ease-out-quint [transition-delay:0s,var(--duration-base)] motion-reduce:transition-none lg:visible lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none";
+    ? "visible fixed inset-y-0 left-0 z-50 flex w-[280px] overflow-y-auto overscroll-contain translate-x-0 flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-(--duration-base) ease-out-quint motion-reduce:transition-none lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none"
+    : "invisible fixed inset-y-0 left-0 z-50 flex w-[280px] overflow-y-auto overscroll-contain -translate-x-[108%] flex-col gap-2 border-r border-line bg-ink-1 px-3.5 pb-4 pt-5 shadow-pop transition-[translate,visibility] duration-(--duration-base) ease-out-quint [transition-delay:0s,var(--duration-base)] motion-reduce:transition-none lg:visible lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[264px] lg:shrink-0 lg:translate-x-0 lg:shadow-none";
 
   const scrimClass = navOpen
     ? "app-nav-scrim visible fixed inset-0 z-[45] cursor-pointer bg-[rgba(4,8,10,0.6)] opacity-100 transition-[opacity,visibility] duration-(--duration-base) ease-out-quint motion-reduce:transition-none lg:hidden"
@@ -325,7 +327,7 @@ export function AppLayout() {
         )}
         <main
           id="main"
-          className="vt-page mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
+          className="vt-page scroll-mt-20 [overflow-wrap:anywhere] mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
           tabIndex={-1}
         >
           {isPending ? (

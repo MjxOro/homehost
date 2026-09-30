@@ -1,3 +1,4 @@
+import { useScrollLock } from "../../lib/useScrollLock";
 import { useEffect, useId, useRef, useState } from "react";
 import { ApiError } from "../../lib/api";
 import {
@@ -69,6 +70,7 @@ export function ModerationDialog({
   onClose,
   onUpdated,
 }: ModerationDialogProps) {
+  useScrollLock(true);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const levelGroupRef = useRef<HTMLFieldSetElement>(null);
   const confirmCheckRef = useRef<HTMLInputElement>(null);
@@ -181,7 +183,7 @@ export function ModerationDialog({
   return (
     <dialog
       ref={dialogRef}
-      className="m-auto w-full max-w-[480px] bg-transparent p-0 text-text-1 backdrop:bg-[rgba(4,8,10,0.72)] backdrop:animate-fade-in"
+      className="m-auto max-h-[calc(100svh-2rem)] w-[calc(100%-2rem)] max-w-[480px] overflow-y-auto overscroll-contain rounded-xl bg-transparent p-0 text-text-1 [overflow-wrap:anywhere] backdrop:bg-[rgba(4,8,10,0.72)] backdrop:animate-fade-in"
       aria-labelledby="moderation-dialog-title"
       aria-describedby="moderation-dialog-desc"
       onClick={(event) => {
@@ -190,7 +192,7 @@ export function ModerationDialog({
         }
       }}
     >
-      <div className="animate-scale-in max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-line-strong bg-ink-1 p-5 shadow-pop">
+      <div className="animate-scale-in rounded-xl border border-line-strong bg-ink-1 p-5 shadow-pop">
         <div className="flex items-start justify-between gap-3">
           <h2 id="moderation-dialog-title" className="text-[18px] font-bold">
             {TITLES[action]}

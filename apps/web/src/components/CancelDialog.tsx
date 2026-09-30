@@ -1,3 +1,4 @@
+import { useScrollLock } from "../lib/useScrollLock";
 import { useEffect, useRef } from "react";
 import type { ServerRequest } from "@homehost/shared";
 import { useCancelRequest } from "../lib/query";
@@ -78,6 +79,7 @@ interface CancelDialogProps {
  * owned solely by the caller's onClose.
  */
 export function CancelDialog({ request, trigger, onClose }: CancelDialogProps) {
+  useScrollLock(true);
   const cancel = useCancelRequest();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const pendingRef = useRef(cancel.isPending);
@@ -113,7 +115,7 @@ export function CancelDialog({ request, trigger, onClose }: CancelDialogProps) {
   return (
     <dialog
       ref={dialogRef}
-      className="m-auto w-full max-w-[480px] bg-transparent p-0 text-text-1 backdrop:bg-[rgba(4,8,10,0.72)] backdrop:animate-fade-in"
+      className="m-auto max-h-[calc(100svh-2rem)] w-[calc(100%-2rem)] max-w-[480px] overflow-y-auto overscroll-contain rounded-xl bg-transparent p-0 text-text-1 [overflow-wrap:anywhere] backdrop:bg-[rgba(4,8,10,0.72)] backdrop:animate-fade-in"
       aria-labelledby="cancel-dialog-title"
       onClick={(event) => {
         // Clicks on the backdrop/canvas are delivered with the dialog itself
