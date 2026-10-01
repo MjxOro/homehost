@@ -8,7 +8,7 @@ import type {
   LlmCallStatus,
   UsagePurpose,
 } from "@homehost/shared";
-import type { DbTransaction } from "../db/client.js";
+import type { Database, DbTransaction } from "../db/client.js";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
 import { DbFailure } from "./errors.js";
@@ -281,6 +281,31 @@ export interface StartAgentRunInput {
   refType?: string;
   refId?: string;
   metadata?: Record<string, unknown>;
+  /** Defaults to the database clock. */
+  startedAt?: Date;
+}
+
+/**
+ * Insert inside a caller-owned transaction, so an admission check (e.g. a
+ * daily cap) commits atomically with the run it admits.
+ */
+export async function startAgentRunInTx(
+  tx: DbTransaction | Database,
+  input: StartAgentRunInput,
+): Promise<AgentRunRow> {
+  const inserted = await tx
+    .insert(schema.agentRuns)
+    .values({
+      userId: input.userId ?? null,
+      kind: input.kind,
+      purpose: input.purpose,
+      refType: input.refType ?? null,
+      refId: input.refId ?? null,
+      metadata: input.metadata ?? {},
+      ...(input.startedAt ? { startedAt: input.startedAt } : {}),
+    })
+    .returning();
+  return inserted[0]!;
 }
 
 export const startAgentRun = (
@@ -288,22 +313,10 @@ export const startAgentRun = (
 ): Effect.Effect<AgentRunRow, DbFailure, DatabaseTag> =>
   Effect.gen(function* () {
     const db = yield* DatabaseTag;
-    const inserted = yield* Effect.tryPromise({
-      try: () =>
-        db
-          .insert(schema.agentRuns)
-          .values({
-            userId: input.userId ?? null,
-            kind: input.kind,
-            purpose: input.purpose,
-            refType: input.refType ?? null,
-            refId: input.refId ?? null,
-            metadata: input.metadata ?? {},
-          })
-          .returning(),
+    return yield* Effect.tryPromise({
+      try: () => startAgentRunInTx(db, input),
       catch: (cause) => new DbFailure({ cause }),
     });
-    return inserted[0]!;
   });
 
 export const finishAgentRun = (

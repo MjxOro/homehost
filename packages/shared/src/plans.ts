@@ -25,6 +25,10 @@ export interface Plan {
   diskGb: number;
   /** Requires the technical friend tier; every request still needs approval. */
   technicalOnly: boolean;
+  /** False when the worker cannot provision this plan yet. */
+  available: boolean;
+  /** Stable code explaining `available: false`. */
+  unavailableReason?: "installer_unavailable";
   /** Tenant unit: shared-kernel container or full KVM virtual machine. */
   kind: "container" | "vm";
   /** Incus image alias, e.g. images:ubuntu/24.04. */
@@ -41,6 +45,7 @@ export const PLANS: Plan[] = [
     memoryMb: 2048,
     diskGb: 20,
     technicalOnly: false,
+    available: true,
     kind: "container",
     image: "images:ubuntu/24.04",
   },
@@ -51,6 +56,7 @@ export const PLANS: Plan[] = [
     memoryMb: 4096,
     diskGb: 40,
     technicalOnly: true,
+    available: true,
     kind: "vm",
     image: "images:ubuntu/24.04/cloud",
   },
@@ -61,6 +67,7 @@ export const PLANS: Plan[] = [
     memoryMb: 8192,
     diskGb: 80,
     technicalOnly: true,
+    available: true,
     kind: "vm",
     image: "images:ubuntu/24.04/cloud",
   },
@@ -71,6 +78,7 @@ export const PLANS: Plan[] = [
     memoryMb: 2048,
     diskGb: 20,
     technicalOnly: true,
+    available: true,
     kind: "vm",
     image: "images:ubuntu/24.04/cloud",
     desktop: {
@@ -89,6 +97,9 @@ export const PLANS: Plan[] = [
     memoryMb: 4096,
     diskGb: 40,
     technicalOnly: true,
+    // The worker fails it closed (omarchyUnavailable): no non-interactive installer.
+    available: false,
+    unavailableReason: "installer_unavailable",
     kind: "vm",
     image: "images:archlinux/cloud",
     desktop: {

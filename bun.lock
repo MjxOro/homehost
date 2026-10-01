@@ -73,6 +73,9 @@
     "packages/shared": {
       "name": "@homehost/shared",
       "version": "0.1.0",
+      "dependencies": {
+        "zod": "^3.25.0",
+      },
       "devDependencies": {
         "bun-types": "latest",
         "typescript": "^5.5.0",

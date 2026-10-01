@@ -55,6 +55,10 @@ export interface ApiEnv {
    * state with no possible admin.
    */
   showcase: boolean;
+  /** OpenRouter key for the concierge (Jev + translation); null disables it. */
+  openrouterApiKey: string | null;
+  /** Concierge suggestions per user per UTC day. */
+  conciergeDailyCap: number;
 }
 
 function httpOrigin(raw: string, name: string): string {
@@ -69,6 +73,8 @@ function httpOrigin(raw: string, name: string): string {
   }
   return url.origin;
 }
+
+const CONCIERGE_DAILY_CAP_MAX = 1000;
 
 /** Showcase boot gates. Throws instead of booting when unsafe. */
 export function getEnv(): ApiEnv {
@@ -102,6 +108,16 @@ export function getEnv(): ApiEnv {
   if (!showcase && operatorEmails.length === 0) {
     throw new Error("SHOWCASE_MODE=false requires OPERATOR_EMAILS");
   }
+  const conciergeDailyCap = Number(process.env.CONCIERGE_DAILY_CAP || 30);
+  if (
+    !Number.isInteger(conciergeDailyCap) ||
+    conciergeDailyCap < 0 ||
+    conciergeDailyCap > CONCIERGE_DAILY_CAP_MAX
+  ) {
+    throw new Error(
+      `CONCIERGE_DAILY_CAP must be an integer from 0 to ${CONCIERGE_DAILY_CAP_MAX}, got ${process.env.CONCIERGE_DAILY_CAP ?? ""}`,
+    );
+  }
   return {
     databaseUrl,
     baseDomain: process.env.BASE_DOMAIN ?? "lab.example.test",
@@ -121,5 +137,7 @@ export function getEnv(): ApiEnv {
     github,
     operatorEmails,
     showcase,
+    openrouterApiKey: process.env.OPENROUTER_API_KEY || null,
+    conciergeDailyCap,
   };
 }
