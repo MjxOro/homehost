@@ -90,6 +90,14 @@ export const serverRequests = pgTable(
     // sees it (proxy injects Basic auth from this column). Survives refresh;
     // never cleared on read (unlike instance_password, the one-read root OTP).
     desktopPassword: text("desktop_password"),
+    // Setup recipe (migration 0015): NULL recipe = plain Ubuntu, and then
+    // setup_status is 'none'. eula_accepted_at records the owner's license
+    // acceptance at request time.
+    recipeId: text("recipe_id"),
+    setupStatus: text("setup_status").notNull().default("none"),
+    setupStep: text("setup_step"),
+    setupError: text("setup_error"),
+    eulaAcceptedAt: timestamp("eula_accepted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -105,6 +113,22 @@ export const serverRequests = pgTable(
     check("server_requests_cpu_check", sql`${t.cpu} > 0`),
     check("server_requests_memory_check", sql`${t.memoryMb} > 0`),
     check("server_requests_disk_check", sql`${t.diskGb} > 0`),
+    check(
+      "server_requests_recipe_id_check",
+      sql`${t.recipeId} IS NULL OR ${t.recipeId} IN ('node','python','docker','code_server','minecraft_java','minecraft_bedrock','valheim')`,
+    ),
+    check(
+      "server_requests_setup_status_check",
+      sql`${t.setupStatus} IN ('none','pending','running','done','failed')`,
+    ),
+    check(
+      "server_requests_setup_recipe_check",
+      sql`(${t.recipeId} IS NULL) = (${t.setupStatus} = 'none')`,
+    ),
+    check(
+      "server_requests_setup_step_check",
+      sql`${t.setupStep} IS NULL OR ${t.setupStep} IN ('update_packages','install_java','download_minecraft','configure_minecraft','install_node','install_python','install_docker','start_service','wait_ready')`,
+    ),
     index("server_requests_owner_id_idx").on(t.ownerId),
     index("server_requests_status_idx").on(t.status),
     index("server_requests_owner_status_idx").on(t.ownerId, t.status),
@@ -130,7 +154,7 @@ export const activityEvents = pgTable(
   (t) => [
     check(
       "activity_events_action_check",
-      sql`${t.action} IN ('requested','approved','rejected','deleted','provisioning','running','stopped','provision_failed')`,
+      sql`${t.action} IN ('requested','approved','rejected','deleted','provisioning','running','stopped','provision_failed','setup_started','setup_done','setup_failed')`,
     ),
     index("activity_events_request_id_idx").on(t.requestId),
     index("activity_events_created_at_idx").on(t.createdAt),
@@ -175,7 +199,7 @@ export const provisionJobs = pgTable(
   (t) => [
     check(
       "provision_jobs_action_check",
-      sql`${t.action} IN ('provision','teardown','stop','start')`,
+      sql`${t.action} IN ('provision','teardown','stop','start','setup')`,
     ),
     check(
       "provision_jobs_status_check",
