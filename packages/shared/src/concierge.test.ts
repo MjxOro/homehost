@@ -41,8 +41,8 @@ function answers(o: Overrides = {}): ConciergeAnswers {
       ...o.use_case,
     },
     plan: {
-      choice: "game-small",
-      probabilities: { "game-small": 0.9, "vm-medium": 0.08 },
+      choice: "container-small",
+      probabilities: { "container-small": 0.9, "vm-medium": 0.08 },
       confidence: 0.9,
       ...o.plan,
     },
@@ -89,7 +89,7 @@ describe("decideSuggestion", () => {
     expect(decideSuggestion(answers(), nontechnical)).toEqual({
       outcome: "suggested",
       useCase: "game_server",
-      planId: "game-small",
+      planId: "container-small",
       recipeId: "minecraft_java",
       warnings: ["players_need_ipv6"],
       schemaVersion: CONCIERGE_SCHEMA_VERSION,
@@ -212,7 +212,7 @@ describe("decideSuggestion", () => {
             probabilities: {
               none: 0.4,
               "vm-large": 0.05,
-              "game-small": 0.3,
+              "container-small": 0.3,
               "vm-medium": 0.2,
             },
           },
@@ -223,7 +223,7 @@ describe("decideSuggestion", () => {
       expect(chosen(d)).toEqual({
         slot: "plan",
         options: [
-          { id: "game-small", label: "Game Small", probability: 0.3 },
+          { id: "container-small", label: "Container Small", probability: 0.3 },
           { id: "vm-medium", label: "VM Medium", probability: 0.2 },
           { id: "vm-large", label: "VM Large", probability: 0.05 },
         ],
@@ -235,7 +235,7 @@ describe("decideSuggestion", () => {
         answers({ plan: { choice: "none", confidence: 0.3 } }),
         nontechnical,
       );
-      expect(suggested(d).planId).toBe("game-small");
+      expect(suggested(d).planId).toBe("container-small");
     });
 
     test("unavailable and tier-locked plans are never suggested", () => {
@@ -243,7 +243,7 @@ describe("decideSuggestion", () => {
         "desktop-omarchy",
       );
       expect(eligiblePlans("nontechnical").map((p) => p.id)).toEqual([
-        "game-small",
+        "container-small",
       ]);
       const omarchy = decideSuggestion(
         answers({
@@ -260,12 +260,12 @@ describe("decideSuggestion", () => {
           answers({ plan: { choice: "vm-medium" } }),
           nontechnical,
         ).planId,
-      ).toBe("game-small");
+      ).toBe("container-small");
     });
 
     test("a remote desktop without an eligible desktop plan is tier locked", () => {
-      // Jev sees only game-small here, so it may answer it or a confident none.
-      for (const plan of [{ choice: "game-small" }, { choice: "none" }]) {
+      // Jev sees only container-small here, so it may answer it or a confident none.
+      for (const plan of [{ choice: "container-small" }, { choice: "none" }]) {
         expect(
           decideSuggestion(
             answers({
@@ -294,7 +294,7 @@ describe("decideSuggestion", () => {
         }),
         technical,
       );
-      expect(d).toMatchObject({ planId: "game-small", recipeId: null });
+      expect(d).toMatchObject({ planId: "container-small", recipeId: null });
       expect(d.warnings).toEqual([]);
       expect(chosen(d).options.map((o) => o.id)).toEqual([
         "docker",
@@ -354,7 +354,7 @@ describe("decideSuggestion", () => {
           technical,
         ),
       );
-      expect(coding.planId).toBe("game-small");
+      expect(coding.planId).toBe("container-small");
       expect(coding.warnings).toEqual([]);
       const docker = suggested(
         decideSuggestion(
@@ -402,9 +402,9 @@ describe("decideSuggestion", () => {
     test("a picked plan is never rewritten; an incompatible recipe is asked again", () => {
       const d = decideSuggestion(
         answers({ ...bot, recipe: { choice: "docker" } }),
-        { ...technical, picks: { planId: "game-small" } },
+        { ...technical, picks: { planId: "container-small" } },
       );
-      expect(d).toMatchObject({ planId: "game-small", recipeId: null });
+      expect(d).toMatchObject({ planId: "container-small", recipeId: null });
       expect(chosen(d).options.map((o) => o.id)).not.toContain("docker");
     });
 
@@ -432,10 +432,10 @@ describe("decideSuggestion", () => {
       ][] = [
         [undefined, "nontechnical", false],
         [{ recipeId: "docker" }, "nontechnical", false],
-        [{ planId: "game-small" }, "nontechnical", false],
+        [{ planId: "container-small" }, "nontechnical", false],
         [{ planId: "vm-medium" }, "nontechnical", true],
         [{ planId: "desktop-omarchy" }, "technical", true],
-        [{ planId: "game-small", recipeId: "docker" }, "technical", true],
+        [{ planId: "container-small", recipeId: "docker" }, "technical", true],
         [{ planId: "vm-medium", recipeId: "docker" }, "technical", false],
       ];
       for (const [picks, tier, rejected] of cases) {
@@ -496,7 +496,7 @@ describe("uncertainSlots", () => {
     ).toEqual(["use_case", "plan", "recipe"]);
     expect(
       uncertainSlots(answers({ plan: { confidence: 0.2 } }), {
-        planId: "game-small",
+        planId: "container-small",
       }),
     ).toEqual([]);
     expect(
@@ -544,7 +544,11 @@ describe("Suggestion schema", () => {
       planId: null,
       recipeId: null,
     };
-    const option = { id: "game-small", label: "Game Small", probability: 0.5 };
+    const option = {
+      id: "container-small",
+      label: "Container Small",
+      probability: 0.5,
+    };
     const bad = [
       choose,
       { ...choose, choice: { slot: "plan", options: [] } },
@@ -558,7 +562,7 @@ describe("Suggestion schema", () => {
         outcome: "refused",
         reason: "policy",
         useCase: null,
-        planId: "game-small",
+        planId: "container-small",
         recipeId: "node",
       },
       {
@@ -600,7 +604,11 @@ describe("SuggestBody", () => {
     expect(
       SuggestBody.safeParse({
         text: "a bot",
-        picks: { useCase: "always_on", planId: "game-small", recipeId: "node" },
+        picks: {
+          useCase: "always_on",
+          planId: "container-small",
+          recipeId: "node",
+        },
       }).success,
     ).toBe(true);
     for (const body of [

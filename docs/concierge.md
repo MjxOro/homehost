@@ -17,7 +17,7 @@ Approved users (and operators) only. Body (`SuggestBody` in
   "text": "vanilla minecraft for me and 4 friends",
   "picks": {
     "useCase": "game_server",
-    "planId": "game-small",
+    "planId": "container-small",
     "recipeId": "minecraft_java"
   }
 }

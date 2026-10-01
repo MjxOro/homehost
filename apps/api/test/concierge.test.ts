@@ -81,8 +81,8 @@ function jevBody(o: JevOverrides = {}) {
       },
       plan: {
         type: "choice",
-        choice: o.planChoice ?? "game-small",
-        probabilities: { "game-small": 0.88, none: 0.1 },
+        choice: o.planChoice ?? "container-small",
+        probabilities: { "container-small": 0.88, none: 0.1 },
         confidence: o.planConfidence ?? 0.88,
       },
       recipe: {
@@ -218,7 +218,7 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
     expect(suggestion).toMatchObject({
       outcome: "suggested",
       useCase: "game_server",
-      planId: "game-small",
+      planId: "container-small",
       recipeId: "minecraft_java",
       warnings: ["players_need_ipv6"],
       translated: false,
@@ -554,10 +554,10 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       { user: await newUser("technical"), text: "a bot" },
       config(t.fetch),
     );
-    expect(planOptions(t.calls[0]!)).toEqual(["game-small", "none"]);
+    expect(planOptions(t.calls[0]!)).toEqual(["container-small", "none"]);
     expect(planOptions(t.calls[1]!)).toEqual([
+      "container-small",
       "desktop-ubuntu",
-      "game-small",
       "none",
       "vm-large",
       "vm-medium",
