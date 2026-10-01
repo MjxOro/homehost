@@ -360,15 +360,23 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       });
     for (const held of ["provisioning", "running", "stopped"] as const) {
       for (const released of ["deleted", "rejected"] as const) {
-        const first = await create(alice, `Held ${held}`, "game-small");
+        const first = await create(alice, `Held ${held}`, "container-small");
         expect(first.statusCode).toBe(201);
         const id = first.json<ServerRequest>().id;
         // Mirror the worker: the request leaves pending/approved for good.
         await client`UPDATE server_requests SET status = ${held} WHERE id = ${id}`;
-        const blocked = await create(alice, `Blocked ${held}`, "game-small");
+        const blocked = await create(
+          alice,
+          `Blocked ${held}`,
+          "container-small",
+        );
         expect(blocked.statusCode).toBe(429);
         await client`UPDATE server_requests SET status = ${released} WHERE id = ${id}`;
-        const admitted = await create(alice, `After ${released}`, "game-small");
+        const admitted = await create(
+          alice,
+          `After ${released}`,
+          "container-small",
+        );
         expect(admitted.statusCode).toBe(201);
         await client`TRUNCATE provision_jobs, activity_events, server_requests`;
       }
