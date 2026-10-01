@@ -299,7 +299,7 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
         {activity.length === 0 ? (
           <EmptyState
             title="No activity yet"
-            copy="Events appear here when a request is created, decided, or cancelled."
+            copy="Events appear here when a request is created, decided, or deleted."
           />
         ) : (
           <ActivityFeed events={activity} />

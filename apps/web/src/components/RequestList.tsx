@@ -606,7 +606,7 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
                   }
                 >
                   <TrashIcon />
-                  Cancel
+                  Delete
                 </button>
               </div>
             </div>
@@ -622,7 +622,7 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
             setTarget(null);
             if (confirmed) {
               onAnnounce(
-                `“${target.request.name}” cancelled — reserved capacity released.`,
+                `“${target.request.name}” deleted — reserved capacity released.`,
               );
               focusRequestsHeading();
             } else if (trigger?.isConnected) {

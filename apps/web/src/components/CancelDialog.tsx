@@ -15,16 +15,16 @@ const COPY: Record<
   { title: string; confirm: string }
 > = {
   pending_approval: {
-    title: "Cancel this request?",
-    confirm: "Withdraw request",
+    title: "Delete this request?",
+    confirm: "Delete request",
   },
   approved: {
-    title: "Release this reservation?",
-    confirm: "Release reservation",
+    title: "Delete this approved request?",
+    confirm: "Delete request",
   },
   provisioning: {
-    title: "Cancel while provisioning?",
-    confirm: "Tear down",
+    title: "Delete while provisioning?",
+    confirm: "Delete server",
   },
   running: {
     title: "Delete this running server?",
@@ -35,31 +35,31 @@ const COPY: Record<
     confirm: "Delete server",
   },
   rejected: {
-    title: "Remove this rejected request?",
-    confirm: "Remove request",
+    title: "Delete this rejected request?",
+    confirm: "Delete request",
   },
   deleted: {
-    title: "Remove this request?",
-    confirm: "Remove request",
+    title: "Delete this request?",
+    confirm: "Delete request",
   },
 };
 
 function bodyText(request: ServerRequest): string {
   switch (request.status) {
     case "pending_approval":
-      return `“${request.name}” is still waiting for operator review. Withdrawing it releases the reserved capacity immediately.`;
+      return `“${request.name}” is still waiting for operator review. Deleting it releases the reserved capacity immediately.`;
     case "approved":
-      return `“${request.name}” is approved but was never provisioned. Releasing it frees the reserved capacity — there is no running server to shut down.`;
+      return `“${request.name}” is approved but was never provisioned. Deleting it frees the reserved capacity — there is no running server to shut down.`;
     case "provisioning":
-      return `“${request.name}” is being provisioned right now. Cancelling queues teardown of the partial instance and releases the reservation.`;
+      return `“${request.name}” is being provisioned right now. Deleting it queues teardown of the partial instance and releases the reservation.`;
     case "running":
-      return `“${request.name}” is running. Cancelling stops and deletes the server, tears down its instance, and releases the reserved capacity.`;
+      return `“${request.name}” is running. Deleting it stops the server, tears down its instance, and releases the reserved capacity.`;
     case "stopped":
-      return `“${request.name}” is stopped. Cancelling deletes the server and releases the reserved capacity.`;
+      return `“${request.name}” is stopped. Deleting it removes the server and releases the reserved capacity.`;
     case "rejected":
-      return `“${request.name}” holds no capacity. Removing it simply clears it from your list.`;
+      return `“${request.name}” holds no capacity. Deleting it simply clears it from your list.`;
     default:
-      return `Remove “${request.name}”?`;
+      return `Delete “${request.name}”?`;
   }
 }
 
@@ -147,7 +147,7 @@ export function CancelDialog({ request, trigger, onClose }: CancelDialogProps) {
           <p className={FORM_ERROR} role="alert">
             {cancel.error instanceof Error
               ? cancel.error.message
-              : "Cancellation failed."}
+              : "Delete failed."}
           </p>
         ) : null}
         <div className="mt-5 flex flex-wrap justify-end gap-3">
