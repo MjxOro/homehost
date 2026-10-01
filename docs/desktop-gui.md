@@ -2,9 +2,58 @@
 
 Browser-native desktops (KasmVNC canvas, zero client installs). Request
 Ubuntu-XFCE or Omarchy from the panel, then open it from your dashboard —
-the panel serves a same-origin proxied canvas URL and injects the persistent
-`desktop_password` toward the guest (never leaves the server), so the canvas
-autoconnects with no login form.
+the panel mints a capability URL and embeds KasmVNC in an opaque sandbox.
+The API supplies guest HTTP Basic auth; the URL fragment supplies the RFB
+password, so the canvas autoconnects with no login form.
+
+## Desktop security boundary
+
+`GET /api/requests/:id/desktop` requires an approved owner or operator panel
+session. It returns `/api/desktop/t/<ticket>/` with an eight-hour HMAC-SHA256
+capability bound to the request and viewer, plus a fresh nonce. Each HTTP
+request and websocket upgrade verifies the signature, expiry, current user
+approval/role, ownership, running state and desktop credentials. A stopped or
+deleted request, or a suspended viewer, invalidates later requests. Already
+open websocket connections are not proactively disconnected on revocation.
+The old cookie-authorized `/desktop/session/` proxy is removed.
+
+Every proxy response, including assets and errors, carries
+`Content-Security-Policy: sandbox allow-scripts allow-forms allow-pointer-lock allow-popups allow-modals allow-downloads`.
+The iframe uses the same sandbox and never grants `allow-same-origin`.
+The response policy also protects direct top-level navigation: guest scripts
+have an opaque origin (`null`), cannot access the panel DOM, and cannot make
+credentialed panel API calls. Panel mutations continue to reject `Origin: null`.
+See [MDN's CSP sandbox reference](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox).
+
+The capability itself is a bearer credential: do not share the URL. Proxy
+responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`;
+incoming panel cookies are ignored and never forwarded to the guest.
+API request logs redact the capability and the panel's Traefik desktop router
+disables access logs. Proxy assets permit anonymous CORS from `null` for the
+opaque client; they do not permit credentialed CORS. Guest redirects and
+cookies are not relayed.
+
+Set `DESKTOP_TICKET_SECRET` in private production environment configuration
+before deploying. Generate it with `openssl rand -base64 32`; never commit or
+print it. Live boot requires at least 32 characters. Showcase development
+uses a random process-local key if absent; an API restart invalidates existing
+tickets. A deliberate production key rotation also invalidates tickets.
+
+KasmVNC's shipped `dist/main.bundle.js` assumes origin storage. The proxy
+adjusts its preference storage calls to use a per-document memory store. Native
+storage remains blocked by the browser; the sandbox is unchanged. Preferences
+reset on reload.
+This adjustment is specific to the shipped Kasm client bundle and must be
+rechecked on Kasm upgrades. It avoids adding another trusted static client
+bundle or introducing another public origin.
+
+Keyboard controls and pointer tracking use a bounded `postMessage` bridge.
+The parent checks the iframe sender and opaque origin; the guest accepts
+commands only from its parent at configured panel origins. Messages carry
+input events and pointer positions, never panel API access. Zoom, pan and
+fullscreen remain in the parent. Browser clipboard access still depends on a
+secure context and permission; the LAN HTTP preview cannot grant the native
+Clipboard API.
 
 ## Naming
 
@@ -21,10 +70,12 @@ autoconnects with no login form.
   used for DNS-only traffic (see `docs/networking.md`).
 
 ## DNS: wildcard-only for desktops, per-VM for SSH
-| Record       | Name                 | Value                                   | Written by                          |
-| ------------ | -------------------- | --------------------------------------- | ----------------------------------- |
-| SSH AAAA     | `<subdomain>`        | guest IPv6 (static, from `IPV6_PREFIX`) | worker `ensureAAAA` (existing path) |
-| Desktop A/AAAA | `*-vnc.<base>`     | edge host (`*.dev` + `*.homehost` wildcards) | one-time Cloudflare wildcard records |
+
+| Record         | Name           | Value                                        | Written by                           |
+| -------------- | -------------- | -------------------------------------------- | ------------------------------------ |
+| SSH AAAA       | `<subdomain>`  | guest IPv6 (static, from `IPV6_PREFIX`)      | worker `ensureAAAA` (existing path)  |
+| Desktop A/AAAA | `*-vnc.<base>` | edge host (`*.dev` + `*.homehost` wildcards) | one-time Cloudflare wildcard records |
+
 No per-VM desktop record is written at provision or deleted at teardown:
 the two `*.dev.homehost.risktozero.sh` records (A → edge v4, AAAA → edge
 host v6) plus `*.homehost.risktozero.sh` cover every current and future
@@ -183,8 +234,8 @@ addr` shows only `fe80::/64` link-local; direct-v6 SSH to provisioned
    DNS (`@1.1.1.1`) says apex A `38.62.47.122`, no apex AAAA. Always probe
    DNS with `@1.1.1.1`/`@8.8.8.8`.
 4. **Desktop DNS is wildcard-only (2026-09-17).** `*.dev.homehost.risktozero.sh`
-  A → edge v4 + AAAA → edge host v6, plus `*.homehost.risktozero.sh`. No
-  per-VM desktop record is written (worker) or needed. `EDGE_IPV6` retired.
+   A → edge v4 + AAAA → edge host v6, plus `*.homehost.risktozero.sh`. No
+   per-VM desktop record is written (worker) or needed. `EDGE_IPV6` retired.
 5. **No host GPU driver.** `nvidia-smi` fails; single GTX 1070 is 1:1-only.
    No multi-tenant GPU story (see above).
 6. **`check.sh` 80/443 MISS is a false alarm on the edge host.** Traefik

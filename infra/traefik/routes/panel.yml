@@ -4,6 +4,16 @@
 #   rule: "Host(`<label>-vnc.<baseDomain>`)"
 http:
   routers:
+    panel-desktop:
+      rule: "Host(`homehost.risktozero.sh`) && PathPrefix(`/api/desktop/t/`)"
+      entryPoints:
+        - websecure
+      service: panel
+      # Capability paths are credentials. API logs redact them separately.
+      observability:
+        accessLogs: false
+      tls:
+        certResolver: letsencrypt
     panel:
       rule: "Host(`homehost.risktozero.sh`)"
       entryPoints:
