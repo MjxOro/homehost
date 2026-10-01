@@ -13,6 +13,7 @@ import {
   isTransientSetupFailure,
   planSetup,
   pollChecks,
+  sameIpv6,
   setupErrorOf,
   toDesktopHostname,
 } from "@homehost/shared";
@@ -423,7 +424,9 @@ async function ensureAAAA(subdomain: string, ipv6: string): Promise<void> {
       { headers: { Authorization: `Bearer ${cfToken}` } },
     )
   ).json()) as { result?: Array<{ id?: unknown; content?: unknown }> };
-  const existing = (found.result ?? []).find((r) => r.content === ipv6);
+  const existing = (found.result ?? []).find(
+    (r) => typeof r.content === "string" && sameIpv6(r.content, ipv6),
+  );
   if (existing) return;
   const response = await fetch(`${CF_API}/zones/${zone}/dns_records`, {
     method: "POST",
