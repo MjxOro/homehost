@@ -77,8 +77,12 @@ services:
       - /var/lib/incus/unix.socket:/var/lib/incus/unix.socket
       - /usr/bin/incus:/usr/bin/incus:ro
     command: ["bun", "apps/worker/src/index.ts"]
+    # Host network: the readiness gate and setup checks TCP-connect to each
+    # box's public IPv6, and Docker's bridge network has no IPv6. Postgres is
+    # reached on its loopback publish instead of the compose network.
+    network_mode: host
     environment:
-      DATABASE_URL: postgres://homehost:homehost@postgres:5432/homehost
+      DATABASE_URL: postgres://homehost:homehost@127.0.0.1:55433/homehost
       WORKER_POLL_MS: "2000"
       WORKER_ENV: dev
       WORKER_BASE_DOMAIN: dev.homehost.risktozero.sh
