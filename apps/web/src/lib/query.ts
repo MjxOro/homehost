@@ -192,6 +192,16 @@ export function useCredentials() {
 }
 
 /**
+ * Concierge suggestion from free text. Creates nothing server-side, so success
+ * invalidates nothing; each call counts against the daily cap.
+ */
+export function useSuggest() {
+  return useMutation({
+    mutationFn: api.suggest,
+  });
+}
+
+/**
  * Desktop session URL: same-origin proxied KasmVNC canvas. A query (not a
  * mutation): the secret never leaves the server, the URL carries only
  * Kasm's `?password=` RFB autoconnect query, and refresh must re-fetch.
