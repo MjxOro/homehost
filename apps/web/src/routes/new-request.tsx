@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { Plan, PortalUser, ServerRequest } from "@homehost/shared";
 import { isValidSshPublicKey } from "@homehost/shared";
 import { isApiError } from "../lib/api";
-import { formatMemory } from "../lib/format";
+import { formatMemory, formatPlanSpecs } from "../lib/format";
 import {
   useCreateRequest,
   useDashboard,
@@ -110,8 +110,7 @@ function PlanCards({
                   </span>
                 </span>
                 <span className="text-[13.5px] text-text-2">
-                  {plan.cpu} CPU · {formatMemory(plan.memoryMb)} RAM ·{" "}
-                  {plan.diskGb} GB disk
+                  {formatPlanSpecs(plan)}
                 </span>
                 <span className="text-[12.5px] leading-[1.5] text-text-3">
                   {locked
