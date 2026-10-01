@@ -119,13 +119,17 @@ export interface ActivityEvent {
     | "provisioning"
     | "running"
     | "stopped"
-    | "provision_failed";
+    | "provision_failed"
+    | "setup_started"
+    | "setup_done"
+    | "setup_failed";
   serverName: string;
   createdAt: string;
   detail: string | null;
 }
 
-export type ProvisionAction = "provision" | "teardown" | "stop" | "start";
+export type ProvisionAction =
+  "provision" | "teardown" | "stop" | "start" | "setup";
 export type ProvisionJobStatus = "queued" | "leased" | "done" | "failed";
 
 export interface ProvisionJob {

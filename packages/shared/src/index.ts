@@ -35,3 +35,4 @@ export type {
 export * from "./ledger.js";
 export * from "./concierge.js";
 export * from "./concierge-catalog.js";
+export * from "./setup.js";
