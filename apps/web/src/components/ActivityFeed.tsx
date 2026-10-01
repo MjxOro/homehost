@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { ActivityEvent, ActivityPageResponse } from "@homehost/shared";
 import { formatDateTime, formatRelative } from "../lib/format";
+import { recipeLabel, setupErrorCopy } from "../lib/concierge";
 import {
   CheckCircleIcon,
+  ClockIcon,
   PlusIcon,
   Spinner,
   TrashIcon,
@@ -45,7 +47,52 @@ const ACTION_META: Record<
   },
   rejected: { icon: XCircleIcon, className: "text-bad", label: "rejected" },
   deleted: { icon: TrashIcon, className: "text-text-3", label: "deleted" },
+  setup_started: {
+    icon: Spinner,
+    className: "text-accent",
+    label: "started setup on",
+  },
+  setup_done: {
+    icon: CheckCircleIcon,
+    className: "text-ok",
+    label: "finished setup on",
+  },
+  setup_failed: {
+    icon: XCircleIcon,
+    className: "text-bad",
+    label: "setup failed on",
+  },
 };
+
+/** A spinning action that a newer terminal event for the same request ended. */
+const SUPERSEDED_META: Partial<
+  Record<ActivityEvent["action"], (typeof ACTION_META)[ActivityEvent["action"]]>
+> = {
+  provisioning: {
+    icon: CheckCircleIcon,
+    className: "text-ok",
+    label: "provisioned",
+  },
+  setup_started: {
+    icon: ClockIcon,
+    className: "text-text-3",
+    label: "started setup on",
+  },
+};
+
+/** Setup events carry ids and codes; show their plain-language form. */
+function detailText(event: ActivityEvent): string | null {
+  if (event.detail === null) return null;
+  switch (event.action) {
+    case "setup_started":
+    case "setup_done":
+      return recipeLabel(event.detail);
+    case "setup_failed":
+      return setupErrorCopy(event.detail);
+    default:
+      return event.detail;
+  }
+}
 
 export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
   const firstPage = events.slice(0, PAGE_SIZE);
@@ -80,17 +127,19 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
     rejected: true,
     cancelled: true,
     deleted: true,
+    setup_done: true,
+    setup_failed: true,
   };
   const terminalByRequest = new Set<string>();
-  const supersededProvisioning = new Set<string>();
+  const superseded = new Set<string>();
   for (const event of visible) {
     if (TERMINAL_ACTIONS[event.action]) {
       terminalByRequest.add(event.requestId);
     } else if (
-      event.action === "provisioning" &&
+      SUPERSEDED_META[event.action] &&
       terminalByRequest.has(event.requestId)
     ) {
-      supersededProvisioning.add(event.id);
+      superseded.add(event.id);
     }
   }
 
@@ -138,13 +187,11 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
     <div>
       <ul className="m-0 flex list-none flex-col divide-y divide-line">
         {visible.map((event) => {
-          const meta = supersededProvisioning.has(event.id)
-            ? {
-                icon: CheckCircleIcon,
-                className: "text-ok",
-                label: "provisioned",
-              }
-            : ACTION_META[event.action];
+          const meta =
+            (superseded.has(event.id)
+              ? SUPERSEDED_META[event.action]
+              : undefined) ?? ACTION_META[event.action];
+          const detail = detailText(event);
           const Icon = meta.icon;
           return (
             <li
@@ -161,9 +208,9 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
                   {meta.label}{" "}
                   <span className="text-text-2">“{event.serverName}”</span>
                 </p>
-                {event.detail ? (
+                {detail ? (
                   <p className="mt-1 text-[13px] leading-[1.5] text-text-2">
-                    {event.detail}
+                    {detail}
                   </p>
                 ) : null}
               </div>
