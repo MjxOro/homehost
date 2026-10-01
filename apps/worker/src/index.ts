@@ -3,19 +3,33 @@ import { spawn } from "node:child_process";
 import { createConnection } from "node:net";
 import postgres from "postgres";
 import {
+  MINECRAFT_PORT,
   PLANS,
+  RECIPES,
+  SETUP_STEP_ATTEMPTS,
   dohHasAaaa,
+  gameAddressOf,
   ipv6ForInstance,
+  isTransientSetupFailure,
+  planSetup,
   pollChecks,
+  setupErrorOf,
   toDesktopHostname,
 } from "@homehost/shared";
-import type { Plan, ProvisionAction } from "@homehost/shared";
+import type {
+  Plan,
+  ProvisionAction,
+  RecipeId,
+  SetupErrorCode,
+  SetupStepId,
+} from "@homehost/shared";
 import {
   appendDesktopToUserData,
   omarchyUnavailable,
   removeDesktopRoute,
   writeDesktopRoute,
 } from "./desktop.js";
+import { setupScript } from "./recipes.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -28,6 +42,8 @@ const teardownAttempts = Number(process.env.WORKER_TEARDOWN_ATTEMPTS ?? 25);
 const powerAttempts = Number(process.env.WORKER_POWER_ATTEMPTS ?? 5);
 const bootTimeoutMs = Number(process.env.WORKER_BOOT_TIMEOUT_MS ?? 240000);
 const readyTimeoutMs = Number(process.env.WORKER_READY_TIMEOUT_MS ?? 120000);
+// Job leases of one setup: a worker crash re-leases it, a crash loop stops here.
+const setupAttempts = Number(process.env.WORKER_SETUP_ATTEMPTS ?? 3);
 const ipv6Prefix = process.env.IPV6_PREFIX ?? "";
 const cfToken = process.env.CF_DNS_API_TOKEN ?? "";
 const workerEnv = process.env.WORKER_ENV ?? "prod";
@@ -857,6 +873,8 @@ async function handleProvision(job: Job): Promise<void> {
     }
     await setRequest(req.id, "running", { instanceName: name, ipv4 });
     await emit(req.id, "Homehost worker", "running", req.name, ipv4);
+    // The readiness gate passed: now install the recipe, if any.
+    await enqueueSetupIfPending(req.id);
     await finishJob(job.id, "done", null);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -994,6 +1012,8 @@ async function handlePower(
       ipv4,
     });
     await emit(req.id, req.ownerName, to, req.name, null);
+    // A setup skipped while the box was stopped resumes on start.
+    if (to === "running") await enqueueSetupIfPending(req.id);
     await finishJob(job.id, "done", null);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -1003,6 +1023,238 @@ async function handlePower(
       await requeue(job.id, message);
     }
   }
+}
+
+/**
+ * Queues the recipe install for a running box whose setup has not run yet.
+ * The partial unique index allows one active setup job per request.
+ */
+async function enqueueSetupIfPending(requestId: string): Promise<void> {
+  await sql`
+    INSERT INTO provision_jobs (request_id, action)
+    SELECT id, 'setup' FROM server_requests
+    WHERE id = ${requestId} AND status = 'running' AND setup_status = 'pending'
+    ON CONFLICT (request_id, action) WHERE status IN ('queued', 'leased')
+    DO NOTHING
+  `;
+}
+
+interface SetupState {
+  recipeId: string | null;
+  setupStatus: string;
+  eulaAccepted: boolean;
+  ipv6: string | null;
+}
+
+async function loadSetupState(requestId: string): Promise<SetupState | null> {
+  const rows = await sql`
+    SELECT recipe_id, setup_status, eula_accepted_at IS NOT NULL AS eula_accepted, ipv6
+    FROM server_requests WHERE id = ${requestId} LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  const r = rows[0] as Record<string, unknown>;
+  return {
+    recipeId: typeof r.recipe_id === "string" ? r.recipe_id : null,
+    setupStatus: String(r.setup_status),
+    eulaAccepted: r.eula_accepted === true,
+    ipv6: typeof r.ipv6 === "string" ? r.ipv6 : null,
+  };
+}
+
+async function setSetup(
+  requestId: string,
+  status: "pending" | "running" | "done" | "failed",
+  step: SetupStepId | null,
+  error: SetupErrorCode | null,
+): Promise<void> {
+  await sql`
+    UPDATE server_requests
+    SET setup_status = ${status}, setup_step = ${step}, setup_error = ${error},
+      updated_at = now()
+    WHERE id = ${requestId}
+  `;
+}
+
+interface GuestRun {
+  exitCode: number | null;
+  timedOut: boolean;
+  output: string;
+}
+
+/**
+ * Runs a fixed step script in the guest. Never throws: the exit code, a
+ * timeout and the output tail are classified by setupErrorOf. stdin is
+ * ignored so nothing in the script can block on it.
+ */
+function runGuestScript(
+  project: string,
+  name: string,
+  script: string,
+  timeoutMs: number,
+): Promise<GuestRun> {
+  return new Promise<GuestRun>((resolve) => {
+    const child = spawn(
+      "incus",
+      [
+        "exec",
+        name,
+        "--project",
+        project,
+        "--",
+        "bash",
+        "-euo",
+        "pipefail",
+        "-c",
+        script,
+      ],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let output = "";
+    let timedOut = false;
+    const keep = (d: unknown) => {
+      output = (output + String(d)).slice(-8000);
+    };
+    child.stdout.on("data", keep);
+    child.stderr.on("data", keep);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      resolve({ exitCode: null, timedOut, output: `${output}\n${e.message}` });
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ exitCode: code, timedOut, output });
+    });
+  });
+}
+
+async function failSetup(
+  req: RequestState,
+  job: Job,
+  step: SetupStepId | null,
+  code: SetupErrorCode,
+  detail: string,
+): Promise<void> {
+  // The box stays as it is: setup failures never reimage or relaunch it.
+  await setSetup(req.id, "failed", step, code);
+  await emit(req.id, "Homehost worker", "setup_failed", req.name, code);
+  await finishJob(
+    job.id,
+    "failed",
+    `${code}${step ? ` at ${step}` : ""}: ${detail.slice(-2000)}`,
+  );
+}
+
+async function handleSetup(job: Job): Promise<void> {
+  const req = await loadRequest(job.requestId);
+  if (!req || req.status === "deleted") {
+    await finishJob(job.id, "done", "skipped: deleted");
+    return;
+  }
+  const state = await loadSetupState(req.id);
+  if (
+    !state ||
+    state.recipeId === null ||
+    (state.setupStatus !== "pending" && state.setupStatus !== "running")
+  ) {
+    await finishJob(
+      job.id,
+      "done",
+      `skipped: setup ${state?.setupStatus ?? "missing"}`,
+    );
+    return;
+  }
+  if (req.status !== "running" || !req.instanceName) {
+    // Stopped before setup ran: stays pending, the next start re-enqueues it.
+    await setSetup(req.id, "pending", null, null);
+    await finishJob(job.id, "done", `skipped: status ${req.status}`);
+    return;
+  }
+  const recipeId = state.recipeId;
+  const plan = PLANS.find((p) => p.id === req.planId);
+  const setup = plan ? planSetup(recipeId, plan.memoryMb) : null;
+  if (!setup) {
+    await failSetup(req, job, null, "unknown", `no setup for ${recipeId}`);
+    return;
+  }
+  if (RECIPES[recipeId as RecipeId].eula !== null && !state.eulaAccepted) {
+    await failSetup(req, job, null, "unknown", "license acceptance missing");
+    return;
+  }
+  if (job.attempts > setupAttempts) {
+    await failSetup(req, job, null, "unknown", "setup interrupted too often");
+    return;
+  }
+  const project = projectForReq(req);
+  const instance = req.instanceName;
+  await setSetup(req.id, "running", null, null);
+  await emit(req.id, "Homehost worker", "setup_started", req.name, recipeId);
+  for (const step of setup.steps) {
+    if (shuttingDown) {
+      // Re-leased on the next start; the scripts are safe to re-run.
+      await requeue(job.id, "worker shutting down");
+      return;
+    }
+    await setSetup(req.id, "running", step.id, null);
+    const script = setupScript(step.id, { heapMb: setup.heapMb });
+    for (let attempt = 1; ; attempt++) {
+      const run = await runGuestScript(
+        project,
+        instance,
+        script,
+        step.timeoutMs,
+      );
+      if (run.exitCode === 0 && !run.timedOut) break;
+      const code = setupErrorOf(step.id, run);
+      if (
+        attempt < SETUP_STEP_ATTEMPTS &&
+        !shuttingDown &&
+        isTransientSetupFailure(code, run.output)
+      ) {
+        await new Promise<void>((r) => setTimeout(r, 15000 * attempt));
+        continue;
+      }
+      await failSetup(req, job, step.id, code, run.output);
+      return;
+    }
+    if (step.id === "wait_ready" && state.ipv6) {
+      // Listening in the box is not enough: players come in over IPv6.
+      const ipv6 = state.ipv6;
+      try {
+        await pollChecks(
+          [
+            {
+              failure: `not reachable at [${ipv6}]:${MINECRAFT_PORT}`,
+              run: () => tcpConnects(ipv6, MINECRAFT_PORT),
+            },
+          ],
+          { timeoutMs: readyTimeoutMs, intervalMs: 3000 },
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        await failSetup(req, job, step.id, "not_ready", message);
+        return;
+      }
+    }
+  }
+  const last = setup.steps[setup.steps.length - 1]?.id ?? null;
+  await setSetup(req.id, "done", last, null);
+  const address = gameAddressOf({
+    recipeId,
+    setupStatus: "done",
+    subdomain: req.subdomain,
+  });
+  await emit(
+    req.id,
+    "Homehost worker",
+    "setup_done",
+    req.name,
+    address ?? recipeId,
+  );
+  await finishJob(job.id, "done", null);
 }
 
 async function handle(job: Job): Promise<void> {
@@ -1015,6 +1267,8 @@ async function handle(job: Job): Promise<void> {
       return handlePower(job, "stop", "stopped");
     case "start":
       return handlePower(job, "start", "running");
+    case "setup":
+      return handleSetup(job);
   }
 }
 
