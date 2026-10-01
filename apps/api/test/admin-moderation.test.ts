@@ -121,7 +121,7 @@ describe.skipIf(!databaseUrl)("admin user moderation", () => {
 
   afterEach(async () => {
     if (client) {
-      await client`TRUNCATE provision_jobs, activity_events, server_requests, moderation_actions`;
+      await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests, moderation_actions`;
       if (fixtures.length > 0) {
         await client`DELETE FROM users WHERE id = ANY(${fixtures})`;
         fixtures = [];
@@ -270,7 +270,10 @@ describe.skipIf(!databaseUrl)("admin user moderation", () => {
     expect(rows).toHaveLength(2);
     // Same-millisecond created_at ties are possible, so compare as a set.
     const pairs = rows.map((r) => `${r.action}:${r.detail}`).sort();
-    expect(pairs).toEqual(["approve:technical", "classification:non_technical"]);
+    expect(pairs).toEqual([
+      "approve:technical",
+      "classification:non_technical",
+    ]);
     expect(rows.every((r) => r.actor_id === "operator")).toBe(true);
   });
 
@@ -323,7 +326,10 @@ describe.skipIf(!databaseUrl)("admin user moderation", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: fixture.cookie },
-      payload: { name: `Provision ${fixture.id.slice(0, 8)}`, planId: "container-small" },
+      payload: {
+        name: `Provision ${fixture.id.slice(0, 8)}`,
+        planId: "container-small",
+      },
     });
     expect(blocked.statusCode).toBe(403);
     expect(blocked.json().code).toBe("AccountPending");
@@ -338,7 +344,10 @@ describe.skipIf(!databaseUrl)("admin user moderation", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: fixture.cookie },
-      payload: { name: `Provision ${fixture.id.slice(0, 8)}`, planId: "container-small" },
+      payload: {
+        name: `Provision ${fixture.id.slice(0, 8)}`,
+        planId: "container-small",
+      },
     });
     expect(created.statusCode).toBe(201);
   });

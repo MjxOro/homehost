@@ -59,7 +59,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
 
   afterEach(async () => {
     if (client)
-      await client`TRUNCATE provision_jobs, activity_events, server_requests`;
+      await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests`;
   });
 
   afterAll(async () => {
@@ -378,7 +378,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
           "container-small",
         );
         expect(admitted.statusCode).toBe(201);
-        await client`TRUNCATE provision_jobs, activity_events, server_requests`;
+        await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests`;
       }
     }
 

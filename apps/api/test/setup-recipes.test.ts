@@ -57,7 +57,7 @@ describe.skipIf(!databaseUrl)("setup recipes on requests", () => {
 
   afterEach(async () => {
     if (client)
-      await client`TRUNCATE provision_jobs, activity_events, server_requests`;
+      await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests`;
   });
 
   afterAll(async () => {
@@ -164,7 +164,7 @@ describe.skipIf(!databaseUrl)("setup recipes on requests", () => {
       const stored = await storedSetup(created.id);
       expect(stored.recipe_id).toBeNull();
       expect(stored.eula_accepted_at).toBeNull();
-      await client`TRUNCATE provision_jobs, activity_events, server_requests`;
+      await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests`;
     }
   });
 
