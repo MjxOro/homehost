@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Plan, PortalUser, ServerRequest } from "@homehost/shared";
 import { isValidSshPublicKey } from "@homehost/shared";
 import { isApiError } from "../lib/api";
+import { setupSlug } from "../lib/concierge";
 import { formatMemory, formatPlanSpecs } from "../lib/format";
 import {
   useCreateRequest,
@@ -11,6 +12,8 @@ import {
   useSession,
 } from "../lib/query";
 import { LockIcon, Spinner } from "../components/icons";
+import { SetupHelper, type SetupPick } from "../components/SetupHelper";
+import { prefersReducedMotion } from "../lib/motion";
 import { SignInGate } from "../components/SignInGate";
 import {
   BUTTON_PRIMARY,
@@ -70,14 +73,20 @@ function PlanCards({
   selectedId,
   disabled,
   onSelect,
+  fieldsetRef,
 }: {
   choices: PlanChoice[];
   selectedId: string | null;
   disabled: boolean;
   onSelect: (planId: string) => void;
+  fieldsetRef: Ref<HTMLFieldSetElement>;
 }) {
   return (
-    <fieldset className="min-w-0 border-0 p-0" disabled={disabled}>
+    <fieldset
+      ref={fieldsetRef}
+      className="min-w-0 border-0 p-0"
+      disabled={disabled}
+    >
       <legend className={`${FIELD_LABEL} mb-2.5 p-0`}>Plan</legend>
       <div className={PLAN_RADIO_GRID}>
         {choices.map(({ plan, locked }) => {
@@ -194,6 +203,15 @@ function SuccessPanel({ request }: { request: ServerRequest }) {
   );
 }
 
+/** Scroll a form section clear of the sticky topbar, then focus a control in it. */
+function bringIntoView(section: HTMLElement, focus: HTMLElement | null) {
+  section.scrollIntoView({
+    behavior: prefersReducedMotion() ? "auto" : "smooth",
+    block: "center",
+  });
+  focus?.focus({ preventScroll: true });
+}
+
 function RequestForm({ user }: { user: PortalUser }) {
   const plansQuery = usePlans();
   const createRequest = useCreateRequest();
@@ -202,6 +220,8 @@ function RequestForm({ user }: { user: PortalUser }) {
   const [sshKey, setSshKey] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [submitted, setSubmitted] = useState<ServerRequest | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const planPickerRef = useRef<HTMLFieldSetElement>(null);
 
   const choices = useMemo<PlanChoice[]>(
     () =>
@@ -252,6 +272,12 @@ function RequestForm({ user }: { user: PortalUser }) {
       ? "Paste a single-line public key: <type> <base64> [comment]."
       : null;
 
+  const applySetup = ({ planId: picked, useCase, recipeId }: SetupPick) => {
+    setPlanId(picked);
+    if (trimmed.length === 0) setName(setupSlug(useCase, recipeId));
+    if (nameRef.current) bringIntoView(nameRef.current, nameRef.current);
+  };
+
   return (
     <form
       className="animate-fade-in lg:min-h-[1100px] lg:@min-[500px]:min-h-[800px] lg:@min-[750px]:min-h-[700px] lg:@min-[900px]:min-h-[600px] flex flex-col gap-[18px]"
@@ -272,6 +298,23 @@ function RequestForm({ user }: { user: PortalUser }) {
         );
       }}
     >
+      <SetupHelper
+        disabled={createRequest.isPending}
+        onApply={applySetup}
+        onPickManually={() => {
+          const picker = planPickerRef.current;
+          if (!picker) return;
+          const radio =
+            picker.querySelector<HTMLInputElement>(
+              'input[type="radio"]:checked',
+            ) ??
+            picker.querySelector<HTMLInputElement>(
+              'input[type="radio"]:not(:disabled)',
+            );
+          bringIntoView(picker, radio);
+        }}
+      />
+
       <div className="flex flex-col gap-2">
         <label htmlFor="server-name" className={FIELD_LABEL}>
           Server name
@@ -281,6 +324,7 @@ function RequestForm({ user }: { user: PortalUser }) {
           name="server-name"
           type="text"
           className={INPUT_FIELD}
+          ref={nameRef}
           value={name}
           maxLength={NAME_MAX + 16}
           disabled={createRequest.isPending}
@@ -318,6 +362,7 @@ function RequestForm({ user }: { user: PortalUser }) {
         selectedId={planId}
         disabled={createRequest.isPending}
         onSelect={setPlanId}
+        fieldsetRef={planPickerRef}
       />
       {attempted && planError ? (
         <p className={FORM_ERROR} role="alert">
