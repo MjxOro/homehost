@@ -327,7 +327,6 @@ function ReadyCard({
             name="server address"
             className=""
           />
-          <Notes items={warningCopy(["players_need_ipv6"])} />
         </div>
       ) : null}
 

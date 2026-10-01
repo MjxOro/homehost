@@ -30,8 +30,6 @@ export function recipeLabel(id: string): string {
 }
 
 const WARNING_COPY: Record<WarningCode, string> = {
-  players_need_ipv6:
-    "Friends join over IPv6 for now. Most mobile and many home networks have it; some don't.",
   console_not_supported:
     "Game consoles (Switch, Xbox, PlayStation) can't join custom servers. Players need a PC, Mac or phone.",
   needs_review: "An operator will take a closer look before approving.",

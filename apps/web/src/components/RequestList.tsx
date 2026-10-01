@@ -88,35 +88,6 @@ function IpBadge({ value }: { value: string }) {
   );
 }
 
-/** Public IPv6 is display text like the IPv4 badge. Shown once assigned. */
-function Ipv6Badge({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <span className="mt-2.5 inline-flex min-w-0 flex-wrap items-center gap-2">
-      <span className="text-[13px] text-text-2">IPv6</span>
-      <code className={`${CODE_BADGE} min-w-0 break-all`}>{value}</code>
-      <button
-        type="button"
-        className={ICON_BTN_QUIET}
-        aria-label={copied ? "IPv6 copied" : `Copy IPv6 ${value}`}
-        onClick={() => {
-          void navigator.clipboard
-            ?.writeText(value)
-            .then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1600);
-            })
-            .catch(() => {
-              /* clipboard unavailable — leave the button inert */
-            });
-        }}
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
-    </span>
-  );
-}
-
 /**
  * Revealed one-time password with focus management and a copy button, so
  * the secret never needs manual transcription. The label chip names the box;
@@ -311,8 +282,8 @@ function DesktopAccess({ request }: { request: ServerRequest }) {
 
 /**
  * Root access for a provisioned box, top to bottom: the bare
- * `ssh root@<subdomain>` command when running (dials over IPv6), then the
- * key status note, then the one-time password flow.
+ * `ssh root@<subdomain>` command when running, then the key status note,
+ * then the one-time password flow.
  */
 export function SshAccess({
   request,
@@ -588,7 +559,6 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
                 <CopyCode value={request.subdomain} name="subdomain" />
               )}
               {request.ipv4 ? <IpBadge value={request.ipv4} /> : null}
-              {request.ipv6 ? <Ipv6Badge value={request.ipv6} /> : null}
               {request.gameAddress ? (
                 <div className="mt-2.5 flex flex-col items-start gap-1">
                   <span className={LABEL_CHIP}>

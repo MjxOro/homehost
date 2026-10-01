@@ -137,11 +137,6 @@ function jevQuestionSet(tier: TrustTier): JevQuestionSet {
       instructions:
         "Does the person want a graphical desktop (not just a terminal)?",
     },
-    players_connect: {
-      type: "noul",
-      instructions:
-        "Will other people (friends, players, customers) need to connect directly to this server?",
-    },
     console_player: {
       type: "noul",
       instructions:
@@ -190,7 +185,6 @@ const JevAnswersSchema = z.object({
   }),
   recipe: choiceAnswer(RECIPE_IDS),
   wants_gui: noulAnswer,
-  players_connect: noulAnswer,
   console_player: noulAnswer,
   abuse: noulAnswer,
   scraping: noulAnswer,
@@ -446,7 +440,6 @@ function toAnswers(a: JevAnswers): ConciergeAnswers {
     plan: a.plan,
     recipe: a.recipe,
     wants_gui: a.wants_gui.noul,
-    players_connect: a.players_connect.noul,
     console_player: a.console_player.noul,
     abuse: a.abuse.noul,
     scraping: a.scraping.noul,

@@ -92,7 +92,6 @@ function jevBody(o: JevOverrides = {}) {
         confidence: o.recipeConfidence ?? 0.9,
       },
       wants_gui: { type: "noul", noul: 0.02 },
-      players_connect: { type: "noul", noul: 0.95 },
       console_player: { type: "noul", noul: 0.03 },
       abuse: { type: "noul", noul: o.abuse ?? 0.01 },
       scraping: { type: "noul", noul: 0.02 },
@@ -220,7 +219,7 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       useCase: "game_server",
       planId: "container-small",
       recipeId: "minecraft_java",
-      warnings: ["players_need_ipv6"],
+      warnings: [],
       translated: false,
       model: JEV_MODEL_REPORTED,
     });

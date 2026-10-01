@@ -489,13 +489,13 @@ async function waitForReachable(
   );
   const checks = [
     {
-      failure: `box not reachable over IPv6 at [${ipv6}]:22 (check the incusbr0 gateway)`,
+      failure: `box not reachable at [${ipv6}]:22 (check the incusbr0 gateway)`,
       run: () => tcpConnects(ipv6, 22),
     },
   ];
   if (cfToken) {
     checks.push({
-      failure: "AAAA not visible on public DNS",
+      failure: "hostname not visible on public DNS yet",
       run: () => aaaaVisible(req.subdomain, ipv6),
     });
   }

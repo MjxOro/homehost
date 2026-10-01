@@ -210,7 +210,6 @@ export const EULAS: Record<"minecraft", { label: string; url: string }> = {
 export const WARNING_CODES = [
   "needs_review",
   "upgraded_for_recipe",
-  "players_need_ipv6",
   "console_not_supported",
 ] as const;
 export type WarningCode = (typeof WARNING_CODES)[number];
