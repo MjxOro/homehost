@@ -1,5 +1,6 @@
 import type {
   ApprovalResponse,
+  CreateRequestInput,
   CredentialsResponse,
   DashboardResponse,
   DesktopSessionResponse,
@@ -82,11 +83,7 @@ export const api = {
 
   getDashboard: (): Promise<DashboardResponse> => request("/api/dashboard"),
 
-  createRequest: (input: {
-    name: string;
-    planId: string;
-    sshPubkey?: string;
-  }): Promise<ServerRequest> =>
+  createRequest: (input: CreateRequestInput): Promise<ServerRequest> =>
     request("/api/requests", {
       method: "POST",
       headers: jsonHeaders,
@@ -114,6 +111,11 @@ export const api = {
     }),
   retryProvision: (id: string): Promise<ServerRequest> =>
     request(`/api/requests/${encodeURIComponent(id)}/retry`, {
+      method: "POST",
+    }),
+
+  retrySetup: (id: string): Promise<ServerRequest> =>
+    request(`/api/requests/${encodeURIComponent(id)}/setup/retry`, {
       method: "POST",
     }),
 

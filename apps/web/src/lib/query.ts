@@ -4,7 +4,12 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { PortalUser, SessionResponse } from "@homehost/shared";
+import type {
+  DashboardResponse,
+  PortalUser,
+  ServerRequest,
+  SessionResponse,
+} from "@homehost/shared";
 import { api, ApiError } from "./api";
 
 export const queryKeys = {
@@ -65,15 +70,21 @@ export function usePlans() {
   });
 }
 
-/** Keyed by user id so two personas never share a dashboard cache entry. */
-export function useDashboard(userId: string | undefined) {
+/**
+ * Keyed by user id so two personas never share a dashboard cache entry.
+ * `pollMs` lets a page watching a request poll faster until it settles.
+ */
+export function useDashboard(
+  userId: string | undefined,
+  pollMs: (data: DashboardResponse | undefined) => number = () => 10_000,
+) {
   return useQuery({
     queryKey: [...queryKeys.dashboard, userId ?? "none"],
     queryFn: api.getDashboard,
     enabled: typeof userId === "string" && userId.length > 0,
     // Worker-driven transitions (approved→provisioning→running, stop/start)
     // land server-side; poll so rows converge without a manual refresh.
-    refetchInterval: 10_000,
+    refetchInterval: (query) => pollMs(query.state.data),
   });
 }
 
@@ -141,11 +152,49 @@ function useInvalidateAfterMutation() {
   };
 }
 
+/**
+ * Puts a request the API just returned into every cached dashboard, so a page
+ * navigated to right after a create or retry shows it without waiting for
+ * the refetch the invalidation triggers.
+ */
+function useUpsertRequest() {
+  const queryClient = useQueryClient();
+  return (request: ServerRequest) => {
+    queryClient.setQueriesData<DashboardResponse>(
+      { queryKey: queryKeys.dashboard },
+      (old) =>
+        old && {
+          ...old,
+          requests: [
+            request,
+            ...old.requests.filter((row) => row.id !== request.id),
+          ],
+        },
+    );
+  };
+}
+
 export function useCreateRequest() {
   const invalidate = useInvalidateAfterMutation();
+  const upsert = useUpsertRequest();
   return useMutation({
     mutationFn: api.createRequest,
-    onSuccess: invalidate,
+    onSuccess: (request) => {
+      upsert(request);
+      invalidate();
+    },
+  });
+}
+
+export function useRetrySetup() {
+  const invalidate = useInvalidateAfterMutation();
+  const upsert = useUpsertRequest();
+  return useMutation({
+    mutationFn: api.retrySetup,
+    onSuccess: (request) => {
+      upsert(request);
+      invalidate();
+    },
   });
 }
 
