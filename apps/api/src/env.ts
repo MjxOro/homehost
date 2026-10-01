@@ -59,6 +59,8 @@ export interface ApiEnv {
   openrouterApiKey: string | null;
   /** Concierge suggestions per user per UTC day. */
   conciergeDailyCap: number;
+  /** Agent chat turns per user per UTC day. */
+  agentChatDailyTurns: number;
 }
 
 function httpOrigin(raw: string, name: string): string {
@@ -118,6 +120,13 @@ export function getEnv(): ApiEnv {
       `CONCIERGE_DAILY_CAP must be an integer from 0 to ${CONCIERGE_DAILY_CAP_MAX}, got ${process.env.CONCIERGE_DAILY_CAP ?? ""}`,
     );
   }
+  const agentChatDailyTurns = Number(process.env.AGENT_CHAT_DAILY_TURNS ?? 40);
+  if (
+    !Number.isInteger(agentChatDailyTurns) ||
+    agentChatDailyTurns < 0 ||
+    agentChatDailyTurns > 1000
+  )
+    throw new Error("AGENT_CHAT_DAILY_TURNS must be an integer from 0 to 1000");
   return {
     databaseUrl,
     baseDomain: process.env.BASE_DOMAIN ?? "lab.example.test",
@@ -139,5 +148,6 @@ export function getEnv(): ApiEnv {
     showcase,
     openrouterApiKey: process.env.OPENROUTER_API_KEY || null,
     conciergeDailyCap,
+    agentChatDailyTurns,
   };
 }
