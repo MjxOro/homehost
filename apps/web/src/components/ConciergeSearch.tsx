@@ -12,7 +12,7 @@ import {
   requestableRecipe,
   sshKeyError,
 } from "../lib/request-input";
-import { ArrowRightIcon, SearchIcon, Spinner } from "./icons";
+import { ArrowRightIcon, SparklesIcon, Spinner } from "./icons";
 import {
   BUTTON_GHOST_SM,
   BUTTON_PRIMARY,
@@ -253,7 +253,7 @@ export function ConciergeSearch() {
         }}
       >
         <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-3" />
+          <SparklesIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-accent" />
           <input
             ref={concierge.inputRef}
             id="ask-text"

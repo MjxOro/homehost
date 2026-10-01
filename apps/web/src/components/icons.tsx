@@ -215,11 +215,12 @@ export function DashboardIcon(props: IconProps) {
   );
 }
 
-export function SearchIcon(props: IconProps) {
+/** AI marker: one large four-point star and one small one. */
+export function SparklesIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
+      <path d="M10 4.5c0 4.6 1.9 7.5 6.5 7.5-4.6 0-6.5 2.9-6.5 7.5 0-4.6-1.9-7.5-6.5-7.5 4.6 0 6.5-2.9 6.5-7.5Z" />
+      <path d="M18 2.5c0 2.1.9 3.5 3 3.5-2.1 0-3 1.4-3 3.5 0-2.1-.9-3.5-3-3.5 2.1 0 3-1.4 3-3.5Z" />
     </svg>
   );
 }
