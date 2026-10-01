@@ -5,13 +5,7 @@ import { z } from "zod";
 import type { Database } from "../db/client.js";
 import * as schema from "../db/schema.js";
 import type { ApiEnv, OAuthProviderConfig } from "../env.js";
-import {
-  clearStateCookieHeader,
-  getStateCookie,
-  sessionCookie,
-  SESSION_MAX_AGE_S,
-  stateCookie,
-} from "./cookies.js";
+import { SESSION_MAX_AGE_S, type CookiePolicy } from "./cookies.js";
 
 const ProviderParams = z.object({ provider: z.enum(["google", "github"]) });
 const CallbackQuery = z.object({
@@ -153,6 +147,7 @@ export function registerOAuth(
   app: FastifyInstance,
   db: Database,
   env: ApiEnv,
+  cookies: CookiePolicy,
 ): void {
   if (!env.google && !env.github) return;
 
@@ -167,7 +162,7 @@ export function registerOAuth(
         return sendErr(reply, 404, "provider not configured", "not_found");
       const def = PROVIDERS[params.data.provider];
       const state = randomBytes(16).toString("hex");
-      reply.header("Set-Cookie", stateCookie(state));
+      reply.header("Set-Cookie", cookies.state(state));
       const url = new URL(def.authorize);
       url.searchParams.set("client_id", config.clientId);
       url.searchParams.set(
@@ -192,8 +187,8 @@ export function registerOAuth(
       const config = configFor(env, params.data.provider);
       if (!config)
         return sendErr(reply, 404, "provider not configured", "not_found");
-      const expected = getStateCookie(req);
-      reply.header("Set-Cookie", clearStateCookieHeader());
+      const expected = cookies.getState(req.headers.cookie);
+      reply.header("Set-Cookie", cookies.clearState());
       const a = Buffer.from(query.data.state);
       const b = Buffer.from(expected ?? "");
       if (!expected || a.length !== b.length || !timingSafeEqual(a, b)) {
@@ -288,7 +283,7 @@ export function registerOAuth(
         userId: user.id,
         expiresAt: new Date(Date.now() + SESSION_MAX_AGE_S * 1000),
       });
-      reply.header("Set-Cookie", sessionCookie(token));
+      reply.header("Set-Cookie", cookies.session(token));
       return reply.redirect(`${env.appOrigin}/`);
     },
   );

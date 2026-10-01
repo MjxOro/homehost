@@ -1,6 +1,8 @@
 # Same-origin static + /api reverse proxy. Traefik points at :80; the browser
 # never talks to the api container directly, so session cookies stay first-party.
 :80 {
+	# Panel only: tenant subdomains may serve plain HTTP. Prod image only.
+	header Strict-Transport-Security "max-age=31536000"
 	handle /api/* {
 		reverse_proxy homehost-prod-api-1:3000
 	}

@@ -80,12 +80,7 @@ import {
 } from "./domain/request-validation.js";
 import { lookupAddress } from "./domain/ipAssignments.js";
 
-import {
-  clearedSessionCookie,
-  sessionCookie,
-  SESSION_COOKIE,
-  SESSION_MAX_AGE_S,
-} from "./auth/cookies.js";
+import { createCookiePolicy, SESSION_MAX_AGE_S } from "./auth/cookies.js";
 import { registerOAuth } from "./auth/oauth.js";
 
 const DEMO_PERSONAS: DemoPersona[] = [
@@ -379,6 +374,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   // Showcase safety gates always apply, including smoke-injected instances.
   const env = getEnv();
   const baseDomain = opts?.baseDomain ?? env.baseDomain;
+  const cookies = createCookiePolicy(opts?.appOrigin ?? env.appOrigin);
   const allowedOrigins = new Set([
     new URL(opts?.appOrigin ?? env.appOrigin).origin,
     ...(opts?.appExtraOrigins ?? env.appExtraOrigins).map(
@@ -452,18 +448,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   async function resolveSessionCookie(
     header: string | null | undefined,
   ): Promise<Session | null> {
-    let token: string | null = null;
-    if (header) {
-      for (const part of header.split(";")) {
-        const idx = part.indexOf("=");
-        if (idx >= 0 && part.slice(0, idx).trim() === SESSION_COOKIE) {
-          // Minted tokens are 64 lowercase hex chars; never percent-decode untrusted input.
-          token = part.slice(idx + 1).trim();
-          break;
-        }
-      }
-    }
-    return sessionFromToken(token);
+    return sessionFromToken(cookies.getSession(header ?? undefined));
   }
 
   async function resolveSession(req: FastifyRequest): Promise<Session | null> {
@@ -631,7 +616,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       userId: u.id,
       expiresAt: new Date(now.getTime() + SESSION_MAX_AGE_S * 1000),
     });
-    reply.header("Set-Cookie", sessionCookie(token));
+    reply.header("Set-Cookie", cookies.session(token));
     return {
       mode: env.showcase ? "showcase" : "live",
       user: {
@@ -655,11 +640,11 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     }
     // Clearing lives in the successful handler, never in a global hook that also
     // fires for denied cross-site logout attempts.
-    reply.header("Set-Cookie", clearedSessionCookie());
+    reply.header("Set-Cookie", cookies.clearSession());
     return { ok: true };
   });
 
-  registerOAuth(app, db, env);
+  registerOAuth(app, db, env, cookies);
 
   app.post("/api/invites", async (req, reply) => {
     const session = await resolveSession(req);
