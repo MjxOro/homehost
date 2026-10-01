@@ -7,16 +7,17 @@ import {
 } from "react";
 import {
   SUGGEST_TEXT_MAX,
+  SECRET_GUARD_COPY,
+  containsSecret,
   type OfferedUseCaseId,
   type Plan,
   type RecipeId,
   type SuggestBody,
-  type SuggestPicks,
   type Suggestion,
-  type SuggestionChoice,
 } from "@homehost/shared";
 import { isApiError } from "../lib/api";
 import {
+  DOCKER_SETUP_COPY,
   notOfferedCopy,
   recipeLabel,
   REFUSED_COPY,
@@ -54,12 +55,6 @@ export type SuggestedResult = Extract<Suggestion, { outcome: "suggested" }>;
 // load so every concierge surface falls back without asking again.
 let conciergeUnavailable = false;
 
-const QUESTION: Record<SuggestionChoice["slot"], string> = {
-  use_case: "What's it mainly for?",
-  plan: "Which size fits best?",
-  recipe: "What should it run?",
-};
-
 const INPUT_FIELD =
   "min-h-11 w-full rounded-control border border-line-strong bg-ink-2 px-3 py-2.5 text-[14.5px] text-text-1 transition-colors duration-(--duration-fast) ease-out-quint placeholder:text-text-3 focus:border-accent aria-invalid:border-bad disabled:opacity-60";
 const FIELD_HINT = "m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-text-3";
@@ -74,47 +69,6 @@ const RESULT_COPY = "m-0 text-[13.5px] leading-[1.55] text-text-2";
 const NOTE =
   "m-0 flex items-start gap-2 text-[13px] leading-[1.55] text-text-2 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-text-3";
 export const ACTIONS = "flex flex-wrap gap-2.5";
-
-interface ChoiceOption {
-  id: string;
-  label: string;
-  detail: string | null;
-  picks: SuggestPicks;
-}
-
-function choiceOptions(
-  choice: SuggestionChoice,
-  plans: readonly Plan[],
-): ChoiceOption[] {
-  switch (choice.slot) {
-    case "use_case":
-      return choice.options.map((o) => ({
-        id: o.id,
-        label: useCaseLabel(o.id),
-        detail: null,
-        picks: { useCase: o.id },
-      }));
-    case "plan":
-      return choice.options.map((o) => {
-        const plan = plans.find((p) => p.id === o.id);
-        return {
-          id: o.id,
-          label: plan?.name ?? o.label,
-          detail: plan ? formatPlanSpecs(plan) : null,
-          picks: { planId: o.id },
-        };
-      });
-    case "recipe":
-      return choice.options.map((o) => ({
-        id: o.id,
-        label: recipeLabel(o.id),
-        detail: null,
-        picks: { recipeId: o.id },
-      }));
-    default:
-      return [];
-  }
-}
 
 export function Notes({ items }: { items: string[] }) {
   if (items.length === 0) return null;
@@ -160,6 +114,11 @@ export function SuggestionSpecs({
         {recipeComingSoon(result.recipeId)
           ? `Plain Ubuntu (${recipeLabel(result.recipeId)} coming soon)`
           : recipeLabel(result.recipeId)}
+        {result.recipeId === "docker" ? (
+          <p className="m-0 mt-1 text-[12.5px] leading-[1.5] text-text-3">
+            {DOCKER_SETUP_COPY}
+          </p>
+        ) : null}
       </Spec>
     </dl>
   );
@@ -242,7 +201,6 @@ export interface Concierge<T extends HTMLElement = HTMLElement> {
   resultRef: FocusRef;
   /** Ask about `value` (defaults to the typed text). */
   submit: (value?: string) => void;
-  answer: (picks: SuggestPicks) => void;
   retry: () => void;
   startOver: () => void;
 }
@@ -257,11 +215,12 @@ export function useConcierge<T extends HTMLElement>(
   const [result, setResult] = useState<Suggestion | null>(null);
   // Bumped on every settled call: re-keys the result so it fades in again.
   const [seq, setSeq] = useState(0);
+  const [secretError, setSecretError] = useState<Error | null>(null);
   const inputRef = useRef<T>(null);
   const resultFocus = useRef<HTMLElement | null>(null);
   const focusResult = useRef(false);
 
-  // Answering a question or retrying replaces the control that had focus;
+  // Retrying replaces the control that had focus;
   // hand focus to the new result instead of dropping it on <body>.
   useEffect(() => {
     if (!focusResult.current) return;
@@ -273,6 +232,11 @@ export function useConcierge<T extends HTMLElement>(
 
   const run = (body: SuggestBody, fromResult: boolean) => {
     if (busy || disabled || unavailable) return;
+    if (containsSecret(body.text)) {
+      setSecretError(new Error(SECRET_GUARD_COPY));
+      return;
+    }
+    setSecretError(null);
     focusResult.current = fromResult;
     setLastBody(body);
     suggest.mutate(body, {
@@ -297,7 +261,7 @@ export function useConcierge<T extends HTMLElement>(
     busy,
     unavailable,
     result,
-    error: suggest.isError ? suggest.error : null,
+    error: secretError ?? (suggest.isError ? suggest.error : null),
     lastBody,
     seq,
     inputRef,
@@ -310,17 +274,11 @@ export function useConcierge<T extends HTMLElement>(
       setResult(null);
       run({ text: trimmed }, false);
     },
-    answer: (picks) => {
-      if (!lastBody) return;
-      run(
-        { text: lastBody.text, picks: { ...lastBody.picks, ...picks } },
-        true,
-      );
-    },
     retry: () => {
       if (lastBody) run(lastBody, true);
     },
     startOver: () => {
+      setSecretError(null);
       suggest.reset();
       setResult(null);
       setLastBody(null);
@@ -333,9 +291,9 @@ export function useConcierge<T extends HTMLElement>(
 export type FocusRef = (node: HTMLElement | null) => void;
 
 /**
- * The concierge's answer: a question, a refusal, an error, or (through
+ * The concierge's answer: a refusal, an error, or (through
  * `suggested`) the page's own card for a finished suggestion. Renders nothing
- * before the first question.
+ * before the first request.
  */
 export function ConciergeResult({
   concierge,
@@ -349,8 +307,6 @@ export function ConciergeResult({
   manualAction: ReactNode;
   suggested: (result: SuggestedResult, headingRef: FocusRef) => ReactNode;
 }) {
-  const plansQuery = usePlans();
-  const plans = plansQuery.data ?? [];
   const { busy, error, result, seq, lastBody, resultRef } = concierge;
 
   const startOverButton = (
@@ -409,50 +365,6 @@ export function ConciergeResult({
   switch (result.outcome) {
     case "suggested":
       return <div key={seq}>{suggested(result, resultRef)}</div>;
-    case "choose": {
-      const options = choiceOptions(result.choice, plans);
-      if (options.length === 0) return null;
-      const questionId = `setup-question-${seq}`;
-      return (
-        <div key={seq} className={RESULT_CARD}>
-          <h3
-            id={questionId}
-            className={RESULT_TITLE}
-            tabIndex={-1}
-            ref={resultRef}
-          >
-            {QUESTION[result.choice.slot]}
-          </h3>
-          <div
-            role="group"
-            aria-labelledby={questionId}
-            className="flex flex-wrap gap-2.5"
-          >
-            {options.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={`${BUTTON_OUTLINE_SM} ${BUSY} max-w-full`}
-                disabled={disabled}
-                aria-disabled={busy || undefined}
-                onClick={() => concierge.answer(option.picks)}
-              >
-                <span className="flex min-w-0 flex-col items-start text-left">
-                  <span>{option.label}</span>
-                  {option.detail ? (
-                    <span className="text-[12.5px] font-normal text-text-3">
-                      {option.detail}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            ))}
-          </div>
-          <Notes items={warningCopy(result.warnings)} />
-          <div className={ACTIONS}>{startOverButton}</div>
-        </div>
-      );
-    }
     case "not_offered":
       return (
         <div key={seq} className={RESULT_CARD}>

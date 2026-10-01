@@ -97,6 +97,8 @@ export interface ServerRequest {
 
 /** Body of POST /api/requests. */
 export interface CreateRequestInput {
+  /** Link a user-confirmed chat proposal; never supplied by the model. */
+  agentProposalId?: string;
   name: string;
   planId: string;
   desktopEnv?: DesktopEnv;

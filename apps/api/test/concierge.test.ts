@@ -6,7 +6,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { Effect, Either } from "effect";
 import type { FastifyInstance } from "fastify";
 import { Suggestion } from "@homehost/shared";
-import type { PortalUser } from "@homehost/shared";
+import type {
+  PortalUser,
+  RecipeId,
+  TrustTier,
+  UseCaseId,
+} from "@homehost/shared";
 import { buildApp } from "../src/app.js";
 import * as schema from "../src/db/schema.js";
 import type { Database } from "../src/db/client.js";
@@ -57,9 +62,14 @@ function fakeTransport(replies: Reply[]) {
 interface JevOverrides {
   isEnglish?: number;
   useCaseConfidence?: number;
+  useCaseChoice?: UseCaseId;
+  useCaseProbabilities?: Partial<Record<UseCaseId, number>>;
   planChoice?: string;
   planConfidence?: number;
   recipeConfidence?: number;
+  recipeChoice?: RecipeId;
+  recipeProbabilities?: Partial<Record<RecipeId, number>>;
+  wantsGui?: number;
   abuse?: number;
   cost?: number;
 }
@@ -75,8 +85,11 @@ function jevBody(o: JevOverrides = {}) {
     answers: {
       use_case: {
         type: "choice",
-        choice: "game_server",
-        probabilities: { game_server: 0.93, always_on: 0.04 },
+        choice: o.useCaseChoice ?? "game_server",
+        probabilities: o.useCaseProbabilities ?? {
+          game_server: 0.93,
+          always_on: 0.04,
+        },
         confidence: o.useCaseConfidence ?? 0.93,
       },
       plan: {
@@ -87,11 +100,14 @@ function jevBody(o: JevOverrides = {}) {
       },
       recipe: {
         type: "choice",
-        choice: "minecraft_java",
-        probabilities: { minecraft_java: 0.9, minecraft_bedrock: 0.08 },
+        choice: o.recipeChoice ?? "minecraft_java",
+        probabilities: o.recipeProbabilities ?? {
+          minecraft_java: 0.9,
+          minecraft_bedrock: 0.08,
+        },
         confidence: o.recipeConfidence ?? 0.9,
       },
-      wants_gui: { type: "noul", noul: 0.02 },
+      wants_gui: { type: "noul", noul: o.wantsGui ?? 0.02 },
       console_player: { type: "noul", noul: 0.03 },
       abuse: { type: "noul", noul: o.abuse ?? 0.01 },
       scraping: { type: "noul", noul: 0.02 },
@@ -317,21 +333,66 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
     expect(t.calls).toHaveLength(1);
   });
 
-  test("an unsure plan or recipe also triggers the translation", async () => {
-    for (const unsure of [{ planConfidence: 0.2 }, { recipeConfidence: 0.2 }]) {
-      const user = await newUser("technical");
-      const t = fakeTransport([
-        jevReply({ isEnglish: 0.01, ...unsure }),
-        chatReply("a minecraft server"),
-        jevReply(),
-      ]);
+  test("an unsure non-English game triggers one translation even when the retry stays unsure", async () => {
+    const t = fakeTransport([
+      jevReply({ isEnglish: 0.01, recipeConfidence: 0.2 }),
+      chatReply("a minecraft server"),
+      jevReply({
+        isEnglish: 0.01,
+        useCaseConfidence: 0.2,
+        recipeConfidence: 0.2,
+      }),
+    ]);
+    const result = await succeeds(
+      { user: await newUser("technical"), text: "un serveur minecraft" },
+      config(t.fetch),
+    );
+    expect(result).toMatchObject({
+      outcome: "suggested",
+      recipeId: "minecraft_java",
+      translated: true,
+    });
+    expect(t.calls).toHaveLength(3);
+  });
+
+  test("plan uncertainty and non-game recipe uncertainty do not trigger translation", async () => {
+    for (const overrides of [
+      { planConfidence: 0.2 },
+      { useCaseChoice: "always_on" as const, recipeConfidence: 0.2 },
+      {
+        useCaseChoice: "remote_desktop" as const,
+        recipeConfidence: 0.2,
+        planConfidence: 0.2,
+      },
+    ]) {
+      const t = fakeTransport([jevReply({ isEnglish: 0.01, ...overrides })]);
       const result = await succeeds(
-        { user, text: "un serveur minecraft" },
+        { user: await newUser("technical"), text: "un serveur" },
         config(t.fetch),
       );
-      expect(result.translated).toBe(true);
-      expect(t.calls).toHaveLength(3);
+      expect(result).toMatchObject({ outcome: "suggested", translated: false });
+      expect(t.calls).toHaveLength(1);
     }
+  });
+
+  test("a confident not-offered use case never translates an unsure game", async () => {
+    const t = fakeTransport([
+      jevReply({
+        isEnglish: 0.01,
+        useCaseChoice: "not_offered",
+        recipeConfidence: 0.2,
+      }),
+    ]);
+    const result = await succeeds(
+      { user: await newUser(), text: "un serveur Windows" },
+      config(t.fetch),
+    );
+    expect(result).toMatchObject({
+      outcome: "not_offered",
+      reason: "unsupported_use_case",
+      translated: false,
+    });
+    expect(t.calls).toHaveLength(1);
   });
 
   test("a refusal on the original text is final and never translated", async () => {
@@ -574,8 +635,8 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
   describe("POST /api/concierge/suggest", () => {
     let app: FastifyInstance | null = null;
 
-    async function approvedCookie(): Promise<string> {
-      const user = await newUser();
+    async function approvedCookie(tier: TrustTier): Promise<string> {
+      const user = await newUser(tier);
       const token = randomBytes(32).toString("hex");
       const tokenHash = createHash("sha256").update(token).digest("hex");
       await client`INSERT INTO sessions (token_hash, user_id, expires_at)
@@ -586,13 +647,14 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
     async function post(
       concierge: ConciergeConfig | null,
       payload: unknown,
+      tier: TrustTier = "nontechnical",
     ): Promise<{ status: number; body: Record<string, unknown> }> {
       if (app) await app.close();
       app = buildApp({ db, concierge });
       const response = await app.inject({
         method: "POST",
         url: "/api/concierge/suggest",
-        headers: { cookie: await approvedCookie() },
+        headers: { cookie: await approvedCookie(tier) },
         payload: payload as Record<string, unknown>,
       });
       return { status: response.statusCode, body: response.json() };
@@ -610,29 +672,139 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       expect(JSON.parse(t.calls[0]!.body).state.request).toBe("minecraft");
     });
 
-    test("picks resolve an earlier question; ineligible picks are rejected", async () => {
-      const t = fakeTransport([jevReply({ useCaseConfidence: 0.2 })]);
-      const unsure = await post(config(t.fetch), { text: "something fun" });
-      expect(unsure.body).toMatchObject({
-        outcome: "choose",
-        choice: { slot: "use_case" },
-      });
-      const again = fakeTransport([jevReply({ useCaseConfidence: 0.2 })]);
-      const picked = await post(config(again.fetch), {
-        text: "something fun",
-        picks: { useCase: "game_server" },
-      });
-      expect(picked.body).toMatchObject({
+    test("unsure requests produce complete defaults without a follow-up", async () => {
+      const t = fakeTransport([
+        jevReply({
+          useCaseChoice: "not_offered",
+          useCaseConfidence: 0.2,
+          useCaseProbabilities: {
+            not_offered: 0.4,
+            website: 0.3,
+            dev_box: 0.2,
+          },
+          planConfidence: 0.2,
+          recipeConfidence: 0.2,
+        }),
+      ]);
+      const res = await post(config(t.fetch), { text: "something to run" });
+      expect(res.status).toBe(200);
+      expect(Suggestion.parse(res.body)).toMatchObject({
         outcome: "suggested",
-        useCase: "game_server",
+        useCase: "website",
+        planId: "container-small",
+        recipeId: "docker",
       });
-      const none = fakeTransport([]);
-      const locked = await post(config(none.fetch), {
+      expect(t.calls).toHaveLength(1);
+    });
+
+    test("non-game helpers use Docker on the smallest fitting plan in both tiers", async () => {
+      for (const tier of ["technical", "nontechnical"] as const) {
+        for (const useCaseChoice of [
+          "always_on",
+          "website",
+          "dev_box",
+          "learn_linux",
+        ] as const) {
+          const t = fakeTransport([
+            jevReply({
+              useCaseChoice,
+              planConfidence: 0.2,
+              recipeChoice: "python",
+            }),
+          ]);
+          const res = await post(config(t.fetch), { text: "my app" }, tier);
+          expect(res.status).toBe(200);
+          expect(Suggestion.parse(res.body)).toMatchObject({
+            outcome: "suggested",
+            useCase: useCaseChoice,
+            planId: "container-small",
+            recipeId: "docker",
+          });
+        }
+      }
+    });
+
+    test("an unsure game uses only game probabilities and keeps coming-soon recipes", async () => {
+      const t = fakeTransport([
+        jevReply({
+          recipeChoice: "node",
+          recipeConfidence: 0.2,
+          recipeProbabilities: { node: 0.7, valheim: 0.2, minecraft_java: 0.1 },
+        }),
+      ]);
+      const res = await post(config(t.fetch), { text: "a game with friends" });
+      expect(res.status).toBe(200);
+      expect(Suggestion.parse(res.body)).toMatchObject({
+        outcome: "suggested",
+        recipeId: "valheim",
+        planId: "container-small",
+      });
+    });
+
+    test("remote desktops use desktop plans and no extra software", async () => {
+      const t = fakeTransport([
+        jevReply({
+          useCaseChoice: "remote_desktop",
+          planConfidence: 0.2,
+          recipeChoice: "docker",
+        }),
+      ]);
+      const res = await post(
+        config(t.fetch),
+        { text: "a desktop in my browser" },
+        "technical",
+      );
+      expect(res.status).toBe(200);
+      expect(Suggestion.parse(res.body)).toMatchObject({
+        outcome: "suggested",
+        planId: "desktop-ubuntu",
+        recipeId: "none",
+      });
+    });
+
+    test("a confident VM plan for a bot is never shrunk", async () => {
+      const t = fakeTransport([
+        jevReply({ useCaseChoice: "always_on", planChoice: "vm-medium" }),
+      ]);
+      const res = await post(
+        config(t.fetch),
+        { text: "a busy bot" },
+        "technical",
+      );
+      expect(res.status).toBe(200);
+      expect(Suggestion.parse(res.body)).toMatchObject({
+        outcome: "suggested",
+        planId: "vm-medium",
+        recipeId: "docker",
+      });
+    });
+
+    test("unsupported uses and workloads with no eligible fit stay not offered", async () => {
+      for (const [overrides, reason] of [
+        [{ useCaseChoice: "not_offered" }, "unsupported_use_case"],
+        [{ useCaseChoice: "remote_desktop" }, "tier_locked"],
+        [{ planChoice: "none" }, "no_fitting_plan"],
+      ] as const) {
+        const t = fakeTransport([jevReply(overrides)]);
+        const res = await post(config(t.fetch), { text: "a server" });
+        expect(res.status).toBe(200);
+        expect(Suggestion.parse(res.body)).toMatchObject({
+          outcome: "not_offered",
+          reason,
+          planId: null,
+          recipeId: null,
+        });
+      }
+    });
+
+    test("legacy picks are invalid and never reach the provider", async () => {
+      const unused = fakeTransport([]);
+      const res = await post(config(unused.fetch), {
         text: "a bot",
-        picks: { planId: "vm-medium" },
+        picks: { planId: "container-small" },
       });
-      expect(locked).toMatchObject({ status: 400, body: { code: "invalid" } });
-      expect(none.calls).toHaveLength(0);
+      expect(res).toMatchObject({ status: 400, body: { code: "invalid" } });
+      expect(unused.calls).toHaveLength(0);
     });
 
     test("maps unavailable, invalid, cap and upstream to stable codes", async () => {

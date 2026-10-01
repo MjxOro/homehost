@@ -27,8 +27,8 @@ describe("recipe request validation", () => {
     }
   });
 
-  test("VM-only recipes are refused on a container plan only", () => {
-    expect(recipeRequestProblem(container, "docker", undefined)).not.toBeNull();
+  test("Docker can be requested on container and VM plans", () => {
+    expect(recipeRequestProblem(container, "docker", undefined)).toBeNull();
     expect(recipeRequestProblem(vm, "docker", undefined)).toBeNull();
   });
 

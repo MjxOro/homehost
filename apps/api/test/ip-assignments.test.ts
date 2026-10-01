@@ -238,7 +238,7 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
 
   afterEach(async () => {
     if (!client) return;
-    await client`TRUNCATE ip_assignments, provision_jobs, activity_events, server_requests`;
+    await client`TRUNCATE agent_messages, agent_conversations, ip_assignments, provision_jobs, activity_events, server_requests`;
     if (fixtureIds.length)
       await client`DELETE FROM users WHERE id = ANY(${fixtureIds})`;
     fixtureIds = [];
@@ -387,7 +387,7 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
   test("history does not block live-table truncation and has no foreign keys", async () => {
     const owner = await fixture();
     await assign(owner);
-    await client`TRUNCATE provision_jobs, activity_events, server_requests`;
+    await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests`;
     expect((await lookup())[0]?.userId).toBe(owner.userId);
     const keys =
       await client`SELECT 1 FROM pg_constraint WHERE conrelid = 'ip_assignments'::regclass AND contype = 'f'`;

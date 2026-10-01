@@ -1,5 +1,6 @@
 import {
   RECIPES,
+  SECRET_GUARD_COPY,
   USE_CASES,
   type NotOfferedReason,
   type OfferedUseCaseId,
@@ -28,6 +29,11 @@ export function useCaseLabel(id: string): string {
 export function recipeLabel(id: string): string {
   return lookup(RECIPES, id)?.label ?? id;
 }
+
+export const DOCKER_SETUP_COPY =
+  "Ready for your app or bot. Once it's running, go to your servers list to get started.";
+export const DOCKER_READY_COPY =
+  "Docker is ready for your app or bot. Go to your servers list to get started.";
 
 const WARNING_COPY: Record<WarningCode, string> = {
   console_not_supported:
@@ -99,7 +105,11 @@ export function suggestErrorCopy(error: unknown): {
   message: string;
   retry: boolean;
 } {
+  if (error instanceof Error && error.message === SECRET_GUARD_COPY)
+    return { message: SECRET_GUARD_COPY, retry: false };
   if (isApiError(error)) {
+    if (error.code === "secret_detected")
+      return { message: SECRET_GUARD_COPY, retry: false };
     if (error.status === 429)
       return {
         message:

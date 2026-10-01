@@ -1,4 +1,6 @@
 import type {
+  AgentConversation,
+  AgentConversationSummary,
   ApprovalResponse,
   CreateRequestInput,
   CredentialsResponse,
@@ -67,6 +69,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const jsonHeaders = { "Content-Type": "application/json" };
 
 export const api = {
+  createConversation: (text: string): Promise<AgentConversation> =>
+    request("/api/agent/conversations", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ text }),
+    }),
+  listConversations: (): Promise<AgentConversationSummary[]> =>
+    request("/api/agent/conversations"),
+  getConversation: (id: string): Promise<AgentConversation> =>
+    request(`/api/agent/conversations/${encodeURIComponent(id)}`),
+  agentTurn: (id: string, text?: string): Promise<AgentConversation> =>
+    request(`/api/agent/conversations/${encodeURIComponent(id)}/turns`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(text === undefined ? {} : { text }),
+    }),
+
   getSession: (): Promise<SessionResponse> => request("/api/session"),
 
   switchPersona: (personaId: string): Promise<SessionResponse> =>
