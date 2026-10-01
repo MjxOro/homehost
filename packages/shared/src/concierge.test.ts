@@ -301,7 +301,7 @@ describe("decideSuggestion", () => {
       ]);
     });
 
-    test("recipe options skip setups no eligible plan can run", () => {
+    test("recipe options include Docker on a container plan", () => {
       const d = decideSuggestion(
         answers({
           ...bot,
@@ -313,30 +313,37 @@ describe("decideSuggestion", () => {
         nontechnical,
       );
       expect(chosen(d).options.map((o) => o.id)).toEqual([
+        "docker",
         "node",
         "python",
-        "none",
       ]);
     });
 
-    test("a VM-only recipe upgrades a container plan to the smallest headless VM", () => {
+    test("Docker leaves a container plan unchanged", () => {
       const d = suggested(
         decideSuggestion(
           answers({ ...bot, recipe: { choice: "docker" } }),
           technical,
         ),
       );
-      expect(d).toMatchObject({ planId: "vm-medium", recipeId: "docker" });
-      expect(d.warnings).toEqual(["upgraded_for_recipe"]);
+      expect(d).toMatchObject({
+        planId: "container-small",
+        recipeId: "docker",
+      });
+      expect(d.warnings).toEqual([]);
     });
 
-    test("a VM-only recipe without an eligible VM is tier locked", () => {
+    test("Docker is available to nontechnical accounts", () => {
       expect(
         decideSuggestion(
           answers({ ...bot, recipe: { choice: "docker" } }),
           nontechnical,
         ),
-      ).toMatchObject({ outcome: "not_offered", reason: "tier_locked" });
+      ).toMatchObject({
+        outcome: "suggested",
+        planId: "container-small",
+        recipeId: "docker",
+      });
     });
 
     test("a desktop plan for a headless workload moves to a headless plan without shrinking", () => {
@@ -366,7 +373,7 @@ describe("decideSuggestion", () => {
         ),
       );
       // The desktop was already a VM: moving off it is not an upgrade.
-      expect(docker).toMatchObject({ planId: "vm-medium", warnings: [] });
+      expect(docker).toMatchObject({ planId: "container-small", warnings: [] });
       const wanted = decideSuggestion(
         answers({
           use_case: { choice: "dev_box" },
@@ -397,13 +404,16 @@ describe("decideSuggestion", () => {
   });
 
   describe("picks", () => {
-    test("a picked plan is never rewritten; an incompatible recipe is asked again", () => {
+    test("a picked container plan can run Docker", () => {
       const d = decideSuggestion(
         answers({ ...bot, recipe: { choice: "docker" } }),
         { ...technical, picks: { planId: "container-small" } },
       );
-      expect(d).toMatchObject({ planId: "container-small", recipeId: null });
-      expect(chosen(d).options.map((o) => o.id)).not.toContain("docker");
+      expect(d).toMatchObject({
+        outcome: "suggested",
+        planId: "container-small",
+        recipeId: "docker",
+      });
     });
 
     test("picked plan and recipe are final and need no upgrade", () => {
@@ -433,7 +443,7 @@ describe("decideSuggestion", () => {
         [{ planId: "container-small" }, "nontechnical", false],
         [{ planId: "vm-medium" }, "nontechnical", true],
         [{ planId: "desktop-omarchy" }, "technical", true],
-        [{ planId: "container-small", recipeId: "docker" }, "technical", true],
+        [{ planId: "container-small", recipeId: "docker" }, "technical", false],
         [{ planId: "vm-medium", recipeId: "docker" }, "technical", false],
       ];
       for (const [picks, tier, rejected] of cases) {

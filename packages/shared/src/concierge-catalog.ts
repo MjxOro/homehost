@@ -148,7 +148,7 @@ export const RECIPES: Record<
   docker: {
     label: "Docker",
     description: "Docker engine to run containerized apps",
-    requiresVm: true,
+    requiresVm: false,
     game: false,
     installable: true,
     eula: null,

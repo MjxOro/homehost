@@ -105,7 +105,6 @@ describe.skipIf(!databaseUrl)("setup recipes on requests", () => {
         recipeId: "minecraft_java",
         eulaAccepted: false,
       },
-      { planId: "container-small", recipeId: "docker" },
       { planId: "container-small", recipeId: "valheim" },
       { planId: "container-small", recipeId: "code_server" },
       { planId: "container-small", recipeId: "minecraft_bedrock" },
@@ -169,7 +168,7 @@ describe.skipIf(!databaseUrl)("setup recipes on requests", () => {
     }
   });
 
-  test("license-free recipes never record a EULA; VM-only recipes work on a VM plan", async () => {
+  test("license-free recipes never record a EULA", async () => {
     const node = await create(alice, {
       planId: "container-small",
       recipeId: "node",
@@ -187,6 +186,21 @@ describe.skipIf(!databaseUrl)("setup recipes on requests", () => {
     expect(docker.statusCode).toBe(201);
     expect(docker.json<ServerRequest>().recipeId).toBe("docker");
     expect(docker.json<ServerRequest>().setupStatus).toBe("pending");
+  });
+
+  test("a nontechnical account can request Docker on a container", async () => {
+    const response = await create(alice, {
+      planId: "container-small",
+      recipeId: "docker",
+    });
+    expect(response.statusCode).toBe(201);
+    const created = response.json<ServerRequest>();
+    expect(created).toMatchObject({
+      planId: "container-small",
+      recipeId: "docker",
+      setupStatus: "pending",
+    });
+    expect((await storedSetup(created.id)).eula_accepted_at).toBeNull();
   });
 
   test("players get the hostname only once a game recipe finished setup", async () => {

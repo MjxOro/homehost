@@ -779,6 +779,7 @@ async function handleProvision(job: Job): Promise<void> {
       `root,size=${plan.diskGb}GiB`,
     ];
     if (plan.kind === "vm") args.push("--vm");
+    else args.push("-c", "security.nesting=true");
     // SSH access for every plan: VMs via cloud-init user-data at launch,
     // containers via incus-exec sshd setup after boot (they ignore
     // cloud-init). Access is decided at launch: deleted-while-queued

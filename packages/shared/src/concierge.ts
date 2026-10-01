@@ -23,7 +23,7 @@ import { PLANS, type Plan } from "./plans.js";
 /** Shape of the `Suggestion` JSON. Bump on breaking contract changes. */
 export const CONCIERGE_SCHEMA_VERSION = 1;
 /** Bump whenever a rule, threshold, question or catalog change can alter a suggestion. */
-export const CONCIERGE_RULES_VERSION = "2026-10-01.1";
+export const CONCIERGE_RULES_VERSION = "2026-10-01.2";
 
 /** Extra Jev plan option meaning "nothing in PLANS fits". */
 export const PLAN_NONE = "none";

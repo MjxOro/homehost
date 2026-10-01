@@ -10,8 +10,7 @@ idempotent step scripts. The box stays usable over SSH the whole time;
 
 `POST /api/requests` accepts `recipeId` (any id in `RECIPE_IDS`) and
 `eulaAccepted`. It answers `400 invalid` when the recipe is not installable
-yet ("coming soon": `code_server`, `minecraft_bedrock`, `valheim`), when it
-needs a VM and the plan is a container (`docker`), or when it has a license
+yet ("coming soon": `code_server`, `minecraft_bedrock`, `valheim`), or when it has a license
 and `eulaAccepted` is not `true` (`minecraft_java`). `none` or no `recipeId`
 is plain Ubuntu.
 
@@ -36,6 +35,11 @@ just the hostname: the default port 25565 needs no suffix. Players need IPv6.
 | `minecraft_java` | `update_packages`, `install_java`, `download_minecraft`, `configure_minecraft`, `start_service`, `wait_ready` | Latest official Minecraft Java server as `minecraft.service`, in a `screen` session |
 
 Every recipe also adds a fixed line to `/etc/motd` saying what was installed.
+
+Docker runs on container and VM plans. New Incus containers are launched with
+`security.nesting=true` so Docker can run inside the guest; VMs keep their
+existing launch configuration. The host must have an Incus version that
+supports nested Docker correctly. Guests never receive the host Docker socket.
 
 All steps run apt non-interactively, wait for cloud-init (`cloud-init status
 --wait`) and the dpkg lock first, and force IPv4 for apt and `curl -4`
