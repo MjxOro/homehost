@@ -31,12 +31,14 @@ export function desktopBridgeScript(origins: string[]) {
       const data = event.data;
       if (event.source !== parent || !origins.includes(event.origin) || !data || data.channel !== channel) return;
       if (data.type === 'focus') {
-        const canvas = document.querySelector('canvas');
+        const canvas = document.querySelector('#noVNC_container canvas[tabindex]');
         if (canvas) canvas.focus();
         return;
       }
       if (data.type !== 'keys' || !Array.isArray(data.events) || data.events.length > 8) return;
-      const target = document.activeElement || document.body;
+      const target = document.querySelector('#noVNC_container canvas[tabindex]');
+      if (!target) return;
+      target.focus();
       sending = true;
       try {
         for (const key of data.events) {

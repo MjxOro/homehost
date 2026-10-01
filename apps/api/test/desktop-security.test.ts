@@ -13,10 +13,17 @@ import { readdir, readFile } from "node:fs/promises";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import type { FastifyInstance } from "fastify";
-import { DESKTOP_CSP, type ServerRequest } from "@homehost/shared";
+import {
+  DESKTOP_CSP,
+  DESKTOP_BRIDGE_CHANNEL,
+  type ServerRequest,
+} from "@homehost/shared";
 import { buildApp } from "../src/app.js";
 import * as schema from "../src/db/schema.js";
-import { desktopJavascript } from "../src/desktop-bridge.js";
+import {
+  desktopBridgeScript,
+  desktopJavascript,
+} from "../src/desktop-bridge.js";
 import {
   createDesktopTickets,
   DESKTOP_TICKET_TTL_S,
@@ -80,6 +87,79 @@ test("Kasm preferences work while native storage stays denied", () => {
     "opaque storage denied",
   );
   expect(desktopJavascript(source, "vendor/other.js")).toBe(source);
+});
+
+test("input bridge focuses the framebuffer and rejects foreign senders and oversized commands", () => {
+  const origin = "https://panel.example.test";
+  const parent = { postMessage() {} };
+  let receive = (_event: {
+    source: object;
+    origin: string;
+    data: unknown;
+  }) => {};
+  let focused = 0;
+  const events: string[] = [];
+  const canvas = {
+    focus() {
+      focused++;
+    },
+    dispatchEvent(event: { type: string; key: string }) {
+      events.push(`${event.type}:${event.key}`);
+    },
+  };
+  const document = {
+    addEventListener() {},
+    querySelector(selector: string) {
+      return selector === "#noVNC_container canvas[tabindex]" ? canvas : null;
+    },
+  };
+  const window = {
+    addEventListener(_type: string, handler: typeof receive) {
+      receive = handler;
+    },
+  };
+  class KeyboardEvent {
+    constructor(
+      public type: string,
+      init: object,
+    ) {
+      Object.assign(this, init);
+    }
+  }
+  runInNewContext(desktopBridgeScript([origin]), {
+    parent,
+    window,
+    document,
+    KeyboardEvent,
+  });
+  const focus = { channel: DESKTOP_BRIDGE_CHANNEL, type: "focus" };
+  receive({ source: {}, origin, data: focus });
+  receive({ source: parent, origin: "null", data: focus });
+  expect(focused).toBe(0);
+  receive({ source: parent, origin, data: focus });
+  expect(focused).toBe(1);
+  const key = { type: "keydown", key: "Enter", code: "Enter" };
+  receive({
+    source: parent,
+    origin,
+    data: {
+      channel: DESKTOP_BRIDGE_CHANNEL,
+      type: "keys",
+      events: Array(9).fill(key),
+    },
+  });
+  expect(events).toEqual([]);
+  receive({
+    source: parent,
+    origin,
+    data: {
+      channel: DESKTOP_BRIDGE_CHANNEL,
+      type: "keys",
+      events: [key, { ...key, type: "keyup" }],
+    },
+  });
+  expect(events).toEqual(["keydown:Enter", "keyup:Enter"]);
+  expect(focused).toBe(2);
 });
 
 const url = process.env.TEST_DATABASE_URL;
