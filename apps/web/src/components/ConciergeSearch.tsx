@@ -1,9 +1,16 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { FocusRef } from "./SetupHelper";
 import { SUGGEST_TEXT_MAX, type Plan } from "@homehost/shared";
+import { api, isApiError } from "../lib/api";
 import { setupSlug } from "../lib/concierge";
-import { useCreateRequest, usePlans } from "../lib/query";
+import {
+  useCreateRequest,
+  usePlans,
+  useSession,
+  queryKeys,
+} from "../lib/query";
 import {
   createErrorCopy,
   NAME_MAX,
@@ -228,8 +235,35 @@ function ConfirmCard({
  */
 export function ConciergeSearch() {
   const concierge = useConcierge<HTMLInputElement>(false);
+  const navigate = useNavigate();
+  const client = useQueryClient();
+  const userId = useSession().data?.user?.id;
+  const [inlineFallback, setInlineFallback] = useState(false);
+  const chat = useMutation({
+    mutationFn: api.createConversation,
+    onSuccess: (conversation) => {
+      client.setQueryData(
+        [...queryKeys.conversation, userId ?? "none", conversation.id],
+        conversation,
+      );
+      void client.invalidateQueries({ queryKey: queryKeys.conversations });
+      void navigate({ to: "/chat/$id", params: { id: conversation.id } });
+    },
+    onError: (error, submittedText) => {
+      if (isApiError(error) && error.code === "agent_unavailable") {
+        setInlineFallback(true);
+        concierge.submit(submittedText);
+      }
+    },
+  });
   const plans = usePlans().data ?? [];
-  const { text, busy } = concierge;
+  const { text } = concierge;
+  const busy = concierge.busy || chat.isPending;
+  const submit = (value = text) => {
+    if (busy || value.trim().length === 0) return;
+    if (inlineFallback) concierge.submit(value);
+    else chat.mutate(value.trim());
+  };
   const open =
     concierge.unavailable ||
     busy ||
@@ -249,7 +283,7 @@ export function ConciergeSearch() {
         aria-labelledby="ask-heading"
         onSubmit={(event) => {
           event.preventDefault();
-          concierge.submit();
+          submit();
         }}
       >
         <div className="relative">
@@ -281,7 +315,7 @@ export function ConciergeSearch() {
       </form>
       <p id="ask-hint" className="sr-only">
         Describe it in your own words, in any language. We suggest a server size
-        and software, and you confirm before anything is created.
+        and software in a chat, and you confirm before anything is created.
       </p>
       <ul
         className="m-0 flex list-none flex-wrap gap-2 p-0"
@@ -296,7 +330,7 @@ export function ConciergeSearch() {
               onClick={() => {
                 if (busy) return;
                 concierge.setText(example);
-                concierge.submit(example);
+                submit(example);
               }}
             >
               {example}
@@ -304,7 +338,14 @@ export function ConciergeSearch() {
           </li>
         ))}
       </ul>
-      {/* Expands from zero height when the first answer arrives. */}
+      {chat.isError && !inlineFallback ? (
+        <p className={FORM_ERROR} role="alert">
+          {isApiError(chat.error)
+            ? chat.error.message
+            : "Chat couldn't open just now. Please try again."}
+        </p>
+      ) : null}
+      {/* The inline helper remains the fallback when chat is unavailable. */}
       <div
         className={`grid transition-[grid-template-rows] duration-(--duration-slow) ease-out-quint motion-reduce:transition-none ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
       >

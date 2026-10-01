@@ -3,6 +3,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { AgentChatPage, AgentConversationsPage } from "./routes/agent-chat";
 import { AppLayout } from "./components/AppLayout";
 import { ApprovalsPage } from "./routes/approvals";
 import { AdminPage } from "./pages/Admin";
@@ -49,8 +50,20 @@ const serverProgressRoute = createRoute({
   path: "/servers/$id",
   component: ServerProgressPage,
 });
+const agentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agent",
+  component: AgentConversationsPage,
+});
+const chatRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/chat/$id",
+  component: AgentChatPage,
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  agentRoute,
+  chatRoute,
   newRequestRoute,
   approvalsRoute,
   adminRoute,

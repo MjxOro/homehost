@@ -10,6 +10,7 @@ import {
   ServerIcon,
   SidebarIcon,
   Spinner,
+  SparklesIcon,
   UserIcon,
   XIcon,
 } from "./icons";
@@ -85,6 +86,18 @@ function SidebarNav({
       >
         <DashboardIcon className="size-[18px] shrink-0" />
         <span>Dashboard</span>
+      </Link>
+      <Link
+        to="/agent"
+        className={
+          pathname.startsWith("/agent") || pathname.startsWith("/chat/")
+            ? NAV_ITEM_ACTIVE
+            : NAV_ITEM_IDLE
+        }
+        onClick={onNavigate}
+      >
+        <SparklesIcon className="size-[18px] shrink-0" />
+        <span>Agent</span>
       </Link>
       <Link
         to="/new"

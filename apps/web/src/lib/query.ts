@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type {
+  AgentConversation,
   DashboardResponse,
   PortalUser,
   ServerRequest,
@@ -14,6 +15,8 @@ import { api, ApiError } from "./api";
 
 export const queryKeys = {
   session: ["session"] as const,
+  conversations: ["agent-conversations"] as const,
+  conversation: ["agent-conversation"] as const,
   plans: ["plans"] as const,
   dashboard: ["dashboard"] as const,
   approvals: ["approvals"] as const,
@@ -47,9 +50,13 @@ async function clearTenantData(queryClient: QueryClient) {
     queryClient.cancelQueries({ queryKey: queryKeys.session }),
     queryClient.cancelQueries({ queryKey: queryKeys.dashboard }),
     queryClient.cancelQueries({ queryKey: queryKeys.approvals }),
+    queryClient.cancelQueries({ queryKey: queryKeys.conversations }),
+    queryClient.cancelQueries({ queryKey: queryKeys.conversation }),
   ]);
   queryClient.removeQueries({ queryKey: queryKeys.dashboard });
   queryClient.removeQueries({ queryKey: queryKeys.approvals });
+  queryClient.removeQueries({ queryKey: queryKeys.conversations });
+  queryClient.removeQueries({ queryKey: queryKeys.conversation });
 }
 
 export function useSession() {
@@ -149,6 +156,8 @@ function useInvalidateAfterMutation() {
   return () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
     void queryClient.invalidateQueries({ queryKey: queryKeys.approvals });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.conversation });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
   };
 }
 
@@ -276,6 +285,41 @@ export function useDecide() {
     onSuccess: invalidate,
     onError: (error) => {
       if (error instanceof ApiError && error.status === 409) invalidate();
+    },
+  });
+}
+
+export function useAgentConversations(userId: string | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.conversations, userId ?? "none"],
+    queryFn: api.listConversations,
+    enabled: !!userId,
+    refetchInterval: (q) =>
+      q.state.data?.some((c) => c.settingUp || c.status !== "idle")
+        ? 2500
+        : 10000,
+  });
+}
+export function useAgentConversation(userId: string | undefined, id: string) {
+  return useQuery({
+    queryKey: [...queryKeys.conversation, userId ?? "none", id],
+    queryFn: () => api.getConversation(id),
+    enabled: !!userId && !!id,
+    refetchInterval: (q) =>
+      q.state.data?.settingUp || q.state.data?.status === "running"
+        ? 2500
+        : 10000,
+  });
+}
+export function useAgentTurn(userId: string | undefined, id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (text: string | undefined) => api.agentTurn(id, text),
+    onSuccess: (c: AgentConversation) =>
+      client.setQueryData([...queryKeys.conversation, userId ?? "none", id], c),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.conversation });
+      void client.invalidateQueries({ queryKey: queryKeys.conversations });
     },
   });
 }
