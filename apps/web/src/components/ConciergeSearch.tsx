@@ -36,8 +36,8 @@ import {
 const EXAMPLES = [
   "Minecraft server for friends",
   "Discord bot running 24/7",
-  "Python playground",
-  "Docker dev box",
+  "A place to try coding",
+  "A website for my project",
 ];
 
 const FIELD_LABEL = "text-[13.5px] font-semibold text-text-1";
@@ -223,7 +223,7 @@ function ConfirmCard({
 
 /**
  * Google-like box at the top of the signed-in dashboard: describe what you
- * want, answer a question or two inline, confirm, and land on the progress
+ * want, confirm the suggested setup, and land on the progress
  * page. Results expand in place under the box.
  */
 export function ConciergeSearch() {

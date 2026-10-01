@@ -15,6 +15,7 @@ import {
 } from "@homehost/shared";
 import { isApiError } from "../lib/api";
 import {
+  DOCKER_SETUP_COPY,
   notOfferedCopy,
   recipeLabel,
   REFUSED_COPY,
@@ -111,6 +112,11 @@ export function SuggestionSpecs({
         {recipeComingSoon(result.recipeId)
           ? `Plain Ubuntu (${recipeLabel(result.recipeId)} coming soon)`
           : recipeLabel(result.recipeId)}
+        {result.recipeId === "docker" ? (
+          <p className="m-0 mt-1 text-[12.5px] leading-[1.5] text-text-3">
+            {DOCKER_SETUP_COPY}
+          </p>
+        ) : null}
       </Spec>
     </dl>
   );

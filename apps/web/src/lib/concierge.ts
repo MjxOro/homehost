@@ -29,6 +29,11 @@ export function recipeLabel(id: string): string {
   return lookup(RECIPES, id)?.label ?? id;
 }
 
+export const DOCKER_SETUP_COPY =
+  "Ready for your app or bot. Once it's running, go to your servers list to get started.";
+export const DOCKER_READY_COPY =
+  "Docker is ready for your app or bot. Go to your servers list to get started.";
+
 const WARNING_COPY: Record<WarningCode, string> = {
   console_not_supported:
     "Game consoles (Switch, Xbox, PlayStation) can't join custom servers. Players need a PC, Mac or phone.",

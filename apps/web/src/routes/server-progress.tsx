@@ -10,7 +10,12 @@ import {
   type ServerRequest,
 } from "@homehost/shared";
 import { isApiError } from "../lib/api";
-import { recipeLabel, setupErrorCopy, warningCopy } from "../lib/concierge";
+import {
+  DOCKER_READY_COPY,
+  recipeLabel,
+  setupErrorCopy,
+  warningCopy,
+} from "../lib/concierge";
 import { formatDateTime, formatPlanSpecs, formatRelative } from "../lib/format";
 import {
   isNetworkError,
@@ -314,6 +319,10 @@ function ReadyCard({
           {request.name} is ready
         </h2>
       </div>
+
+      {request.recipeId === "docker" ? (
+        <p className={COPY}>{DOCKER_READY_COPY}</p>
+      ) : null}
 
       {request.gameAddress ? (
         <div className="flex flex-col gap-1.5">
