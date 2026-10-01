@@ -14,23 +14,23 @@ export const STEPS: Array<{ title: string; copy: string }> = [
   { title: "Request a box.", copy: "Pick a plan and send a request." },
   {
     title: "Operator approves.",
-    copy: "A lab operator reviews it and provisions a real machine.",
+    copy: "An operator reviews it and starts a real machine.",
   },
   {
-    title: "SSH over IPv6.",
-    copy: "Connect straight to your box — no leased ports.",
+    title: "Connect.",
+    copy: "SSH in, or open your desktop in the browser.",
   },
 ];
 
 const LIVE_FACTS = [
-  "SSH on your bare subdomain",
-  "A dedicated IPv6 address per box",
-  "No leased ports to manage",
+  "Containers, VMs and browser desktops",
+  "SSH with your own key",
+  "Start, stop or delete anytime",
 ];
 
 /**
  * Live-mode sign-in panel. Leads with what Homehost is, how a box goes from
- * request to SSH, and the network facts that matter — then the real login
+ * request to SSH, and what you get — then the real login
  * buttons. Rendered wherever sign-in is offered; the buttons are plain
  * anchors so the provider dance runs outside the SPA.
  */
@@ -54,7 +54,7 @@ export function OAuthButtons({
 
   const facts = (
     <ul
-      aria-label="Connection facts"
+      aria-label="What you get"
       className={`m-0 flex list-none flex-wrap p-0 ${
         landing ? "animate-fade-up gap-x-5 gap-y-2" : "gap-2"
       }`}
@@ -83,7 +83,7 @@ export function OAuthButtons({
       {landing ? null : (
         <>
           <p className="m-0 text-[15.5px] font-[700] tracking-[-0.005em] text-text-1">
-            Your personal homelab control panel.
+            Your own servers, a click away.
           </p>
           <ol
             aria-label="How it works"

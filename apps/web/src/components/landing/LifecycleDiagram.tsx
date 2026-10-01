@@ -4,8 +4,8 @@ import { usePauseOffscreen } from "./usePauseOffscreen";
 
 const STEPS = [
   { n: 1, title: "Request", sub: "Pick a plan and send it" },
-  { n: 2, title: "Approved", sub: "A lab operator signs off" },
-  { n: 3, title: "Provisioned", sub: "A real box on the homelab" },
+  { n: 2, title: "Approved", sub: "An operator signs off" },
+  { n: 3, title: "Running", sub: "A real server, ready to use" },
 ] as const;
 
 const PILL = "col-start-1 row-start-1 text-center";
@@ -75,9 +75,9 @@ export function LifecycleDiagram({ showcase }: { showcase: boolean }) {
           </div>
           <div className="lc-anim lc-out">
             <div className="flex items-center gap-1.5 text-accent">
-              <CheckIcon className="size-3.5" /> connected over IPv6
+              <CheckIcon className="size-3.5" /> connected
             </div>
-            <div className="text-text-3">2001:db8:a1::7c</div>
+            <div className="text-text-3">Welcome to Ubuntu 24.04 LTS</div>
           </div>
         </div>
       </div>

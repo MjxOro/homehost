@@ -101,8 +101,8 @@ function SignedOutHome() {
               aria-hidden="true"
             />
             {showcase
-              ? "Homelab control plane · showcase"
-              : "Homelab control plane · live"}
+              ? "Containers, VMs and desktops · showcase"
+              : "Containers, VMs and desktops · live"}
           </p>
           <h1 className="mb-5 mt-5 text-[clamp(36px,5.4vw,62px)] font-[750] leading-[1.04] tracking-[-0.03em]">
             <span className="lc-line">
@@ -110,7 +110,7 @@ function SignedOutHome() {
             </span>{" "}
             <span className="lc-line">
               <span className="lc-line-in text-accent-strong" style={delay(90)}>
-                SSH in over IPv6.
+                SSH in and build.
               </span>
             </span>
           </h1>
@@ -119,8 +119,8 @@ function SignedOutHome() {
             style={delay(220)}
           >
             {session?.mode === "live"
-              ? "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. Approved servers are provisioned as real machines on the homelab."
-              : "Homehost is a small control plane for friends: pick a plan, request it, and a lab operator approves or rejects. This running copy is an honest showcase — requests only reserve capacity on paper, and no server is ever created."}
+              ? "Homehost is a small cloud for friends. Pick a container, a virtual machine or a browser desktop and request it. Once an operator approves, you get a real server you can SSH into, start, stop or delete."
+              : "Homehost is a small cloud for friends. Pick a container, a virtual machine or a browser desktop and request it, and an operator approves it. This copy is a showcase: requests only reserve capacity on paper, and no server is ever created."}
           </p>
           <div className="mt-8">
             {showPersonas ? (
