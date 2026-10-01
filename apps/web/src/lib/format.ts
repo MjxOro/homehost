@@ -38,6 +38,15 @@ export function formatMemory(mb: number): string {
   return `${(mb / 1024).toLocaleString("en", { maximumFractionDigits: 1 })} GB`;
 }
 
+/** One-line plan size, e.g. "2 CPU · 2 GB RAM · 20 GB disk". */
+export function formatPlanSpecs(plan: {
+  cpu: number;
+  memoryMb: number;
+  diskGb: number;
+}): string {
+  return `${plan.cpu} CPU · ${formatMemory(plan.memoryMb)} RAM · ${plan.diskGb} GB disk`;
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts

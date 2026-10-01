@@ -6,6 +6,8 @@ import type {
   Plan,
   ServerRequest,
   SessionResponse,
+  SuggestBody,
+  Suggestion,
 } from "@homehost/shared";
 
 /**
@@ -89,6 +91,13 @@ export const api = {
       method: "POST",
       headers: jsonHeaders,
       body: JSON.stringify(input),
+    }),
+
+  suggest: (body: SuggestBody): Promise<Suggestion> =>
+    request("/api/concierge/suggest", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(body),
     }),
 
   cancelRequest: (id: string): Promise<{ ok: true }> =>

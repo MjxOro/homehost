@@ -106,6 +106,12 @@ All thresholds are named constants in `packages/shared/src/concierge.ts`; they
 are starting values. A generic "is information missing?" question is
 deliberately not asked: it fired on complete requests.
 
+The catalogs (`USE_CASES`, `RECIPES`, warning codes, not-offered reasons,
+choice slots, `SUGGEST_TEXT_MAX`) live in
+`packages/shared/src/concierge-catalog.ts`. It must stay zod-free: the web
+imports it for labels and codes, and anything pulling in the schemas would
+bundle zod into the browser.
+
 ## Environment
 
 | variable              | default | notes                                               |

@@ -112,7 +112,17 @@ function jevQuestionSet(tier: TrustTier): JevQuestionSet {
         question:
           "Which `plans` entry is the smallest one that comfortably fits `request`?",
       },
-      criteria: Object.fromEntries(planOptions.map((id) => [id, null])),
+      // Only `none` is described: undefined, Jev used it for "can't serve this
+      // at all" (e.g. Switch players) instead of "too small", and the rules
+      // turned that into no_fitting_plan for requests a plan fits.
+      criteria: Object.fromEntries(
+        planOptions.map((id) => [
+          id,
+          id === PLAN_NONE
+            ? "None of the listed plans has enough CPU, RAM or disk for this workload"
+            : null,
+        ]),
+      ),
     },
     recipe: {
       type: "choice",
