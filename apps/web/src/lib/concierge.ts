@@ -4,6 +4,8 @@ import {
   type NotOfferedReason,
   type OfferedUseCaseId,
   type RecipeId,
+  type ServerRequest,
+  type SetupErrorCode,
   type WarningCode,
 } from "@homehost/shared";
 import { isApiError } from "./api";
@@ -28,8 +30,6 @@ export function recipeLabel(id: string): string {
 }
 
 const WARNING_COPY: Record<WarningCode, string> = {
-  players_need_ipv6:
-    "Friends join over IPv6 for now. Most mobile and many home networks have it; some don't.",
   console_not_supported:
     "Game consoles (Switch, Xbox, PlayStation) can't join custom servers. Players need a PC, Mac or phone.",
   needs_review: "An operator will take a closer look before approving.",
@@ -102,19 +102,20 @@ export function suggestErrorCopy(error: unknown): {
   if (isApiError(error)) {
     if (error.status === 429)
       return {
-        message: "You've used today's suggestions. Pick a plan below.",
+        message:
+          "You've used today's suggestions. You can still pick a plan yourself.",
         retry: false,
       };
     if (error.status === 403)
       return {
         message:
-          "Suggestions open up once your account is approved. You can still pick a plan below.",
+          "Suggestions open up once your account is approved. You can still pick a plan yourself.",
         retry: false,
       };
     if (error.status === 400)
       return {
         message:
-          "We couldn't use that description. Try rewording it, or pick a plan below.",
+          "We couldn't use that description. Try rewording it, or pick a plan yourself.",
         retry: false,
       };
   }
@@ -122,4 +123,47 @@ export function suggestErrorCopy(error: unknown): {
     message: "We couldn't get a suggestion just now.",
     retry: true,
   };
+}
+
+const SETUP_ERROR_COPY: Record<SetupErrorCode, string> = {
+  apt_failed:
+    "Installing the system packages failed. That is usually a short hiccup at the package mirror, and trying again normally fixes it.",
+  java_unavailable:
+    "Ubuntu doesn't offer the Java version this Minecraft release needs yet, so it couldn't be installed. Trying again only helps once that Java version is available.",
+  download_failed:
+    "We couldn't download the software. The download site may be busy or unreachable; try again in a minute.",
+  checksum_mismatch:
+    "The download didn't match the official copy, so we threw it away to keep your server safe. Trying again fetches a fresh copy.",
+  service_failed: "It installed, but its background service wouldn't start.",
+  not_ready:
+    "It installed and started, but it didn't answer in time. Trying again checks it once more.",
+  timeout: "One of the steps took longer than its time limit.",
+  unknown: "Something unexpected went wrong during setup.",
+};
+
+/** Plain explanation of a setup failure code; unknown codes get a neutral line. */
+export function setupErrorCopy(code: string | null): string {
+  return (
+    (code === null ? undefined : lookup(SETUP_ERROR_COPY, code)) ??
+    SETUP_ERROR_COPY.unknown
+  );
+}
+
+/** Short setup state for a request with a recipe, e.g. "Minecraft Java ready". */
+export function setupChip(
+  request: Pick<ServerRequest, "recipeId" | "setupStatus">,
+): { label: string; tone: "busy" | "ok" | "bad" } | null {
+  if (request.recipeId === null || request.recipeId === "none") return null;
+  const label = recipeLabel(request.recipeId);
+  switch (request.setupStatus) {
+    case "pending":
+    case "running":
+      return { label: `Setting up ${label}…`, tone: "busy" };
+    case "done":
+      return { label: `${label} ready`, tone: "ok" };
+    case "failed":
+      return { label: "Setup failed", tone: "bad" };
+    default:
+      return null;
+  }
 }

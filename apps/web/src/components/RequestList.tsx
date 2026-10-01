@@ -11,6 +11,7 @@ import {
   useStopInstance,
   queryKeys,
 } from "../lib/query";
+import { recipeLabel, setupChip } from "../lib/concierge";
 import { formatDateTime, formatMemory, formatRelative } from "../lib/format";
 import { CancelDialog } from "./CancelDialog";
 import {
@@ -34,16 +35,31 @@ function resourceLine(request: ServerRequest): string {
   return `${request.cpu} CPU · ${formatMemory(request.memoryMb)} RAM · ${request.diskGb} GB disk`;
 }
 
-/** Subdomain is display text, never a (fake) reachable link. */
-function SubdomainText({ value }: { value: string }) {
+/**
+ * Display text with a copy button (1600 ms "copied" state, inert when the
+ * clipboard is unavailable). `name` reads naturally in "Copy {name} {value}".
+ * Addresses are display text, never (fake) reachable links.
+ */
+export function CopyCode({
+  value,
+  name,
+  className = "mt-2.5",
+}: {
+  value: string;
+  name: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
+  const title = name.charAt(0).toUpperCase() + name.slice(1);
   return (
-    <span className="mt-2.5 inline-flex min-w-0 flex-wrap items-center gap-0.5">
+    <span
+      className={`${className} inline-flex min-w-0 flex-wrap items-center gap-0.5`}
+    >
       <code className={`${CODE_BADGE} min-w-0 break-all`}>{value}</code>
       <button
         type="button"
         className={ICON_BTN_QUIET}
-        aria-label={copied ? "Subdomain copied" : `Copy subdomain ${value}`}
+        aria-label={copied ? `${title} copied` : `Copy ${name} ${value}`}
         onClick={() => {
           void navigator.clipboard
             ?.writeText(value)
@@ -68,69 +84,6 @@ function IpBadge({ value }: { value: string }) {
     <span className="mt-2.5 inline-flex min-w-0 flex-wrap items-center gap-2">
       <span className="text-[13px] text-text-2">IP</span>
       <code className={`${CODE_BADGE} min-w-0 break-all`}>{value}</code>
-    </span>
-  );
-}
-
-/** Public IPv6 is display text like the IPv4 badge. Shown once assigned. */
-function Ipv6Badge({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <span className="mt-2.5 inline-flex min-w-0 flex-wrap items-center gap-2">
-      <span className="text-[13px] text-text-2">IPv6</span>
-      <code className={`${CODE_BADGE} min-w-0 break-all`}>{value}</code>
-      <button
-        type="button"
-        className={ICON_BTN_QUIET}
-        aria-label={copied ? "IPv6 copied" : `Copy IPv6 ${value}`}
-        onClick={() => {
-          void navigator.clipboard
-            ?.writeText(value)
-            .then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1600);
-            })
-            .catch(() => {
-              /* clipboard unavailable — leave the button inert */
-            });
-        }}
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
-    </span>
-  );
-}
-
-/**
- * Copyable command box. Rendered wherever a command is actionable; the copy
- * button shares the badge pattern (1600 ms reset, inert when the clipboard
- * is unavailable).
- */
-function SshCommand({ command }: { command: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <span className="mt-2.5 inline-flex min-w-0 flex-wrap items-center gap-0.5">
-      <code className={`${CODE_BADGE} min-w-0 break-all`}>{command}</code>
-      <button
-        type="button"
-        className={ICON_BTN_QUIET}
-        aria-label={
-          copied ? "SSH command copied" : `Copy SSH command ${command}`
-        }
-        onClick={() => {
-          void navigator.clipboard
-            ?.writeText(command)
-            .then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1600);
-            })
-            .catch(() => {
-              /* clipboard unavailable — leave the button inert */
-            });
-        }}
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
     </span>
   );
 }
@@ -329,8 +282,8 @@ function DesktopAccess({ request }: { request: ServerRequest }) {
 
 /**
  * Root access for a provisioned box, top to bottom: the bare
- * `ssh root@<subdomain>` command when running (dials over IPv6), then the
- * key status note, then the one-time password flow.
+ * `ssh root@<subdomain>` command when running, then the key status note,
+ * then the one-time password flow.
  */
 export function SshAccess({
   request,
@@ -365,7 +318,10 @@ export function SshAccess({
       {request.status === "running" ? (
         <div className="animate-fade-in mt-2.5 flex flex-col items-start gap-1 [&>span]:mt-0">
           <span className={LABEL_CHIP}>SSH</span>
-          <SshCommand command={`ssh root@${request.subdomain}`} />
+          <CopyCode
+            value={`ssh root@${request.subdomain}`}
+            name="SSH command"
+          />
         </div>
       ) : null}
       {request.hasSshKey ? (
@@ -473,6 +429,36 @@ function LiveStatusPill({ status }: { status: ServerRequest["status"] }) {
   );
 }
 
+const SETUP_TONE = {
+  busy: "border-accent-line bg-accent-dim text-accent",
+  ok: "border-[rgba(94,201,143,0.4)] bg-ok-dim text-ok",
+  bad: "border-[rgba(224,108,108,0.4)] bg-bad-dim text-bad",
+} as const;
+
+/**
+ * Setup state for a box with software, linking to its progress page. Setup
+ * runs once the box is up, so earlier states show "Follow progress" instead.
+ */
+function SetupChip({ request }: { request: ServerRequest }) {
+  const chip = setupChip(request);
+  if (!chip || (request.status !== "running" && request.status !== "stopped"))
+    return null;
+  return (
+    <Link
+      to="/servers/$id"
+      params={{ id: request.id }}
+      className="group inline-flex min-h-11 items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      <span
+        className={`${LIVE_PILL_BASE} ${SETUP_TONE[chip.tone]} group-hover:underline`}
+      >
+        {chip.tone === "busy" ? <Spinner className="spinner-sm" /> : null}
+        {chip.label}
+      </span>
+    </Link>
+  );
+}
+
 function focusRequestsHeading() {
   const heading = document.getElementById("requests-heading");
   if (heading instanceof HTMLElement) {
@@ -497,8 +483,11 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
   const [powerError, setPowerError] = useState<string | null>(null);
   const busy = stop.isPending || start.isPending;
   const queryClient = useQueryClient();
-  const awaitingFlip = requests.some((request) =>
-    NON_TERMINAL_STATUSES.has(request.status),
+  const awaitingFlip = requests.some(
+    (request) =>
+      NON_TERMINAL_STATUSES.has(request.status) ||
+      request.setupStatus === "pending" ||
+      request.setupStatus === "running",
   );
   // Worker/operator-driven transitions land server-side; while any row can
   // still flip, refetch faster than the base poll so the live pill and rows
@@ -550,6 +539,16 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
               <div className="flex flex-wrap items-center gap-3">
                 <h3 className="text-[15.5px] font-[650]">{request.name}</h3>
                 <LiveStatusPill status={request.status} />
+                <SetupChip request={request} />
+                {NON_TERMINAL_STATUSES.has(request.status) ? (
+                  <Link
+                    to="/servers/$id"
+                    params={{ id: request.id }}
+                    className="inline-flex min-h-11 items-center text-[13.5px] font-semibold text-accent underline-offset-2 hover:underline"
+                  >
+                    Follow progress
+                  </Link>
+                ) : null}
               </div>
               <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[13.5px] text-text-2">
                 <span>{planNames.get(request.planId) ?? request.planId}</span>
@@ -557,10 +556,23 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
                 <span>{resourceLine(request)}</span>
               </p>
               {request.status === "provisioning" ? null : (
-                <SubdomainText value={request.subdomain} />
+                <CopyCode value={request.subdomain} name="subdomain" />
               )}
               {request.ipv4 ? <IpBadge value={request.ipv4} /> : null}
-              {request.ipv6 ? <Ipv6Badge value={request.ipv6} /> : null}
+              {request.gameAddress ? (
+                <div className="mt-2.5 flex flex-col items-start gap-1">
+                  <span className={LABEL_CHIP}>
+                    {request.recipeId
+                      ? `${recipeLabel(request.recipeId)} address`
+                      : "Game address"}
+                  </span>
+                  <CopyCode
+                    value={request.gameAddress}
+                    name="game address"
+                    className=""
+                  />
+                </div>
+              ) : null}
               <SshAccess request={request} onAnnounce={onAnnounce} />
               <DesktopAccess request={request} />
               {request.status === "rejected" && request.decisionReason ? (

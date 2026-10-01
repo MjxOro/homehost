@@ -19,6 +19,7 @@ import { usePauseOffscreen } from "../components/landing/usePauseOffscreen";
 import { PersonaPicker } from "../components/PersonaPicker";
 import { OAuthButtons, SignInGate } from "../components/SignInGate";
 import { RequestList } from "../components/RequestList";
+import { ConciergeSearch } from "../components/ConciergeSearch";
 import {
   CARD,
   CARD_HEAD,
@@ -229,6 +230,9 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
   const { quota, usage, requests, activity } = dashboard.data;
   return (
     <div className="flex flex-col gap-5">
+      <div className="animate-fade-up pb-2">
+        <ConciergeSearch />
+      </div>
       <div className="flex animate-fade-up flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[clamp(22px,3vw,28px)] font-bold tracking-[-0.01em]">

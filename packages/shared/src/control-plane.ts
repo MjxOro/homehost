@@ -1,3 +1,8 @@
+import type {
+  RecipeId,
+  SetupStatus,
+  SetupStepId,
+} from "./concierge-catalog.js";
 import type { DesktopEnv } from "./plans.js";
 
 export type TrustTier = "nontechnical" | "technical";
@@ -75,6 +80,31 @@ export interface ServerRequest {
   createdAt: string;
   updatedAt: string;
   decisionReason: string | null;
+  /** Setup recipe chosen at request time. Null = plain Ubuntu. */
+  recipeId: RecipeId | null;
+  /** `none` when recipeId is null; otherwise pending → running → done | failed. */
+  setupStatus: SetupStatus;
+  /** Step the worker is on (or failed at). Null before setup starts. */
+  setupStep: SetupStepId | null;
+  /** Stable failure code when setupStatus is `failed`, e.g. `download_failed`. */
+  setupError: string | null;
+  /**
+   * Address players type into the game (Minecraft Java: the box hostname; the
+   * default port needs no suffix). Null unless a game recipe finished setup.
+   */
+  gameAddress: string | null;
+}
+
+/** Body of POST /api/requests. */
+export interface CreateRequestInput {
+  name: string;
+  planId: string;
+  desktopEnv?: DesktopEnv;
+  sshPubkey?: string;
+  /** Must be an installable recipe the plan can run. Omit for plain Ubuntu. */
+  recipeId?: RecipeId;
+  /** Required true when RECIPES[recipeId].eula is set; recorded as a timestamp. */
+  eulaAccepted?: boolean;
 }
 
 export interface ActivityEvent {
@@ -89,13 +119,17 @@ export interface ActivityEvent {
     | "provisioning"
     | "running"
     | "stopped"
-    | "provision_failed";
+    | "provision_failed"
+    | "setup_started"
+    | "setup_done"
+    | "setup_failed";
   serverName: string;
   createdAt: string;
   detail: string | null;
 }
 
-export type ProvisionAction = "provision" | "teardown" | "stop" | "start";
+export type ProvisionAction =
+  "provision" | "teardown" | "stop" | "start" | "setup";
 export type ProvisionJobStatus = "queued" | "leased" | "done" | "failed";
 
 export interface ProvisionJob {

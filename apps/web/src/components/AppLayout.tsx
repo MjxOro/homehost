@@ -76,7 +76,11 @@ function SidebarNav({
     <nav className="flex flex-col gap-1 pt-2.5" aria-label="Primary">
       <Link
         to="/"
-        className={pathname === "/" ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE}
+        className={
+          pathname === "/" || pathname.startsWith("/servers/")
+            ? NAV_ITEM_ACTIVE
+            : NAV_ITEM_IDLE
+        }
         onClick={onNavigate}
       >
         <DashboardIcon className="size-[18px] shrink-0" />

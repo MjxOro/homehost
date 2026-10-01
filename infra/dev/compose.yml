@@ -5,6 +5,14 @@ name: homehost-dev
 # Open http://127.0.0.1:5174 — no dev domains needed. SHOWCASE_MODE in
 # .env.dev picks the auth path: true = persona login (default, no OAuth),
 # false = real GitHub OAuth (fill OAuth + OPERATOR_EMAILS first).
+#
+# Staging is LAN-only. The dev stack provisions real boxes and showcase mode
+# lets anyone pick the operator persona, so it must never be reachable from
+# the internet. Docker's `0.0.0.0`/`[::]` publish also lands on the host's
+# public IPv6, so every port is bound to one address: loopback by default,
+# or the LAN address for QA from other machines on the home network:
+#   DEV_BIND_IP=192.168.1.16 bun run dev:up
+# (and add http://192.168.1.16:5174 to APP_EXTRA_ORIGINS in .env.dev).
 
 services:
   postgres:
@@ -39,10 +47,7 @@ services:
       - path: ../../.env.dev
         required: true
     ports:
-      - "3001:3001"
-    networks:
-      - default
-      - edge
+      - "127.0.0.1:3001:3001"
     restart: unless-stopped
     depends_on:
       postgres:
@@ -58,10 +63,7 @@ services:
     environment:
       API_PROXY_TARGET: http://api:3001
     ports:
-      - "5174:5174"
-    networks:
-      - default
-      - edge
+      - "${DEV_BIND_IP:-127.0.0.1}:5174:5174"
     restart: unless-stopped
     depends_on:
       - api
@@ -77,8 +79,12 @@ services:
       - /var/lib/incus/unix.socket:/var/lib/incus/unix.socket
       - /usr/bin/incus:/usr/bin/incus:ro
     command: ["bun", "apps/worker/src/index.ts"]
+    # Host network: the readiness gate and setup checks TCP-connect to each
+    # box's public IPv6, and Docker's bridge network has no IPv6. Postgres is
+    # reached on its loopback publish instead of the compose network.
+    network_mode: host
     environment:
-      DATABASE_URL: postgres://homehost:homehost@postgres:5432/homehost
+      DATABASE_URL: postgres://homehost:homehost@127.0.0.1:55433/homehost
       WORKER_POLL_MS: "2000"
       WORKER_ENV: dev
       WORKER_BASE_DOMAIN: dev.homehost.risktozero.sh
@@ -89,10 +95,5 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-networks:
-  edge:
-    name: homehost-edge_default
-    external: true
-
 volumes:
   homehost-dev-postgres:

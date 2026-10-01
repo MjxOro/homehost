@@ -10,6 +10,7 @@ import { DashboardPage } from "./routes/dashboard";
 import { DesktopLoginPage } from "./routes/desktop-login";
 import { NewRequestPage } from "./routes/new-request";
 import { NotFoundPage } from "./routes/not-found";
+import { ServerProgressPage } from "./routes/server-progress";
 const rootRoute = createRootRoute({
   component: AppLayout,
   notFoundComponent: NotFoundPage,
@@ -43,12 +44,18 @@ const desktopRoute = createRoute({
   path: "/desktop/$id",
   component: DesktopLoginPage,
 });
+const serverProgressRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/servers/$id",
+  component: ServerProgressPage,
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   newRequestRoute,
   approvalsRoute,
   adminRoute,
   desktopRoute,
+  serverProgressRoute,
 ]);
 
 export const router = createRouter({

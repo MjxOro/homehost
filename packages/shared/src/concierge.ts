@@ -23,7 +23,7 @@ import { PLANS, type Plan } from "./plans.js";
 /** Shape of the `Suggestion` JSON. Bump on breaking contract changes. */
 export const CONCIERGE_SCHEMA_VERSION = 1;
 /** Bump whenever a rule, threshold, question or catalog change can alter a suggestion. */
-export const CONCIERGE_RULES_VERSION = "2026-09-30.2";
+export const CONCIERGE_RULES_VERSION = "2026-10-01.1";
 
 /** Extra Jev plan option meaning "nothing in PLANS fits". */
 export const PLAN_NONE = "none";
@@ -42,8 +42,6 @@ export const PLAN_MIN = 0.5;
 export const RECIPE_MIN = 0.5;
 /** wants_gui below this makes a workload headless (no desktop plans). */
 export const GUI_MIN = 0.5;
-/** players_connect at or above this adds `players_need_ipv6` for non-game recipes. */
-export const PLAYERS_MIN = 0.6;
 /** console_player at or above this adds `console_not_supported` for game recipes. */
 export const CONSOLE_MIN = 0.5;
 /** Most options offered in a `choose` follow-up. */
@@ -173,7 +171,6 @@ export interface ConciergeAnswers {
   plan: ChoiceAnswer<string>;
   recipe: ChoiceAnswer<RecipeId>;
   wants_gui: number;
-  players_connect: number;
   console_player: number;
   abuse: number;
   scraping: number;
@@ -368,9 +365,6 @@ export function decideSuggestion(
   if (planNoneSure) return notOffered("no_fitting_plan");
 
   const game = recipe !== null && RECIPES[recipe].game;
-  if (game || answers.players_connect >= PLAYERS_MIN) {
-    warnings.add("players_need_ipv6");
-  }
   if (game && answers.console_player >= CONSOLE_MIN) {
     warnings.add("console_not_supported");
   }

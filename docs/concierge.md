@@ -3,9 +3,11 @@
 `POST /api/concierge/suggest` turns a free-text wish ("vanilla minecraft for me
 and 4 friends") into a suggested use case, plan and first-boot recipe. It
 creates nothing: the client shows a confirm card and then calls the existing
-`POST /api/requests`, which enforces tiers and quotas on its own. Recipes are
-only suggested; nothing installs them yet. A refusal is advice, not
-enforcement: nothing stops a user from creating a plain request directly.
+`POST /api/requests`, which enforces tiers and quotas on its own. Installable
+recipes are then set up by the worker once the box is running (see
+[recipes.md](recipes.md)); "coming soon" recipes are only suggested. A refusal
+is advice, not enforcement: nothing stops a user from creating a plain request
+directly.
 
 ## Request
 
@@ -45,8 +47,7 @@ questions or catalogs change):
 
 Warning codes (the UI owns the copy): `needs_review` (abuse score in the grey
 zone, or scraping), `upgraded_for_recipe` (the final plan was enlarged to a VM
-because the final recipe needs one), `players_need_ipv6` (other people will
-connect and boxes are IPv6-only), `console_not_supported` (console players
+because the final recipe needs one), `console_not_supported` (console players
 cannot join a self-hosted game server).
 
 Errors use the usual `{ error, code }` shape:
@@ -67,8 +68,8 @@ Errors use the usual `{ error, code }` shape:
 2. One Jev request (`typesafe/jev-1.13`, OpenRouter `POST /api/alpha/decisions`)
    asks everything at once: `use_case`, `plan`, `recipe` (choices built from
    `USE_CASES`, `RECIPES` and the plans this user's tier can create right
-   now), and the probabilities `wants_gui`, `players_connect`,
-   `console_player`, `abuse`, `scraping`, `is_english`. Questions live in
+   now), and the probabilities `wants_gui`, `console_player`, `abuse`,
+   `scraping`, `is_english`. Questions live in
    `apps/api/src/domain/concierge.ts`.
 3. Translation fallback, at most once: when the text is not English
    (`is_english < ENGLISH_MIN`, 0.5) and a slot still needed is unsure, the
@@ -97,10 +98,8 @@ Errors use the usual `{ error, code }` shape:
      slot with a single eligible candidate is filled without asking. Recipe
      options only include setups some eligible plan (or the picked plan) can
      run.
-   - connection warnings: game recipes (`RECIPES[id].game`) always get
-     `players_need_ipv6`, other recipes when `players_connect >= PLAYERS_MIN`
-     (0.6); game recipes get `console_not_supported` when
-     `console_player >= CONSOLE_MIN` (0.5).
+   - console warning: game recipes (`RECIPES[id].game`) get
+     `console_not_supported` when `console_player >= CONSOLE_MIN` (0.5).
 
 All thresholds are named constants in `packages/shared/src/concierge.ts`; they
 are starting values. A generic "is information missing?" question is

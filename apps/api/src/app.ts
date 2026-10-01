@@ -10,12 +10,16 @@ import { z } from "zod";
 import {
   PLANS,
   QUOTA_HOLDING_STATUSES,
+  RECIPE_IDS,
+  RECIPES,
   SSH_KEY_MAX,
   SuggestBody,
   TECHNICAL_LEVELS,
   TIER_QUOTAS,
+  gameAddressOf,
   isValidSshPublicKey,
   picksProblem,
+  recipeRequestProblem,
 } from "@homehost/shared";
 import type {
   ActivityEvent,
@@ -27,6 +31,7 @@ import type {
   PortalUser,
   ServerRequest,
   SessionResponse,
+  StoredRecipeId,
   TechnicalLevel,
 } from "@homehost/shared";
 import { createDb, type Database } from "./db/client.js";
@@ -42,6 +47,7 @@ import {
   readDesktopSession,
   readInstancePassword,
   retryProvision,
+  retrySetup,
   startInstance,
   stopInstance,
 } from "./domain/requests.js";
@@ -104,6 +110,8 @@ const CreateRequestBody = z
     planId: z.string().min(1),
     desktopEnv: z.enum(["ubuntu-xfce", "omarchy"]).optional(),
     sshPubkey: z.string().trim().max(SSH_KEY_MAX).optional(),
+    recipeId: z.enum(RECIPE_IDS).optional(),
+    eulaAccepted: z.boolean().optional(),
   })
   .strict()
   .refine(
@@ -278,6 +286,11 @@ function toServerRequest(r: RequestRow): ServerRequest {
     desktopHostname: r.desktopHostname,
     desktopUrl: r.desktopHostname ? `https://${r.desktopHostname}` : null,
     desktopUser: plan?.desktop?.user ?? null,
+    recipeId: r.recipeId as ServerRequest["recipeId"],
+    setupStatus: r.setupStatus as ServerRequest["setupStatus"],
+    setupStep: r.setupStep as ServerRequest["setupStep"],
+    setupError: r.setupError,
+    gameAddress: gameAddressOf(r),
   };
 }
 
@@ -1042,6 +1055,16 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     if (!desktop && parsed.data.desktopEnv !== undefined) {
       return sendErr(reply, 403, "plan has no desktop", "forbidden");
     }
+    const recipeProblem = recipeRequestProblem(
+      plan,
+      parsed.data.recipeId,
+      parsed.data.eulaAccepted,
+    );
+    if (recipeProblem) return sendErr(reply, 400, recipeProblem, "invalid");
+    const recipeId: StoredRecipeId | null =
+      parsed.data.recipeId === undefined || parsed.data.recipeId === "none"
+        ? null
+        : parsed.data.recipeId;
     // The worker installs sshd on containers too, so all plans accept ssh keys.
     const created = await runtime.runPromise(
       Effect.either(
@@ -1051,6 +1074,12 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
           plan,
           baseDomain,
           sshPubkey: parsed.data.sshPubkey,
+          recipeId,
+          // Recorded only for a recipe that has a license to accept.
+          eulaAccepted:
+            recipeId !== null &&
+            RECIPES[recipeId].eula !== null &&
+            parsed.data.eulaAccepted === true,
         }),
       ),
     );
@@ -1258,6 +1287,25 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   );
 
+  // Owner re-runs a failed setup recipe on the running box (idempotent steps).
+  app.post<{ Params: { id: string } }>(
+    "/api/requests/:id/setup/retry",
+    async (req, reply) => {
+      const session = await requireApprovedUser(req, reply);
+      if (!session) return;
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const retried = await runtime.runPromise(
+        Effect.either(retrySetup({ id: params.data.id, user: session.user })),
+      );
+      return Either.match(retried, {
+        onLeft: (e) => sendDomainError(reply, e),
+        onRight: (row) => toServerRequest(row),
+      });
+    },
+  );
+
   // Credentials flow: the instance one-time password for root SSH (read once,
   // then cleared). Desktop VNC uses its own persistent desktop_password via
   // the DesktopSession gate + same-origin proxy below — never this endpoint.
@@ -1309,8 +1357,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         onLeft: (e) => sendDomainError(reply, e),
         onRight: ({ desktopUser, desktopPassword }) => {
           const base = `/api/requests/${params.data.id}/desktop/session/`;
-          const wsPath =
-            `api/requests/${params.data.id}/desktop/session/websockify`;
+          const wsPath = `api/requests/${params.data.id}/desktop/session/websockify`;
           return {
             url:
               `${base}#password=${encodeURIComponent(desktopPassword)}` +
@@ -1407,20 +1454,20 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   // both directions; either side closing tears the pair down.
   // Node http server 'upgrade' args are (req, socket, head) — req first.
   app.server.on("upgrade", (...rawArgs: unknown[]) => {
-      const upgradeReq = rawArgs[0] as {
-        url?: unknown;
-        headers: Record<string, unknown>;
-      };
-      const socket = rawArgs[1] as import("node:net").Socket;
-      const getHeader = (name: string): string | undefined => {
-        const value = upgradeReq?.headers?.[name];
-        return typeof value === "string" ? value : undefined;
-      };
-      if (!upgradeReq || typeof upgradeReq !== "object") {
-        socket.destroy();
-        return;
-      }
-      void (async () => {
+    const upgradeReq = rawArgs[0] as {
+      url?: unknown;
+      headers: Record<string, unknown>;
+    };
+    const socket = rawArgs[1] as import("node:net").Socket;
+    const getHeader = (name: string): string | undefined => {
+      const value = upgradeReq?.headers?.[name];
+      return typeof value === "string" ? value : undefined;
+    };
+    if (!upgradeReq || typeof upgradeReq !== "object") {
+      socket.destroy();
+      return;
+    }
+    void (async () => {
       try {
         const rawUrl = typeof upgradeReq.url === "string" ? upgradeReq.url : "";
         const match = rawUrl.match(
@@ -1452,9 +1499,9 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         const { desktopUser, backendHost, backendPort, desktopPassword } =
           gated.right;
         const { connect } = tls;
-        const basic = Buffer.from(
-          `${desktopUser}:${desktopPassword}`,
-        ).toString("base64");
+        const basic = Buffer.from(`${desktopUser}:${desktopPassword}`).toString(
+          "base64",
+        );
         const guestPath = `/${after}`;
         const guest = connect({
           host: backendHost,
@@ -1541,7 +1588,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         }
         socket.destroy();
       }
-      })();
+    })();
   });
 
   app.addHook("onClose", async () => {

@@ -12,15 +12,9 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     strictPort: true,
-    // Behind Traefik: the browser's Host is the public name. Loopback and
-    // LAN entries keep direct access working alongside the domain.
-    allowedHosts: [
-      "localhost",
-      "127.0.0.1",
-      "192.168.1.16",
-      "homehost.risktozero.sh",
-      "hhfrontdev.homehost.risktozero.sh",
-    ],
+    // Loopback and LAN only: the dev stack is never published on a public
+    // name (see infra/dev/compose.yml).
+    allowedHosts: ["localhost", "127.0.0.1", "192.168.1.16"],
     proxy: {
       "/api": {
         target: apiTarget,

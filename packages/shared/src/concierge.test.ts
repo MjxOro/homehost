@@ -7,7 +7,6 @@ import {
   CONSOLE_MIN,
   GUI_MIN,
   PLAN_MIN,
-  PLAYERS_MIN,
   RECIPE_MIN,
   SCRAPING_REVIEW,
   SuggestBody,
@@ -53,7 +52,6 @@ function answers(o: Overrides = {}): ConciergeAnswers {
       ...o.recipe,
     },
     wants_gui: o.wants_gui ?? 0.02,
-    players_connect: o.players_connect ?? 0.1,
     console_player: o.console_player ?? 0.05,
     abuse: o.abuse ?? 0.01,
     scraping: o.scraping ?? 0.01,
@@ -91,7 +89,7 @@ describe("decideSuggestion", () => {
       useCase: "game_server",
       planId: "container-small",
       recipeId: "minecraft_java",
-      warnings: ["players_need_ipv6"],
+      warnings: [],
       schemaVersion: CONCIERGE_SCHEMA_VERSION,
       rulesVersion: CONCIERGE_RULES_VERSION,
     });
@@ -444,36 +442,18 @@ describe("decideSuggestion", () => {
     });
   });
 
-  describe("connection warnings", () => {
-    test("game recipes always warn about IPv6; other recipes from the threshold", () => {
-      expect(
-        decideSuggestion(answers({ players_connect: 0 }), technical).warnings,
-      ).toEqual(["players_need_ipv6"]);
-      expect(
-        decideSuggestion(
-          answers({ ...bot, players_connect: PLAYERS_MIN }),
-          technical,
-        ).warnings,
-      ).toEqual(["players_need_ipv6"]);
-      expect(
-        decideSuggestion(
-          answers({ ...bot, players_connect: PLAYERS_MIN - 0.01 }),
-          technical,
-        ).warnings,
-      ).toEqual([]);
-    });
-
+  describe("console warning", () => {
     test("console players are warned only for game recipes", () => {
       expect(
         decideSuggestion(answers({ console_player: CONSOLE_MIN }), technical)
           .warnings,
-      ).toEqual(["players_need_ipv6", "console_not_supported"]);
+      ).toEqual(["console_not_supported"]);
       expect(
         decideSuggestion(
           answers({ console_player: CONSOLE_MIN - 0.01 }),
           technical,
         ).warnings,
-      ).toEqual(["players_need_ipv6"]);
+      ).toEqual([]);
       expect(
         decideSuggestion(answers({ ...bot, console_player: 1 }), technical)
           .warnings,
