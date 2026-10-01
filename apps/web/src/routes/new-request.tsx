@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type Ref } from "react";
-import { Link } from "@tanstack/react-router";
-import type { Plan, PortalUser, ServerRequest } from "@homehost/shared";
-import { isValidSshPublicKey } from "@homehost/shared";
-import { isApiError } from "../lib/api";
-import { setupSlug } from "../lib/concierge";
+import { useMemo, useRef, useState, type Ref } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import type { Plan, PortalUser, RecipeId } from "@homehost/shared";
+import { recipeLabel, setupSlug } from "../lib/concierge";
 import { formatMemory, formatPlanSpecs } from "../lib/format";
 import {
   useCreateRequest,
@@ -11,47 +9,40 @@ import {
   usePlans,
   useSession,
 } from "../lib/query";
+import {
+  createErrorCopy,
+  NAME_MAX,
+  nameError as checkName,
+  recipeComingSoon,
+  recipeEula,
+  recipePlanError,
+  requestableRecipe,
+  sshKeyError as checkKey,
+} from "../lib/request-input";
 import { LockIcon, Spinner } from "../components/icons";
-import { SetupHelper, type SetupPick } from "../components/SetupHelper";
+import {
+  EulaCheckbox,
+  SetupHelper,
+  type SetupPick,
+} from "../components/SetupHelper";
 import { prefersReducedMotion } from "../lib/motion";
 import { SignInGate } from "../components/SignInGate";
 import {
+  BUTTON_GHOST_SM,
   BUTTON_PRIMARY,
   CARD,
   Chip,
   ErrorState,
   FORM_ERROR,
   LINK_GHOST,
-  LINK_PRIMARY,
   PageLoading,
-  StatusPill,
 } from "../components/primitives";
 
-const NAME_MAX = 48;
-
-const CODE_BADGE =
-  "rounded-md border border-line bg-ink-2 px-1.5 py-0.5 font-mono text-[12.5px] text-accent [overflow-wrap:anywhere]";
 const FIELD_LABEL = "text-[13.5px] font-semibold text-text-1";
 const INPUT_FIELD =
   "min-h-11 w-full rounded-control border border-line-strong bg-ink-2 px-3 py-2.5 text-[14.5px] text-text-1 transition-colors duration-(--duration-fast) ease-out-quint placeholder:text-text-3 focus:border-accent aria-invalid:border-bad disabled:opacity-60";
 const FIELD_HINT = "m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-text-3";
 const COUNTER_BASE = "m-0 whitespace-nowrap font-mono text-[12px]";
-
-function describeSubmitError(error: unknown): string {
-  if (isApiError(error)) {
-    if (error.status === 429) {
-      return `${error.message} Cancel an existing request or ask an operator to adjust your tier.`;
-    }
-    if (error.status === 403) {
-      return `${error.message} Locked plans need a technical friend tier.`;
-    }
-    if (error.status === 0) {
-      return "Network error — the API did not respond.";
-    }
-    return error.message;
-  }
-  return "Unexpected error while submitting the request.";
-}
 
 interface PlanChoice {
   plan: Plan;
@@ -173,36 +164,6 @@ function QuotaHint({ userId, plan }: { userId: string; plan: Plan | null }) {
   );
 }
 
-function SuccessPanel({ request }: { request: ServerRequest }) {
-  const headingRef = useRef<HTMLHeadingElement>(null);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
-
-  return (
-    <div
-      className="animate-fade-in lg:min-h-[1100px] lg:@min-[500px]:min-h-[800px] lg:@min-[750px]:min-h-[700px] lg:@min-[900px]:min-h-[600px] flex flex-col items-center justify-center gap-2.5 px-4 py-10 text-center"
-      role="status"
-    >
-      <h2 className="text-[18px] font-bold" tabIndex={-1} ref={headingRef}>
-        Request submitted
-      </h2>
-      <p className="max-w-[54ch] text-[14px] leading-[1.6] text-text-2">
-        “{request.name}” is now <StatusPill status={request.status} />. An
-        operator will review it — nothing has been created or started.
-      </p>
-      <p className="max-w-[54ch] text-[14px] leading-[1.6] text-text-2">
-        Reserved subdomain label:{" "}
-        <code className={CODE_BADGE}>{request.subdomain}</code>
-      </p>
-      <Link to="/" className={LINK_PRIMARY}>
-        View dashboard
-      </Link>
-    </div>
-  );
-}
-
 /** Scroll a form section clear of the sticky topbar, then focus a control in it. */
 function bringIntoView(section: HTMLElement, focus: HTMLElement | null) {
   section.scrollIntoView({
@@ -215,11 +176,14 @@ function bringIntoView(section: HTMLElement, focus: HTMLElement | null) {
 function RequestForm({ user }: { user: PortalUser }) {
   const plansQuery = usePlans();
   const createRequest = useCreateRequest();
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [planId, setPlanId] = useState<string | null>(null);
+  // Software from the helper's "Use this"; null = plain Ubuntu.
+  const [recipeId, setRecipeId] = useState<RecipeId | null>(null);
+  const [eulaAccepted, setEulaAccepted] = useState(false);
   const [sshKey, setSshKey] = useState("");
   const [attempted, setAttempted] = useState(false);
-  const [submitted, setSubmitted] = useState<ServerRequest | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const planPickerRef = useRef<HTMLFieldSetElement>(null);
 
@@ -231,8 +195,6 @@ function RequestForm({ user }: { user: PortalUser }) {
       })),
     [plansQuery.data, user.tier],
   );
-
-  if (submitted) return <SuccessPanel request={submitted} />;
 
   if (plansQuery.isPending) {
     return (
@@ -257,24 +219,29 @@ function RequestForm({ user }: { user: PortalUser }) {
 
   const trimmed = name.trim();
   const nameTooLong = name.length > NAME_MAX;
-  const nameError =
-    trimmed.length === 0
-      ? "Enter a server name."
-      : nameTooLong
-        ? `Name is limited to ${NAME_MAX} characters.`
-        : null;
+  const nameError = checkName(name);
   const planError = planId === null ? "Choose a plan." : null;
   const selectedPlan =
     choices.find((choice) => choice.plan.id === planId)?.plan ?? null;
   const trimmedKey = sshKey.trim();
-  const keyError =
-    trimmedKey.length > 0 && !isValidSshPublicKey(trimmedKey)
-      ? "Paste a single-line public key: <type> <base64> [comment]."
+  const keyError = checkKey(trimmedKey);
+  const sentRecipe = requestableRecipe(recipeId);
+  const eula = recipeEula(sentRecipe);
+  const eulaError =
+    eula && !eulaAccepted
+      ? "Accept the license to continue, or use plain Ubuntu instead."
       : null;
+  const recipeError = recipePlanError(sentRecipe, selectedPlan);
 
-  const applySetup = ({ planId: picked, useCase, recipeId }: SetupPick) => {
+  const applySetup = ({
+    planId: picked,
+    useCase,
+    recipeId: recipe,
+  }: SetupPick) => {
     setPlanId(picked);
-    if (trimmed.length === 0) setName(setupSlug(useCase, recipeId));
+    setRecipeId(recipe === "none" ? null : recipe);
+    setEulaAccepted(false);
+    if (trimmed.length === 0) setName(setupSlug(useCase, recipe));
     if (nameRef.current) bringIntoView(nameRef.current, nameRef.current);
   };
 
@@ -285,15 +252,29 @@ function RequestForm({ user }: { user: PortalUser }) {
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);
-        if (nameError || planError || keyError || !planId) return;
+        if (
+          nameError ||
+          planError ||
+          keyError ||
+          eulaError ||
+          recipeError ||
+          !planId
+        )
+          return;
         createRequest.mutate(
           {
             name: trimmed,
             planId,
+            recipeId: sentRecipe,
+            eulaAccepted: eula ? true : undefined,
             sshPubkey: trimmedKey || undefined,
           },
           {
-            onSuccess: (request) => setSubmitted(request),
+            onSuccess: (request) =>
+              void navigate({
+                to: "/servers/$id",
+                params: { id: request.id },
+              }),
           },
         );
       }}
@@ -370,6 +351,54 @@ function RequestForm({ user }: { user: PortalUser }) {
         </p>
       ) : null}
 
+      {recipeId !== null ? (
+        <div className="flex flex-col gap-2">
+          <p className={`${FIELD_LABEL} m-0`}>Software</p>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-control border border-line bg-ink-2 py-1 pl-3 pr-1">
+            <span className="min-w-0 text-[14px] text-text-1">
+              {recipeComingSoon(recipeId)
+                ? "Plain Ubuntu"
+                : recipeLabel(recipeId)}
+            </span>
+            <button
+              type="button"
+              className={BUTTON_GHOST_SM}
+              disabled={createRequest.isPending}
+              onClick={() => {
+                setRecipeId(null);
+                setEulaAccepted(false);
+              }}
+            >
+              Use plain Ubuntu instead
+            </button>
+          </div>
+          <p className={FIELD_HINT}>
+            {recipeComingSoon(recipeId)
+              ? `Automatic setup for ${recipeLabel(recipeId)} is coming soon. For now you'll get a clean Ubuntu server you can set it up on yourself.`
+              : "Installed automatically once the server is running. You can follow every step after you submit."}
+          </p>
+          {recipeError ? (
+            <p className={FORM_ERROR} role="alert">
+              {recipeError}
+            </p>
+          ) : null}
+          {eula ? (
+            <EulaCheckbox
+              id="request-eula"
+              eula={eula}
+              checked={eulaAccepted}
+              disabled={createRequest.isPending}
+              onChange={setEulaAccepted}
+            />
+          ) : null}
+          {attempted && eulaError ? (
+            <p className={FORM_ERROR} role="alert">
+              {eulaError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {selectedPlan ? <QuotaHint userId={user.id} plan={selectedPlan} /> : null}
 
       {selectedPlan ? (
@@ -405,7 +434,7 @@ function RequestForm({ user }: { user: PortalUser }) {
 
       {createRequest.isError ? (
         <p className={FORM_ERROR} role="alert">
-          {describeSubmitError(createRequest.error)}
+          {createErrorCopy(createRequest.error)}
         </p>
       ) : null}
 
