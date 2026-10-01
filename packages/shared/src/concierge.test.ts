@@ -14,15 +14,11 @@ import {
   USE_CASE_MIN,
   decideSuggestion,
   eligiblePlans,
-  picksProblem,
-  uncertainSlots,
+  needsTranslation,
 } from "./concierge.js";
-import { SUGGEST_TEXT_MAX } from "./concierge-catalog.js";
-import type {
-  ConciergeAnswers,
-  SuggestPicks,
-  SuggestionDecision,
-} from "./concierge.js";
+import { RECIPES, SUGGEST_TEXT_MAX } from "./concierge-catalog.js";
+import { PLANS } from "./plans.js";
+import type { ConciergeAnswers, SuggestionDecision } from "./concierge.js";
 
 type Overrides = {
   [K in keyof ConciergeAnswers]?: ConciergeAnswers[K] extends number
@@ -61,8 +57,6 @@ function answers(o: Overrides = {}): ConciergeAnswers {
 
 const technical = { userTier: "technical" } as const;
 const nontechnical = { userTier: "nontechnical" } as const;
-
-/** A confidently chosen non-game setup, so connection warnings stay quiet. */
 const bot = {
   use_case: { choice: "always_on" },
   recipe: {
@@ -72,18 +66,13 @@ const bot = {
 } as const satisfies Overrides;
 
 function suggested(d: SuggestionDecision) {
-  expect(d.outcome).toBe("suggested");
+  if (d.outcome !== "suggested")
+    throw new Error(`expected suggested, got ${d.outcome}`);
   return d;
 }
 
-function chosen(d: SuggestionDecision) {
-  if (d.outcome !== "choose")
-    throw new Error(`expected choose, got ${d.outcome}`);
-  return d.choice;
-}
-
 describe("decideSuggestion", () => {
-  test("confident answers suggest the plan and recipe as-is, versioned", () => {
+  test("confident Minecraft answers produce a complete versioned suggestion", () => {
     expect(decideSuggestion(answers(), nontechnical)).toEqual({
       outcome: "suggested",
       useCase: "game_server",
@@ -105,15 +94,16 @@ describe("decideSuggestion", () => {
         useCase: null,
         planId: null,
         recipeId: null,
+        warnings: [],
       });
     });
 
     test("grey-zone abuse keeps going and flags review", () => {
       for (const abuse of [ABUSE_REVIEW, ABUSE_REFUSE - 0.01]) {
-        const d = suggested(
-          decideSuggestion(answers({ ...bot, abuse }), technical),
-        );
-        expect(d.warnings).toEqual(["needs_review"]);
+        expect(
+          suggested(decideSuggestion(answers({ ...bot, abuse }), technical))
+            .warnings,
+        ).toEqual(["needs_review"]);
       }
       expect(
         decideSuggestion(
@@ -124,10 +114,10 @@ describe("decideSuggestion", () => {
     });
 
     test("scraping only ever flags review", () => {
-      const d = suggested(
-        decideSuggestion(answers({ ...bot, scraping: 1 }), technical),
-      );
-      expect(d.warnings).toEqual(["needs_review"]);
+      expect(
+        suggested(decideSuggestion(answers({ ...bot, scraping: 1 }), technical))
+          .warnings,
+      ).toEqual(["needs_review"]);
       expect(
         decideSuggestion(
           answers({ ...bot, scraping: SCRAPING_REVIEW - 0.01 }),
@@ -137,8 +127,8 @@ describe("decideSuggestion", () => {
     });
   });
 
-  describe("use case", () => {
-    test("an unsure use case asks with the top offered options", () => {
+  describe("use case and software defaults", () => {
+    test("an unsure not-offered answer uses the top offered probability", () => {
       const d = decideSuggestion(
         answers({
           use_case: {
@@ -152,21 +142,31 @@ describe("decideSuggestion", () => {
               game_server: 0.05,
             },
           },
+          plan: { confidence: 0.1 },
         }),
         technical,
       );
-      expect(d).toMatchObject({ useCase: null, planId: null, recipeId: null });
-      expect(chosen(d)).toEqual({
-        slot: "use_case",
-        options: [
-          { id: "website", label: expect.any(String), probability: 0.3 },
-          { id: "dev_box", label: expect.any(String), probability: 0.2 },
-          { id: "game_server", label: expect.any(String), probability: 0.05 },
-        ],
+      expect(suggested(d)).toMatchObject({
+        useCase: "website",
+        planId: "container-small",
+        recipeId: "docker",
       });
     });
 
-    test("only a confident not_offered use case is terminal", () => {
+    test("an unsure offered use case keeps Jev's top choice", () => {
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({
+              use_case: { choice: "dev_box", confidence: 0.1 },
+            }),
+            technical,
+          ),
+        ),
+      ).toMatchObject({ useCase: "dev_box", recipeId: "docker" });
+    });
+
+    test("only a confident not-offered use case is terminal", () => {
       expect(
         decideSuggestion(
           answers({
@@ -177,21 +177,108 @@ describe("decideSuggestion", () => {
       ).toMatchObject({
         outcome: "not_offered",
         reason: "unsupported_use_case",
+        useCase: "not_offered",
         planId: null,
         recipeId: null,
       });
     });
 
-    test("a picked use case overrides an unsure answer", () => {
-      const d = decideSuggestion(
-        answers({ use_case: { choice: "not_offered", confidence: 0.1 } }),
-        { ...technical, picks: { useCase: "game_server" } },
-      );
-      expect(suggested(d).useCase).toBe("game_server");
+    test("bots, websites, dev boxes and Linux learners default to the smallest fitting Docker plan in either tier", () => {
+      for (const tier of [technical, nontechnical]) {
+        for (const choice of [
+          "always_on",
+          "website",
+          "dev_box",
+          "learn_linux",
+        ] as const) {
+          const d = decideSuggestion(
+            answers({
+              use_case: { choice },
+              plan: { choice: "vm-large", confidence: PLAN_MIN - 0.01 },
+              recipe: { choice: "python", confidence: 0.1 },
+            }),
+            tier,
+          );
+          expect(suggested(d)).toMatchObject({
+            useCase: choice,
+            recipeId: "docker",
+            planId: "container-small",
+            warnings: [],
+          });
+        }
+      }
+    });
+
+    test("an unsure game uses the top game probability, ignoring non-games", () => {
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({
+              recipe: {
+                choice: "node",
+                confidence: 0.1,
+                probabilities: {
+                  node: 0.6,
+                  python: 0.2,
+                  minecraft_java: 0.04,
+                  valheim: 0.1,
+                  minecraft_bedrock: 0.06,
+                },
+              },
+            }),
+            nontechnical,
+          ),
+        ).recipeId,
+      ).toBe("valheim");
+      expect(RECIPES.valheim.installable).toBe(false);
+    });
+
+    test("games default to Minecraft Java without any positive game probability", () => {
+      for (const probabilities of [{}, { node: 0.9, minecraft_bedrock: 0 }]) {
+        expect(
+          suggested(
+            decideSuggestion(
+              answers({ recipe: { choice: "node", probabilities } }),
+              technical,
+            ),
+          ).recipeId,
+        ).toBe("minecraft_java");
+      }
+    });
+
+    test("game probability ties keep catalog order", () => {
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({
+              recipe: {
+                choice: "valheim",
+                probabilities: { valheim: 0.4, minecraft_bedrock: 0.4 },
+              },
+            }),
+            technical,
+          ),
+        ).recipeId,
+      ).toBe("minecraft_bedrock");
+    });
+
+    test("a remote desktop defaults to a desktop plan and plain software", () => {
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({
+              use_case: { choice: "remote_desktop" },
+              plan: { confidence: 0.1 },
+              recipe: { choice: "docker" },
+            }),
+            technical,
+          ),
+        ),
+      ).toMatchObject({ planId: "desktop-ubuntu", recipeId: "none" });
     });
   });
 
-  describe("plan", () => {
+  describe("plan and normalization", () => {
     test("only a confident plan none is terminal", () => {
       expect(
         decideSuggestion(
@@ -199,41 +286,27 @@ describe("decideSuggestion", () => {
           technical,
         ),
       ).toMatchObject({ outcome: "not_offered", reason: "no_fitting_plan" });
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({ plan: { choice: "none", confidence: PLAN_MIN - 0.01 } }),
+            technical,
+          ),
+        ).planId,
+      ).toBe("container-small");
     });
 
-    test("an unsure plan asks with the top 3 eligible plans, never none", () => {
-      const d = decideSuggestion(
-        answers({
-          plan: {
-            choice: "none",
-            confidence: PLAN_MIN - 0.01,
-            probabilities: {
-              none: 0.4,
-              "vm-large": 0.05,
-              "container-small": 0.3,
-              "vm-medium": 0.2,
-            },
-          },
-        }),
-        technical,
-      );
-      expect(d).toMatchObject({ planId: null, recipeId: "minecraft_java" });
-      expect(chosen(d)).toEqual({
-        slot: "plan",
-        options: [
-          { id: "container-small", label: "Container Small", probability: 0.3 },
-          { id: "vm-medium", label: "VM Medium", probability: 0.2 },
-          { id: "vm-large", label: "VM Large", probability: 0.05 },
-        ],
-      });
-    });
-
-    test("an unsure plan with a single eligible candidate needs no question", () => {
-      const d = decideSuggestion(
-        answers({ plan: { choice: "none", confidence: 0.3 } }),
-        nontechnical,
-      );
-      expect(suggested(d).planId).toBe("container-small");
+    test("a confident VM plan for a bot is kept without shrinking", () => {
+      for (const choice of ["vm-medium", "vm-large"]) {
+        expect(
+          suggested(
+            decideSuggestion(
+              answers({ ...bot, plan: { choice, confidence: PLAN_MIN } }),
+              technical,
+            ),
+          ),
+        ).toMatchObject({ planId: choice, recipeId: "docker", warnings: [] });
+      }
     });
 
     test("unavailable and tier-locked plans are never suggested", () => {
@@ -243,260 +316,179 @@ describe("decideSuggestion", () => {
       expect(eligiblePlans("nontechnical").map((p) => p.id)).toEqual([
         "container-small",
       ]);
-      const omarchy = decideSuggestion(
-        answers({
-          use_case: { choice: "remote_desktop" },
-          plan: { choice: "desktop-omarchy" },
-          recipe: { choice: "none" },
-          wants_gui: 0.95,
-        }),
-        technical,
-      );
-      expect(suggested(omarchy).planId).toBe("desktop-ubuntu");
       expect(
-        decideSuggestion(
-          answers({ plan: { choice: "vm-medium" } }),
-          nontechnical,
+        suggested(
+          decideSuggestion(
+            answers({
+              use_case: { choice: "remote_desktop" },
+              plan: { choice: "desktop-omarchy" },
+            }),
+            technical,
+          ),
+        ).planId,
+      ).toBe("desktop-ubuntu");
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({ ...bot, plan: { choice: "vm-medium" } }),
+            nontechnical,
+          ),
         ).planId,
       ).toBe("container-small");
     });
 
     test("a remote desktop without an eligible desktop plan is tier locked", () => {
-      // Jev sees only container-small here, so it may answer it or a confident none.
-      for (const plan of [{ choice: "container-small" }, { choice: "none" }]) {
+      for (const choice of ["container-small", "none"]) {
         expect(
           decideSuggestion(
             answers({
               use_case: { choice: "remote_desktop" },
-              plan,
-              recipe: { choice: "none" },
-              wants_gui: 0.95,
+              plan: { choice },
             }),
             nontechnical,
           ),
         ).toMatchObject({ outcome: "not_offered", reason: "tier_locked" });
       }
     });
-  });
 
-  describe("normalizer", () => {
-    test("an unsure recipe leaves a confident container plan alone", () => {
-      const d = decideSuggestion(
-        answers({
-          ...bot,
-          recipe: {
-            choice: "docker",
-            confidence: RECIPE_MIN - 0.01,
-            probabilities: { docker: 0.4, node: 0.35, python: 0.25 },
-          },
-        }),
-        technical,
-      );
-      expect(d).toMatchObject({ planId: "container-small", recipeId: null });
-      expect(d.warnings).toEqual([]);
-      expect(chosen(d).options.map((o) => o.id)).toEqual([
-        "docker",
-        "node",
-        "python",
-      ]);
-    });
-
-    test("recipe options include Docker on a container plan", () => {
-      const d = decideSuggestion(
-        answers({
-          ...bot,
-          recipe: {
-            confidence: 0.3,
-            probabilities: { docker: 0.4, node: 0.35, python: 0.2, none: 0.05 },
-          },
-        }),
-        nontechnical,
-      );
-      expect(chosen(d).options.map((o) => o.id)).toEqual([
-        "docker",
-        "node",
-        "python",
-      ]);
-    });
-
-    test("Docker leaves a container plan unchanged", () => {
-      const d = suggested(
-        decideSuggestion(
-          answers({ ...bot, recipe: { choice: "docker" } }),
-          technical,
-        ),
-      );
-      expect(d).toMatchObject({
+    test("a headless workload is moved off a desktop without shrinking", () => {
+      const o = {
+        ...bot,
+        plan: { choice: "desktop-ubuntu" },
+        wants_gui: GUI_MIN - 0.01,
+      };
+      expect(suggested(decideSuggestion(answers(o), technical))).toMatchObject({
         planId: "container-small",
-        recipeId: "docker",
-      });
-      expect(d.warnings).toEqual([]);
-    });
-
-    test("Docker is available to nontechnical accounts", () => {
-      expect(
-        decideSuggestion(
-          answers({ ...bot, recipe: { choice: "docker" } }),
-          nontechnical,
-        ),
-      ).toMatchObject({
-        outcome: "suggested",
-        planId: "container-small",
-        recipeId: "docker",
-      });
-    });
-
-    test("a desktop plan for a headless workload moves to a headless plan without shrinking", () => {
-      const desktop = { choice: "desktop-ubuntu", confidence: 0.9 };
-      const coding = suggested(
-        decideSuggestion(
-          answers({
-            use_case: { choice: "dev_box" },
-            plan: desktop,
-            recipe: { choice: "code_server" },
-            wants_gui: GUI_MIN - 0.01,
-          }),
-          technical,
-        ),
-      );
-      expect(coding.planId).toBe("container-small");
-      expect(coding.warnings).toEqual([]);
-      const docker = suggested(
-        decideSuggestion(
-          answers({
-            use_case: { choice: "dev_box" },
-            plan: desktop,
-            recipe: { choice: "docker" },
-            wants_gui: GUI_MIN - 0.01,
-          }),
-          technical,
-        ),
-      );
-      // The desktop was already a VM: moving off it is not an upgrade.
-      expect(docker).toMatchObject({ planId: "container-small", warnings: [] });
-      const wanted = decideSuggestion(
-        answers({
-          use_case: { choice: "dev_box" },
-          plan: desktop,
-          recipe: { choice: "code_server" },
-          wants_gui: 0.9,
-        }),
-        technical,
-      );
-      expect(wanted.planId).toBe("desktop-ubuntu");
-    });
-
-    test("a remote desktop never shrinks a larger headless answer silently", () => {
-      const d = decideSuggestion(
-        answers({
-          use_case: { choice: "remote_desktop" },
-          plan: { choice: "vm-large", probabilities: { "vm-large": 0.9 } },
-          recipe: { choice: "none" },
-          wants_gui: 0.95,
-        }),
-        technical,
-      );
-      expect(chosen(d)).toMatchObject({
-        slot: "plan",
-        options: [{ id: "desktop-ubuntu" }],
-      });
-    });
-  });
-
-  describe("picks", () => {
-    test("a picked container plan can run Docker", () => {
-      const d = decideSuggestion(
-        answers({ ...bot, recipe: { choice: "docker" } }),
-        { ...technical, picks: { planId: "container-small" } },
-      );
-      expect(d).toMatchObject({
-        outcome: "suggested",
-        planId: "container-small",
-        recipeId: "docker",
-      });
-    });
-
-    test("picked plan and recipe are final and need no upgrade", () => {
-      const d = decideSuggestion(
-        answers({
-          ...bot,
-          plan: { confidence: 0.1 },
-          recipe: { confidence: 0.1 },
-        }),
-        { ...technical, picks: { planId: "vm-medium", recipeId: "docker" } },
-      );
-      expect(suggested(d)).toMatchObject({
-        planId: "vm-medium",
         recipeId: "docker",
         warnings: [],
       });
+      expect(
+        suggested(
+          decideSuggestion(answers({ ...o, wants_gui: GUI_MIN }), technical),
+        ).planId,
+      ).toBe("desktop-ubuntu");
     });
 
-    test("picksProblem rejects ineligible plans and incompatible pairs", () => {
-      const cases: [
-        SuggestPicks | undefined,
-        "technical" | "nontechnical",
-        boolean,
-      ][] = [
-        [undefined, "nontechnical", false],
-        [{ recipeId: "docker" }, "nontechnical", false],
-        [{ planId: "container-small" }, "nontechnical", false],
-        [{ planId: "vm-medium" }, "nontechnical", true],
-        [{ planId: "desktop-omarchy" }, "technical", true],
-        [{ planId: "container-small", recipeId: "docker" }, "technical", false],
-        [{ planId: "vm-medium", recipeId: "docker" }, "technical", false],
-      ];
-      for (const [picks, tier, rejected] of cases) {
-        expect(picksProblem(picks, tier) !== null).toBe(rejected);
+    test("a remote desktop never shrinks a larger headless answer silently", () => {
+      expect(
+        decideSuggestion(
+          answers({
+            use_case: { choice: "remote_desktop" },
+            plan: { choice: "vm-large" },
+          }),
+          technical,
+        ),
+      ).toMatchObject({ outcome: "not_offered", reason: "no_fitting_plan" });
+    });
+
+    test("no available fitting plan returns not offered", () => {
+      const desktop = PLANS.find((p) => p.id === "desktop-ubuntu")!;
+      const available = desktop.available;
+      try {
+        desktop.available = false;
+        expect(
+          decideSuggestion(
+            answers({ use_case: { choice: "remote_desktop" } }),
+            technical,
+          ),
+        ).toMatchObject({ outcome: "not_offered", reason: "no_fitting_plan" });
+      } finally {
+        desktop.available = available;
+      }
+    });
+
+    test("a future VM-only game upgrades once and preserves ordered warnings", () => {
+      const requiresVm = RECIPES.valheim.requiresVm;
+      try {
+        RECIPES.valheim.requiresVm = true;
+        expect(
+          suggested(
+            decideSuggestion(
+              answers({
+                recipe: { choice: "valheim", probabilities: { valheim: 1 } },
+                abuse: ABUSE_REVIEW,
+                console_player: CONSOLE_MIN,
+              }),
+              technical,
+            ),
+          ),
+        ).toMatchObject({
+          planId: "vm-medium",
+          recipeId: "valheim",
+          warnings: [
+            "needs_review",
+            "upgraded_for_recipe",
+            "console_not_supported",
+          ],
+        });
+        expect(
+          decideSuggestion(
+            answers({
+              recipe: { choice: "valheim", probabilities: { valheim: 1 } },
+            }),
+            nontechnical,
+          ),
+        ).toMatchObject({ outcome: "not_offered", reason: "tier_locked" });
+      } finally {
+        RECIPES.valheim.requiresVm = requiresVm;
       }
     });
   });
 
-  describe("console warning", () => {
-    test("console players are warned only for game recipes", () => {
-      expect(
-        decideSuggestion(answers({ console_player: CONSOLE_MIN }), technical)
-          .warnings,
-      ).toEqual(["console_not_supported"]);
-      expect(
-        decideSuggestion(
-          answers({ console_player: CONSOLE_MIN - 0.01 }),
-          technical,
-        ).warnings,
-      ).toEqual([]);
-      expect(
-        decideSuggestion(answers({ ...bot, console_player: 1 }), technical)
-          .warnings,
-      ).toEqual([]);
-    });
+  test("console players are warned only for game recipes", () => {
+    expect(
+      decideSuggestion(answers({ console_player: CONSOLE_MIN }), technical)
+        .warnings,
+    ).toEqual(["console_not_supported"]);
+    expect(
+      decideSuggestion(
+        answers({ console_player: CONSOLE_MIN - 0.01 }),
+        technical,
+      ).warnings,
+    ).toEqual([]);
+    expect(
+      decideSuggestion(answers({ ...bot, console_player: 1 }), technical)
+        .warnings,
+    ).toEqual([]);
   });
 });
 
-describe("uncertainSlots", () => {
-  test("lists unpicked slots below their thresholds", () => {
-    expect(uncertainSlots(answers())).toEqual([]);
+describe("needsTranslation", () => {
+  test("only use case and game uncertainty matter", () => {
+    expect(needsTranslation(answers())).toBe(false);
     expect(
-      uncertainSlots(
+      needsTranslation(
+        answers({ use_case: { confidence: USE_CASE_MIN - 0.01 } }),
+      ),
+    ).toBe(true);
+    expect(needsTranslation(answers({ plan: { confidence: 0.1 } }))).toBe(
+      false,
+    );
+    expect(
+      needsTranslation(answers({ recipe: { confidence: RECIPE_MIN - 0.01 } })),
+    ).toBe(true);
+    expect(
+      needsTranslation(answers({ recipe: { confidence: RECIPE_MIN } })),
+    ).toBe(false);
+    expect(
+      needsTranslation(answers({ ...bot, recipe: { confidence: 0.1 } })),
+    ).toBe(false);
+    expect(
+      needsTranslation(
         answers({
-          use_case: { confidence: 0.2 },
-          plan: { confidence: 0.2 },
-          recipe: { confidence: 0.2 },
+          use_case: { choice: "remote_desktop" },
+          recipe: { confidence: 0.1 },
         }),
       ),
-    ).toEqual(["use_case", "plan", "recipe"]);
+    ).toBe(false);
     expect(
-      uncertainSlots(answers({ plan: { confidence: 0.2 } }), {
-        planId: "container-small",
-      }),
-    ).toEqual([]);
-    expect(
-      uncertainSlots(
+      needsTranslation(
         answers({
-          use_case: { choice: "not_offered", confidence: 0.9 },
-          plan: { confidence: 0.1 },
+          use_case: { choice: "not_offered", confidence: USE_CASE_MIN },
+          recipe: { confidence: 0.1 },
         }),
       ),
-    ).toEqual([]);
+    ).toBe(false);
   });
 });
 
@@ -526,27 +518,8 @@ describe("Suggestion schema", () => {
     }
   });
 
-  test("rejects incoherent outcomes", () => {
-    const choose = {
-      ...envelope,
-      outcome: "choose",
-      useCase: "game_server",
-      planId: null,
-      recipeId: null,
-    };
-    const option = {
-      id: "container-small",
-      label: "Container Small",
-      probability: 0.5,
-    };
+  test("rejects old schema versions and incoherent outcomes", () => {
     const bad = [
-      choose,
-      { ...choose, choice: { slot: "plan", options: [] } },
-      { ...choose, choice: { slot: "plan", options: [option, option] } },
-      {
-        ...choose,
-        choice: { slot: "plan", options: [{ ...option, id: "nope" }] },
-      },
       {
         ...envelope,
         outcome: "refused",
@@ -569,6 +542,14 @@ describe("Suggestion schema", () => {
         planId: null,
         recipeId: null,
       },
+      {
+        ...envelope,
+        outcome: "suggested",
+        useCase: "always_on",
+        planId: "container-small",
+        recipeId: "docker",
+        schemaVersion: 1,
+      },
     ];
     for (const value of bad) {
       expect(Suggestion.safeParse(value).success).toBe(false);
@@ -578,9 +559,7 @@ describe("Suggestion schema", () => {
 
 describe("SuggestBody", () => {
   test("trims and bounds the text", () => {
-    expect(SuggestBody.parse({ text: "  a bot  " })).toEqual({
-      text: "a bot",
-    });
+    expect(SuggestBody.parse({ text: "  a bot  " })).toEqual({ text: "a bot" });
     expect(SuggestBody.safeParse({ text: "   " }).success).toBe(false);
     expect(
       SuggestBody.safeParse({ text: "x".repeat(SUGGEST_TEXT_MAX) }).success,
@@ -590,21 +569,9 @@ describe("SuggestBody", () => {
     ).toBe(false);
   });
 
-  test("accepts catalog picks and nothing else", () => {
-    expect(
-      SuggestBody.safeParse({
-        text: "a bot",
-        picks: {
-          useCase: "always_on",
-          planId: "container-small",
-          recipeId: "node",
-        },
-      }).success,
-    ).toBe(true);
+  test("accepts text only; old overrides and other unknown keys are rejected", () => {
     for (const body of [
-      { text: "a bot", picks: { planId: "huge" } },
-      { text: "a bot", picks: { useCase: "not_offered" } },
-      { text: "a bot", picks: { model: "other" } },
+      { text: "a bot", recipeId: "node" },
       { text: "a bot", model: "other" },
     ]) {
       expect(SuggestBody.safeParse(body).success).toBe(false);

@@ -11,12 +11,11 @@ import {
   USE_CASE_IDS,
   decideSuggestion,
   eligiblePlans,
-  uncertainSlots,
+  needsTranslation,
 } from "@homehost/shared";
 import type {
   ConciergeAnswers,
   PortalUser,
-  SuggestPicks,
   Suggestion,
   TrustTier,
 } from "@homehost/shared";
@@ -430,8 +429,6 @@ const translate = (ctx: CallContext, text: string) =>
 export interface SuggestInput {
   user: PortalUser;
   text: string;
-  /** Answers to an earlier `choose`; validated by the caller (picksProblem). */
-  picks?: SuggestPicks;
 }
 
 function toAnswers(a: JevAnswers): ConciergeAnswers {
@@ -511,11 +508,11 @@ export const suggest = (
       let model = first.model;
       let translated = false;
       // A refusal on the original text stands: never translate it away. Only
-      // translate when a slot we still need is unsure.
+      // translate when the use case or game is unsure.
       if (
         answers.abuse < ABUSE_REFUSE &&
         answers.is_english < ENGLISH_MIN &&
-        uncertainSlots(answers, input.picks).length > 0
+        needsTranslation(answers)
       ) {
         const english = yield* translate(ctx, input.text);
         const second = yield* askJev(ctx, tier, english);
@@ -531,7 +528,6 @@ export const suggest = (
       }
       const decision = decideSuggestion(answers, {
         userTier: tier,
-        picks: input.picks,
       });
       return { ...decision, translated, model };
     }).pipe(

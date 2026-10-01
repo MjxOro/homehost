@@ -221,7 +221,4 @@ export const NOT_OFFERED_REASONS = [
 ] as const;
 export type NotOfferedReason = (typeof NOT_OFFERED_REASONS)[number];
 
-export const CHOICE_SLOTS = ["use_case", "plan", "recipe"] as const;
-export type ChoiceSlot = (typeof CHOICE_SLOTS)[number];
-
 export const SUGGEST_TEXT_MAX = 500;

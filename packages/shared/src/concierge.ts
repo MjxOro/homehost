@@ -10,9 +10,7 @@ import {
   RECIPES,
   SUGGEST_TEXT_MAX,
   USE_CASE_IDS,
-  USE_CASES,
   WARNING_CODES,
-  type ChoiceSlot,
   type NotOfferedReason,
   type RecipeId,
   type UseCaseId,
@@ -21,9 +19,9 @@ import {
 import { PLANS, type Plan } from "./plans.js";
 
 /** Shape of the `Suggestion` JSON. Bump on breaking contract changes. */
-export const CONCIERGE_SCHEMA_VERSION = 1;
+export const CONCIERGE_SCHEMA_VERSION = 2;
 /** Bump whenever a rule, threshold, question or catalog change can alter a suggestion. */
-export const CONCIERGE_RULES_VERSION = "2026-10-01.2";
+export const CONCIERGE_RULES_VERSION = "2026-10-01.3";
 
 /** Extra Jev plan option meaning "nothing in PLANS fits". */
 export const PLAN_NONE = "none";
@@ -34,70 +32,27 @@ export const ABUSE_REFUSE = 0.8;
 export const ABUSE_REVIEW = 0.4;
 /** scraping at or above this adds `needs_review`; it never refuses. */
 export const SCRAPING_REVIEW = 0.5;
-/** Use case confidence below this asks the user to pick a use case. */
+/** Minimum confidence to treat a not-offered use case as terminal. */
 export const USE_CASE_MIN = 0.5;
-/** Plan confidence below this asks the user to pick a plan. */
+/** Minimum confidence to keep Jev's plan instead of using the smallest fit. */
 export const PLAN_MIN = 0.5;
-/** Recipe confidence below this asks the user to pick a recipe. */
+/** Minimum game recipe confidence before trying the translation fallback. */
 export const RECIPE_MIN = 0.5;
 /** wants_gui below this makes a workload headless (no desktop plans). */
 export const GUI_MIN = 0.5;
 /** console_player at or above this adds `console_not_supported` for game recipes. */
 export const CONSOLE_MIN = 0.5;
-/** Most options offered in a `choose` follow-up. */
-export const CHOICE_OPTIONS = 3;
 
 const planId = z
   .string()
   .refine((id) => PLANS.some((p) => p.id === id), "unknown plan");
 
-/** Answers to an earlier `choose`, applied as overrides; the call stays stateless. */
-export const SuggestPicks = z
-  .object({
-    useCase: z.enum(OFFERED_USE_CASE_IDS).optional(),
-    planId: planId.optional(),
-    recipeId: z.enum(RECIPE_IDS).optional(),
-  })
-  .strict();
-export type SuggestPicks = z.infer<typeof SuggestPicks>;
-
 export const SuggestBody = z
   .object({
     text: z.string().trim().min(1).max(SUGGEST_TEXT_MAX),
-    picks: SuggestPicks.optional(),
   })
   .strict();
 export type SuggestBody = z.infer<typeof SuggestBody>;
-
-const choiceOptions = <Id extends z.ZodType<string>>(id: Id) =>
-  z
-    .array(
-      z.object({
-        id,
-        label: z.string(),
-        probability: z.number().min(0).max(1),
-      }),
-    )
-    .min(1)
-    .max(CHOICE_OPTIONS);
-
-export const SuggestionChoice = z
-  .discriminatedUnion("slot", [
-    z.object({
-      slot: z.literal("use_case"),
-      options: choiceOptions(z.enum(OFFERED_USE_CASE_IDS)),
-    }),
-    z.object({ slot: z.literal("plan"), options: choiceOptions(planId) }),
-    z.object({
-      slot: z.literal("recipe"),
-      options: choiceOptions(z.enum(RECIPE_IDS)),
-    }),
-  ])
-  .refine(
-    (c) => new Set(c.options.map((o) => o.id)).size === c.options.length,
-    "options must be distinct",
-  );
-export type SuggestionChoice = z.infer<typeof SuggestionChoice>;
 
 const envelope = {
   /** Stable codes; the UI owns the copy. */
@@ -119,15 +74,6 @@ export const Suggestion = z.discriminatedUnion("outcome", [
       "plan unavailable",
     ),
     recipeId: z.enum(RECIPE_IDS),
-    ...envelope,
-  }),
-  /** One slot needs the user; resolved slots so far are informational only. */
-  z.object({
-    outcome: z.literal("choose"),
-    useCase: z.enum(OFFERED_USE_CASE_IDS).nullable(),
-    planId: planId.nullable(),
-    recipeId: z.enum(RECIPE_IDS).nullable(),
-    choice: SuggestionChoice,
     ...envelope,
   }),
   z.object({
@@ -188,59 +134,46 @@ export function planFitsRecipe(plan: Plan, recipeId: RecipeId): boolean {
   return !RECIPES[recipeId].requiresVm || plan.kind === "vm";
 }
 
-/** Why `picks` cannot be honored for this tier (a 400), or null. */
-export function picksProblem(
-  picks: SuggestPicks | undefined,
-  tier: TrustTier,
-): string | null {
-  if (!picks?.planId) return null;
-  const plan = eligiblePlans(tier).find((p) => p.id === picks.planId);
-  if (!plan) return "picked plan is not available to this account";
-  if (picks.recipeId && !planFitsRecipe(plan, picks.recipeId)) {
-    return "picked recipe does not run on the picked plan";
-  }
-  return null;
-}
-
-/**
- * Slots whose answer is too unsure to use and that the user has not picked.
- * Empty when the use case is confidently not offered (nothing else matters).
- */
-export function uncertainSlots(
-  answers: ConciergeAnswers,
-  picks: SuggestPicks = {},
-): ChoiceSlot[] {
-  const useCaseSure = answers.use_case.confidence >= USE_CASE_MIN;
-  if (
-    !picks.useCase &&
-    useCaseSure &&
-    answers.use_case.choice === "not_offered"
-  )
-    return [];
-  const slots: ChoiceSlot[] = [];
-  if (!picks.useCase && !useCaseSure) slots.push("use_case");
-  if (!picks.planId && answers.plan.confidence < PLAN_MIN) slots.push("plan");
-  if (!picks.recipeId && answers.recipe.confidence < RECIPE_MIN)
-    slots.push("recipe");
-  return slots;
-}
-
-/** Top options by descending probability; ties keep catalog order (stable sort). */
-function topOptions<Id extends string>(
+/** Highest positive probability; ties keep catalog order. */
+function mostProbable<Id extends string>(
   ids: readonly Id[],
-  answer: ChoiceAnswer<string>,
-  label: (id: Id) => string,
-) {
-  return [...ids]
-    .sort(
-      (a, b) => (answer.probabilities[b] ?? 0) - (answer.probabilities[a] ?? 0),
-    )
-    .slice(0, CHOICE_OPTIONS)
-    .map((id) => ({
-      id,
-      label: label(id),
-      probability: answer.probabilities[id] ?? 0,
-    }));
+  answer: ChoiceAnswer<Id>,
+  fallback: Id,
+): Id {
+  let best = fallback;
+  let probability = 0;
+  for (const id of ids) {
+    const next = answer.probabilities[id] ?? 0;
+    if (next > probability) {
+      best = id;
+      probability = next;
+    }
+  }
+  return best;
+}
+
+function resolvedUseCase(answers: ConciergeAnswers): UseCaseId {
+  if (
+    answers.use_case.choice !== "not_offered" ||
+    answers.use_case.confidence >= USE_CASE_MIN
+  ) {
+    return answers.use_case.choice;
+  }
+  return mostProbable(
+    OFFERED_USE_CASE_IDS,
+    answers.use_case,
+    OFFERED_USE_CASE_IDS[0],
+  );
+}
+
+/** Only uncertainty about the use case or a game merits a translated re-ask. */
+export function needsTranslation(answers: ConciergeAnswers): boolean {
+  const useCase = resolvedUseCase(answers);
+  if (useCase === "not_offered") return false;
+  return (
+    answers.use_case.confidence < USE_CASE_MIN ||
+    (useCase === "game_server" && answers.recipe.confidence < RECIPE_MIN)
+  );
 }
 
 /** Smallest of two plans by cpu, then memory, then disk. */
@@ -259,17 +192,15 @@ const VERSIONS = {
 } as const;
 
 /**
- * Every concierge rule, deterministic and I/O-free. Uncertain slots are
- * resolved first (use case, then plan, then recipe; one `choose` per
- * response); the plan is then normalized once against the workload and the
- * recipe. Picks override Jev and are never rewritten. Thresholds are the
- * named constants above; see docs/concierge.md.
+ * Every concierge rule, deterministic and I/O-free. Resolve software from the
+ * use case, keep a confident fitting plan, otherwise use the smallest fit.
+ * A confident plan that needs normalizing is never shrunk. The helper always
+ * returns a complete suggestion or a terminal outcome; see docs/concierge.md.
  */
 export function decideSuggestion(
   answers: ConciergeAnswers,
-  opts: { userTier: TrustTier; picks?: SuggestPicks },
+  opts: { userTier: TrustTier },
 ): SuggestionDecision {
-  const picks = opts.picks ?? {};
   const warnings = new Set<WarningCode>();
   const orderedWarnings = () => WARNING_CODES.filter((w) => warnings.has(w));
 
@@ -289,12 +220,8 @@ export function decideSuggestion(
     warnings.add("needs_review");
   }
 
-  // 2. Use case.
-  const useCase =
-    picks.useCase ??
-    (answers.use_case.confidence >= USE_CASE_MIN
-      ? answers.use_case.choice
-      : null);
+  // 2. Use case: only a confident not-offered answer is terminal.
+  const useCase = resolvedUseCase(answers);
   const notOffered = (reason: NotOfferedReason): SuggestionDecision => ({
     outcome: "not_offered",
     reason,
@@ -305,74 +232,48 @@ export function decideSuggestion(
     ...VERSIONS,
   });
   if (useCase === "not_offered") return notOffered("unsupported_use_case");
-  if (useCase === null) {
-    return {
-      outcome: "choose",
-      useCase: null,
-      planId: null,
-      recipeId: null,
-      choice: {
-        slot: "use_case",
-        options: topOptions(
-          OFFERED_USE_CASE_IDS,
-          answers.use_case,
-          (id) => USE_CASES[id].label,
-        ),
-      },
-      warnings: orderedWarnings(),
-      ...VERSIONS,
-    };
-  }
 
-  // 3. Plan and recipe slots, without rewriting anything yet.
-  const eligible = eligiblePlans(opts.userTier);
-  const lockReason = (fits: (p: Plan) => boolean): NotOfferedReason =>
-    PLANS.some((p) => p.available && fits(p))
-      ? "tier_locked"
-      : "no_fitting_plan";
-  let plan: Plan | undefined;
-  const planPinned = picks.planId !== undefined;
-  if (planPinned) {
-    plan = eligible.find((p) => p.id === picks.planId);
-    if (!plan) return notOffered(lockReason((p) => p.id === picks.planId));
-  } else if (answers.plan.confidence >= PLAN_MIN) {
-    plan = eligible.find((p) => p.id === answers.plan.choice);
-  }
-  const planNoneSure =
-    !planPinned &&
-    answers.plan.confidence >= PLAN_MIN &&
-    answers.plan.choice === PLAN_NONE;
-  let recipe: RecipeId | null =
-    picks.recipeId ??
-    (answers.recipe.confidence >= RECIPE_MIN ? answers.recipe.choice : null);
-  // A picked plan wins over a recipe it cannot run: ask for the recipe again.
-  if (plan && planPinned && recipe && !planFitsRecipe(plan, recipe)) {
-    recipe = null;
-  }
+  // 3. Software: game probabilities matter only among game recipes.
+  const recipe: RecipeId =
+    useCase === "game_server"
+      ? mostProbable(
+          RECIPE_IDS.filter((id) => RECIPES[id].game),
+          answers.recipe,
+          "minecraft_java",
+        )
+      : useCase === "remote_desktop"
+        ? "none"
+        : "docker";
 
   // Remote desktops need a desktop plan; headless workloads must not get one.
   const fitsWorkload = (p: Plan) =>
     useCase === "remote_desktop"
       ? p.desktop !== undefined
       : answers.wants_gui >= GUI_MIN || p.desktop === undefined;
-  const fits = (p: Plan) =>
-    fitsWorkload(p) && (recipe === null || planFitsRecipe(p, recipe));
+  const fits = (p: Plan) => fitsWorkload(p) && planFitsRecipe(p, recipe);
+  const eligible = eligiblePlans(opts.userTier);
   const candidates = eligible.filter(fits);
-  // Jev only sees eligible plans: when none of them fits but a tier-locked
-  // one would, say so instead of "nothing fits".
-  if (!planPinned && candidates.length === 0)
-    return notOffered(lockReason(fits));
-  if (planNoneSure) return notOffered("no_fitting_plan");
+  if (candidates.length === 0) {
+    return notOffered(
+      PLANS.some((p) => p.available && fits(p))
+        ? "tier_locked"
+        : "no_fitting_plan",
+    );
+  }
+  // Jev's confident "none" means the workload exceeds the listed sizes.
+  if (answers.plan.confidence >= PLAN_MIN && answers.plan.choice === PLAN_NONE)
+    return notOffered("no_fitting_plan");
 
-  const game = recipe !== null && RECIPES[recipe].game;
-  if (game && answers.console_player >= CONSOLE_MIN) {
+  if (RECIPES[recipe].game && answers.console_player >= CONSOLE_MIN) {
     warnings.add("console_not_supported");
   }
 
-  // 4. Normalize a model-chosen plan: the smallest fitting plan that is at
-  // least as large. Never shrink; if none exists, ask instead.
-  let mustAsk = false;
-  if (plan && !planPinned && !fits(plan)) {
+  // 4. Keep a confident model plan, normalizing only when it does not fit.
+  let plan =
+    answers.plan.confidence >= PLAN_MIN
+      ? eligible.find((p) => p.id === answers.plan.choice)
+      : undefined;
+  if (plan && !fits(plan)) {
     const from = plan;
     const larger = candidates.filter(
       (p) =>
@@ -380,58 +281,12 @@ export function decideSuggestion(
         p.memoryMb >= from.memoryMb &&
         p.diskGb >= from.diskGb,
     );
-    plan = larger.length > 0 ? larger.reduce(smaller) : undefined;
-    mustAsk = plan === undefined;
-    if (plan && recipe !== null && !planFitsRecipe(from, recipe)) {
-      warnings.add("upgraded_for_recipe");
-    }
+    // No questions and no silent shrink when the required shape is too small.
+    if (larger.length === 0) return notOffered("no_fitting_plan");
+    plan = larger.reduce(smaller);
+    if (!planFitsRecipe(from, recipe)) warnings.add("upgraded_for_recipe");
   }
-
-  // 5. Follow-ups, plan first. A single candidate needs no question unless
-  // taking it would shrink a plan Jev was sure about.
-  if (!plan) {
-    if (candidates.length === 1 && !mustAsk) {
-      plan = candidates[0]!;
-    } else {
-      return {
-        outcome: "choose",
-        useCase,
-        planId: null,
-        recipeId: recipe,
-        choice: {
-          slot: "plan",
-          options: topOptions(
-            candidates.map((p) => p.id),
-            answers.plan,
-            (id) => PLANS.find((p) => p.id === id)!.name,
-          ),
-        },
-        warnings: orderedWarnings(),
-        ...VERSIONS,
-      };
-    }
-  }
-  if (recipe === null) {
-    const planNow = plan;
-    // Offer only recipes some eligible plan can run (the picked one, if any).
-    const options = RECIPE_IDS.filter((id) =>
-      planPinned
-        ? planFitsRecipe(planNow, id)
-        : eligible.some((p) => fitsWorkload(p) && planFitsRecipe(p, id)),
-    );
-    return {
-      outcome: "choose",
-      useCase,
-      planId: plan.id,
-      recipeId: null,
-      choice: {
-        slot: "recipe",
-        options: topOptions(options, answers.recipe, (id) => RECIPES[id].label),
-      },
-      warnings: orderedWarnings(),
-      ...VERSIONS,
-    };
-  }
+  plan ??= candidates.reduce(smaller);
 
   return {
     outcome: "suggested",

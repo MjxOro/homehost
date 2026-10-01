@@ -18,7 +18,6 @@ import {
   TIER_QUOTAS,
   gameAddressOf,
   isValidSshPublicKey,
-  picksProblem,
   recipeRequestProblem,
 } from "@homehost/shared";
 import type {
@@ -1106,14 +1105,11 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     const parsed = SuggestBody.safeParse(req.body);
     if (!parsed.success)
       return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
-    const pickError = picksProblem(parsed.data.picks, session.user.tier);
-    if (pickError) return sendErr(reply, 400, pickError, "invalid");
     const result = await runtime.runPromise(
       Effect.either(
         suggest({
           user: session.user,
           text: parsed.data.text,
-          picks: parsed.data.picks,
         }),
       ).pipe(Effect.provideService(ConciergeConfigTag, concierge)),
     );
