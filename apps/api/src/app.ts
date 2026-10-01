@@ -9,6 +9,7 @@ import { and, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   PLANS,
+  QUOTA_HOLDING_STATUSES,
   SSH_KEY_MAX,
   TECHNICAL_LEVELS,
   TIER_QUOTAS,
@@ -900,13 +901,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     const events = eventRows.map((r) => r.event);
     const usage = { servers: 0, cpu: 0, memoryMb: 0, diskGb: 0 };
     for (const r of requests) {
-      if (
-        r.status === "pending_approval" ||
-        r.status === "approved" ||
-        r.status === "provisioning" ||
-        r.status === "running" ||
-        r.status === "stopped"
-      ) {
+      if (QUOTA_HOLDING_STATUSES.some((s) => s === r.status)) {
         usage.servers += 1;
         usage.cpu += r.cpu;
         usage.memoryMb += r.memoryMb;

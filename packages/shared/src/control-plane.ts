@@ -151,6 +151,15 @@ export interface ApiError {
   code: string;
 }
 
+/** Statuses that hold quota: everything until teardown is queued or the request is rejected. */
+export const QUOTA_HOLDING_STATUSES: readonly RequestStatus[] = [
+  "pending_approval",
+  "approved",
+  "provisioning",
+  "running",
+  "stopped",
+];
+
 export const TIER_QUOTAS: Record<TrustTier, Quota> = {
   /** Default: smallest footprint. Every new friend starts here. */
   nontechnical: { servers: 1, cpu: 2, memoryMb: 2048, diskGb: 20 },
