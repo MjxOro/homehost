@@ -422,6 +422,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   const tickets =
     opts?.desktopTickets ?? createDesktopTickets(env.desktopTicketSecret);
   const desktopFetch = opts?.desktopFetch ?? globalThis.fetch;
+  const desktopProxyRoute = "/api/desktop/t/:ticket/*";
   const app = Fastify({
     routerOptions: { maxParamLength: 700 },
     logger: {
@@ -429,7 +430,10 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         req(req) {
           return {
             method: req.method,
-            url: redactDesktopUrl(req.url),
+            url:
+              req.routeOptions.url === desktopProxyRoute
+                ? "/api/desktop/t/[redacted]"
+                : redactDesktopUrl(req.url),
             hostname: req.hostname,
             remoteAddress: req.ip,
           };
@@ -438,7 +442,10 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   });
   app.addHook("onRequest", async (req, reply) => {
-    if (req.raw.url?.startsWith("/api/desktop/t/")) {
+    if (
+      req.routeOptions.url === desktopProxyRoute ||
+      req.raw.url?.startsWith("/api/desktop/t/")
+    ) {
       reply.header("Content-Security-Policy", DESKTOP_CSP);
       reply.header("Referrer-Policy", "no-referrer");
       reply.header("Cache-Control", "no-store");
@@ -1478,7 +1485,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   // Capability HTTP proxy. Every asset/error has a response sandbox too,
   // including direct top-level navigation. No incoming cookies are forwarded.
   app.get<{ Params: { ticket: string; "*": string } }>(
-    "/api/desktop/t/:ticket/*",
+    desktopProxyRoute,
     async (req, reply) => {
       const viewer = await resolveDesktopTicket(req.params.ticket);
       if (!viewer)
@@ -1493,9 +1500,8 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         gated.right;
       const rawUrl = req.raw.url ?? "/";
       const prefix = `/api/desktop/t/${req.params.ticket}/`;
-      const pathStart = rawUrl.indexOf(prefix);
-      const after =
-        pathStart >= 0 ? rawUrl.slice(pathStart + prefix.length) : "";
+      // Keep the raw asset path/query, regardless of encoded static segments.
+      const after = rawUrl.split("/").slice(5).join("/");
       const target = `https://${backendHost}:${backendPort}/${after}`;
       let upstream: Response;
       try {

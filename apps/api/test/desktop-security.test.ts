@@ -56,8 +56,11 @@ test("desktop capability validates signature, expiry, bounded input and fresh no
   now += DESKTOP_TICKET_TTL_S * 1000;
   expect(issuer.verify(ticket)).toBeNull();
   expect(redactDesktopUrl(`/api/desktop/t/${ticket}/dist/a.js?x=1`)).toBe(
-    "/api/desktop/t/[redacted]/dist/a.js?x=1",
+    "/api/desktop/t/[redacted]",
   );
+  expect(
+    redactDesktopUrl(`/%61pi/%64esktop/%74/${ticket}/dist/a.js?x=%ZZ`),
+  ).toBe("/api/desktop/t/[redacted]");
 });
 
 test("Kasm preferences work while native storage stays denied", () => {
@@ -338,6 +341,30 @@ describe.skipIf(!url)("desktop proxy security", () => {
     ).toBe(404);
     now += DESKTOP_TICKET_TTL_S * 1000;
     expect((await app.inject({ url: proxy })).statusCode).toBe(401);
+  });
+  test("encoded proxy route segments retain sandbox headers on HTML, assets and errors", async () => {
+    const r = await desktop();
+    const proxy = path(await mint(r.id));
+    for (const encoded of [
+      proxy.replace("/api/", "/%61pi/"),
+      proxy.replace("/desktop/", "/%64esktop/"),
+      proxy.replace("/t/", "/%74/"),
+      proxy.replace("/api/desktop/t/", "/%61pi/%64esktop/%74/"),
+    ]) {
+      for (const suffix of ["", "dist/main.bundle.js?quality=9"]) {
+        const response = await app.inject({ url: encoded + suffix });
+        expect(response.statusCode).toBe(200);
+        expect(response.headers["content-security-policy"]).toBe(DESKTOP_CSP);
+        expect(upstreamRequests.at(-1)!.url).toBe(
+          `https://127.0.0.1:6090/${suffix}`,
+        );
+      }
+      const error = await app.inject({
+        url: encoded.replace(proxy.split("/")[4]!, "invalid"),
+      });
+      expect(error.statusCode).toBe(401);
+      expect(error.headers["content-security-policy"]).toBe(DESKTOP_CSP);
+    }
   });
   test("stopped/deleted requests and revoked viewers invalidate a previously issued capability", async () => {
     const r = await desktop();

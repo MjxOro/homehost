@@ -55,5 +55,15 @@ export function createDesktopTickets(secret: string, now = Date.now) {
 }
 /** Bearer capabilities never belong in access logs. */
 export function redactDesktopUrl(url: string) {
-  return url.replace(/(\/api\/desktop\/t\/)[^/?]+/g, "$1[redacted]");
+  try {
+    const segments = url.split("/");
+    if (
+      segments.slice(0, 4).map(decodeURIComponent).join("/") ===
+      "/api/desktop/t"
+    )
+      return "/api/desktop/t/[redacted]";
+  } catch {
+    // Invalid escape sequences cannot be a valid capability route.
+  }
+  return url;
 }
