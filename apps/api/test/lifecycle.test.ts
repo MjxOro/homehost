@@ -78,7 +78,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
           method: "POST",
           url: "/api/requests",
           headers: { cookie: alice },
-          payload: { name: `Race ${i}`, planId: "game-small" },
+          payload: { name: `Race ${i}`, planId: "container-small" },
         }),
       ),
     );
@@ -117,7 +117,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       headers: { cookie: alice },
       payload: {
         name: "Spoof",
-        planId: "game-small",
+        planId: "container-small",
         ownerId: "bob",
         trusted: true,
       },
@@ -129,7 +129,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       headers: { cookie: alice },
       payload: {
         name: "Tenant boundary",
-        planId: "game-small",
+        planId: "container-small",
       },
     });
     expect(createdResponse.statusCode).toBe(201);
@@ -189,7 +189,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: alice },
-      payload: { name: "Decision race", planId: "game-small" },
+      payload: { name: "Decision race", planId: "container-small" },
     });
     expect(createdResponse.statusCode).toBe(201);
     const created = createdResponse.json<ServerRequest>();
@@ -256,7 +256,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: alice },
-      payload: { name: "Rejected slot", planId: "game-small" },
+      payload: { name: "Rejected slot", planId: "container-small" },
     });
     expect(first.statusCode).toBe(201);
     const rejected = await app.inject({
@@ -270,7 +270,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: alice },
-      payload: { name: "Replacement slot", planId: "game-small" },
+      payload: { name: "Replacement slot", planId: "container-small" },
     });
     expect(replacement.statusCode).toBe(201);
   });
@@ -290,7 +290,7 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: bob },
-      payload: { name: "Plain box", planId: "game-small" },
+      payload: { name: "Plain box", planId: "container-small" },
     });
     expect(unkeyed.json<ServerRequest>().hasSshKey).toBe(false);
     const bogus = await app.inject({
@@ -308,7 +308,11 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
       method: "POST",
       url: "/api/requests",
       headers: { cookie: bob },
-      payload: { name: "Container key", planId: "game-small", sshPubkey: key },
+      payload: {
+        name: "Container key",
+        planId: "container-small",
+        sshPubkey: key,
+      },
     });
     expect(containerKey.statusCode).toBe(201);
     expect(containerKey.json<ServerRequest>().hasSshKey).toBe(true);

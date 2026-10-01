@@ -35,8 +35,8 @@ export interface Plan {
 
 export const PLANS: Plan[] = [
   {
-    id: "game-small",
-    name: "Game Small",
+    id: "container-small",
+    name: "Container Small",
     cpu: 2,
     memoryMb: 2048,
     diskGb: 20,

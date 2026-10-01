@@ -54,7 +54,7 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
       VALUES (${userId}, ${ownerName}, ${ownerEmail}, 'member', 'nontechnical')`;
     await client`INSERT INTO server_requests
       (id, owner_id, owner_name, name, plan_id, status, subdomain, cpu, memory_mb, disk_gb, ipv6, created_at, updated_at)
-      VALUES (${requestId}, ${userId}, ${ownerName}, 'History fixture', 'game-small', ${status},
+      VALUES (${requestId}, ${userId}, ${ownerName}, 'History fixture', 'container-small', ${status},
         ${subdomain}, 1, 512, 10, ${ipv6}, ${start}, ${end})`;
     return { userId, requestId, ownerName, ownerEmail, subdomain };
   }
@@ -131,7 +131,7 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
               id: owner.requestId,
               instanceName: noName ? null : instanceName,
               subdomain: owner.subdomain,
-              planId: "game-small",
+              planId: "container-small",
             },
       instanceNameOf: () => instanceName,
       projectForReq: () => "fixture-project",
