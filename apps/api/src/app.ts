@@ -1,3 +1,8 @@
+import { desktopHtml, desktopJavascript } from "./desktop-bridge.js";
+import {
+  createDesktopTickets,
+  redactDesktopUrl,
+} from "./auth/desktop-tickets.js";
 import Fastify, {
   type FastifyInstance,
   type FastifyReply,
@@ -8,6 +13,7 @@ import * as tls from "node:tls";
 import { and, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
+  DESKTOP_CSP,
   PLANS,
   QUOTA_HOLDING_STATUSES,
   RECIPES,
@@ -207,6 +213,8 @@ export interface BuildAppOptions {
   /** Concierge transport/config; null disables it. Defaults from env. */
   concierge?: ConciergeConfig | null;
   agentChat?: AgentChatConfig | null;
+  desktopTickets?: ReturnType<typeof createDesktopTickets>;
+  desktopFetch?: typeof globalThis.fetch;
 }
 
 interface Session {
@@ -415,7 +423,54 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
           }
         : null;
 
-  const app = Fastify({ logger: true });
+  const tickets =
+    opts?.desktopTickets ?? createDesktopTickets(env.desktopTicketSecret);
+  const desktopFetch = opts?.desktopFetch ?? globalThis.fetch;
+  const app = Fastify({
+    routerOptions: { maxParamLength: 700 },
+    logger: {
+      serializers: {
+        req(req) {
+          return {
+            method: req.method,
+            url: redactDesktopUrl(req.url),
+            hostname: req.hostname,
+            remoteAddress: req.ip,
+          };
+        },
+      },
+    },
+  });
+  app.addHook("onRequest", async (req, reply) => {
+    if (req.raw.url?.startsWith("/api/desktop/t/")) {
+      reply.header("Content-Security-Policy", DESKTOP_CSP);
+      reply.header("Referrer-Policy", "no-referrer");
+      reply.header("Cache-Control", "no-store");
+      reply.header("X-Content-Type-Options", "nosniff");
+      // Module/asset loads from the opaque client are credential-free CORS.
+      reply.header("Access-Control-Allow-Origin", "null");
+    }
+  });
+  async function resolveDesktopTicket(ticket: string) {
+    const claims = tickets.verify(ticket);
+    if (!claims) return null;
+    const [u] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, claims.userId));
+    if (!u || (u.role !== "operator" && u.accountStatus !== "approved"))
+      return null;
+    return {
+      requestId: claims.requestId,
+      user: {
+        id: u.id,
+        name: u.name,
+        role: u.role as PortalUser["role"],
+        tier: u.tier as PortalUser["tier"],
+        email: u.email,
+      },
+    };
+  }
 
   async function sessionFromToken(
     token: string | null | undefined,
@@ -1380,7 +1435,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
 
   // Credentials flow: the instance one-time password for root SSH (read once,
   // then cleared). Desktop VNC uses its own persistent desktop_password via
-  // the DesktopSession gate + same-origin proxy below — never this endpoint.
+  // the DesktopSession gate + sandboxed proxy below — never this endpoint.
   app.get<{ Params: { id: string } }>(
     "/api/requests/:id/credentials",
     async (req, reply) => {
@@ -1402,21 +1457,13 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   );
 
-  // Desktop session: same-origin KasmVNC canvas URL for the panel iframe.
-  // Panel session cookie is the only gate; the guest secret travels only in
-  // the URL hash fragment (never sent to the server, never logged). The
-  // proxy injects Basic auth toward the guest from desktop_password, and the
-  // hash carries Kasm's `password` (RFB autoconnect, no login form) plus the
-  // `path` override so the client WebSocket targets the same-origin proxy
-  // prefix instead of /websockify at the panel root. Basic auth alone would
-  // only unlock the HTTP page, not the VNC session. Owner/operator +
-  // running + desktop row present, else 404 (no oracle).
+  // The authenticated panel mints a bounded bearer capability. Guest content
+  // is sandboxed to an opaque origin; panel cookies never authorize its proxy.
   app.get<{ Params: { id: string } }>(
     "/api/requests/:id/desktop",
     async (req, reply) => {
-      const session = await resolveSession(req);
-      if (!session)
-        return sendErr(reply, 401, "session required", "unauthorized");
+      const session = await requireApprovedUser(req, reply);
+      if (!session) return;
       const params = IdParams.safeParse(req.params);
       if (!params.success)
         return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
@@ -1428,8 +1475,10 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       return Either.match(gated, {
         onLeft: (e) => sendDomainError(reply, e),
         onRight: ({ desktopUser, desktopPassword }) => {
-          const base = `/api/requests/${params.data.id}/desktop/session/`;
-          const wsPath = `api/requests/${params.data.id}/desktop/session/websockify`;
+          reply.header("Cache-Control", "no-store");
+          const ticket = tickets.mint(params.data.id, session.user.id);
+          const base = `/api/desktop/t/${ticket}/`;
+          const wsPath = `api/desktop/t/${ticket}/websockify`;
           return {
             url:
               `${base}#password=${encodeURIComponent(desktopPassword)}` +
@@ -1441,43 +1490,33 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     },
   );
 
-  // Desktop session proxy: same-origin KasmVNC canvas. Panel cookie gates;
-  // the server injects Basic auth toward the guest from desktop_password.
-  // One wildcard handler serves the page plus every asset: subpath (after
-  // /desktop/session/) maps 1:1 onto the guest root, query passes through.
-  // GET streams the guest response with COOP/COEP stripped (Kasm's
-  // require-corp + same-origin would blank the same-origin iframe). The
-  // canvas secret travels only in the page URL hash fragment (never sent
-  // to the server, never logged); the hash carries Kasm's `password` (RFB
-  // autoconnect, no login form) plus the `path` override so the client
-  // WebSocket targets this same prefix instead of /websockify at root.
-  // Basic auth alone would only unlock the HTTP page, not the VNC session.
-  app.get<{ Params: { id: string; "*": string } }>(
-    "/api/requests/:id/desktop/session/*",
+  // Capability HTTP proxy. Every asset/error has a response sandbox too,
+  // including direct top-level navigation. No incoming cookies are forwarded.
+  app.get<{ Params: { ticket: string; "*": string } }>(
+    "/api/desktop/t/:ticket/*",
     async (req, reply) => {
-      const session = await resolveSession(req);
-      if (!session)
-        return sendErr(reply, 401, "session required", "unauthorized");
-      const params = IdWildcardParams.safeParse(req.params);
-      if (!params.success)
-        return sendErr(reply, 400, zodMessage(params.error.issues), "invalid");
+      const viewer = await resolveDesktopTicket(req.params.ticket);
+      if (!viewer)
+        return sendErr(reply, 401, "desktop ticket required", "unauthorized");
       const gated = await runtime.runPromise(
         Effect.either(
-          readDesktopSession({ id: params.data.id, user: session.user }),
+          readDesktopSession({ id: viewer.requestId, user: viewer.user }),
         ),
       );
       if (Either.isLeft(gated)) return sendDomainError(reply, gated.left);
       const { desktopUser, backendHost, backendPort, desktopPassword } =
         gated.right;
       const rawUrl = req.raw.url ?? "/";
-      const prefix = `/api/requests/${params.data.id}/desktop/session/`;
+      const prefix = `/api/desktop/t/${req.params.ticket}/`;
       const pathStart = rawUrl.indexOf(prefix);
       const after =
         pathStart >= 0 ? rawUrl.slice(pathStart + prefix.length) : "";
       const target = `https://${backendHost}:${backendPort}/${after}`;
       let upstream: Response;
       try {
-        upstream = await fetch(target, {
+        upstream = await desktopFetch(target, {
+          redirect: "manual",
+          signal: AbortSignal.timeout(15000),
           headers: {
             Authorization:
               "Basic " +
@@ -1495,10 +1534,9 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       }
       const contentType = upstream.headers.get("content-type");
       if (contentType) reply.header("content-type", contentType);
-      const cache = upstream.headers.get("cache-control");
-      if (cache) reply.header("cache-control", cache);
+
       // COOP/COEP stripped by omission: Kasm's require-corp + same-origin
-      // would blank the same-origin iframe. No framing headers upstream.
+      // would blank the sandboxed iframe. No framing headers upstream.
       const rawBody = Buffer.from(await upstream.arrayBuffer());
       // Anchor relative Kasm asset URLs (dist/, vendor/, app/) to this
       // prefix: without this the page resolves them against /desktop/ and
@@ -1507,23 +1545,20 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         upstream.status === 200 &&
         (contentType ?? "").includes("text/html")
       ) {
-        const html = rawBody
-          .toString("utf8")
-          .replace(
-            /<html([^>]*)>/,
-            `<html$1><head><base href="/api/requests/${params.data.id}/desktop/session/">`,
-          );
+        const html = desktopHtml(rawBody.toString("utf8"), prefix, [
+          ...allowedOrigins,
+        ]);
         return reply.code(upstream.status).send(html);
       }
+      if (upstream.status === 200 && (contentType ?? "").includes("javascript"))
+        return reply
+          .code(upstream.status)
+          .send(desktopJavascript(rawBody.toString("utf8"), after));
       return reply.code(upstream.status).send(rawBody);
     },
   );
-  // The browser opens wss://<panel>/api/requests/:id/desktop/session/
-  // websockify (per the `path` hash override); the panel cookie gates the
-  // upgrade and the server re-authenticates toward the guest with Basic
-  // auth from desktop_password over a TLS backend that skips verify
-  // (same snakeoil cert Traefik already trusts blindly). Frames relay
-  // both directions; either side closing tears the pair down.
+  // WebSocket upgrades use the same capability and current ownership gate.
+  // The guest gets Basic auth and Origin: null, never the panel cookie.
   // Node http server 'upgrade' args are (req, socket, head) — req first.
   app.server.on("upgrade", (...rawArgs: unknown[]) => {
     const upgradeReq = rawArgs[0] as {
@@ -1543,24 +1578,24 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       try {
         const rawUrl = typeof upgradeReq.url === "string" ? upgradeReq.url : "";
         const match = rawUrl.match(
-          /^\/api\/requests\/([0-9a-f-]{36})\/desktop\/session\/(.*)$/,
+          /^\/api\/desktop\/t\/([A-Za-z0-9_.-]+)\/(.*)$/,
         );
         if (!match?.[1]) {
           socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
           socket.destroy();
           return;
         }
-        const requestId = match[1];
+        const ticket = match[1];
         const after = match[2] ?? "";
-        const session = await resolveSessionCookie(getHeader("cookie"));
-        if (!session) {
+        const viewer = await resolveDesktopTicket(ticket);
+        if (!viewer) {
           socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
           socket.destroy();
           return;
         }
         const gated = await runtime.runPromise(
           Effect.either(
-            readDesktopSession({ id: requestId, user: session.user }),
+            readDesktopSession({ id: viewer.requestId, user: viewer.user }),
           ),
         );
         if (Either.isLeft(gated)) {
@@ -1574,7 +1609,6 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         const basic = Buffer.from(`${desktopUser}:${desktopPassword}`).toString(
           "base64",
         );
-        const guestPath = `/${after}`;
         const guest = connect({
           host: backendHost,
           port: backendPort,
@@ -1589,14 +1623,11 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
           typeof incoming === "string" && incoming.length > 0
             ? incoming
             : "binary";
-        // KasmVNC's websocket check requires an Origin header (browser
-        // always sends one; raw sockets do not). Forward the client's or
-        // synthesize the panel origin — either satisfies the check.
-        const origin =
-          getHeader("origin") ?? getHeader("sec-websocket-origin") ?? "";
-        // The client dials the proxy subpath (/desktop/session/websockify);
+        // The browser client is opaque; guest credentials are capability-scoped.
+        const origin = "null";
+        // The client dials the capability subpath;
         // the guest serves the channel at its root — strip the prefix.
-        const proxyPrefix = `api/requests/${requestId}/desktop/session/`;
+        const proxyPrefix = `api/desktop/t/${ticket}/`;
         const guestWsPath = after.startsWith(proxyPrefix)
           ? `/${after.slice(proxyPrefix.length)}`
           : "/websockify";

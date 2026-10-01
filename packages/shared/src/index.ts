@@ -38,3 +38,9 @@ export * from "./concierge-catalog.js";
 export * from "./setup.js";
 export * from "./agent-chat.js";
 export { containsSecret } from "./secrets.js";
+
+export {
+  DESKTOP_SANDBOX,
+  DESKTOP_CSP,
+  DESKTOP_BRIDGE_CHANNEL,
+} from "./desktop-sandbox.js";

@@ -1,3 +1,7 @@
+import { randomBytes } from "node:crypto";
+
+const devDesktopTicketSecret = randomBytes(32).toString("base64");
+
 export interface OAuthProviderConfig {
   clientId: string;
   clientSecret: string;
@@ -61,6 +65,8 @@ export interface ApiEnv {
   conciergeDailyCap: number;
   /** Agent chat turns per user per UTC day. */
   agentChatDailyTurns: number;
+  /** Persistent HMAC signing key; ephemeral only in showcase development. */
+  desktopTicketSecret: string;
 }
 
 function httpOrigin(raw: string, name: string): string {
@@ -127,7 +133,13 @@ export function getEnv(): ApiEnv {
     agentChatDailyTurns > 1000
   )
     throw new Error("AGENT_CHAT_DAILY_TURNS must be an integer from 0 to 1000");
+  const desktopTicketSecret = process.env.DESKTOP_TICKET_SECRET;
+  if (desktopTicketSecret !== undefined && desktopTicketSecret.length < 32)
+    throw new Error("DESKTOP_TICKET_SECRET must be at least 32 characters");
+  if (!showcase && !desktopTicketSecret)
+    throw new Error("DESKTOP_TICKET_SECRET is required in live mode");
   return {
+    desktopTicketSecret: desktopTicketSecret ?? devDesktopTicketSecret,
     databaseUrl,
     baseDomain: process.env.BASE_DOMAIN ?? "lab.example.test",
     port,
