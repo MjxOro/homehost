@@ -232,7 +232,6 @@ function ChatView({
             Thinking about your setup…
           </p>
         ) : null}
-        <div ref={end} />
       </div>
       {dashboard.isError && requestIds.length > 0 ? (
         <p className={FORM_ERROR} role="alert">
@@ -297,13 +296,14 @@ function ChatView({
           </p>
           <button
             type="submit"
-            className={BUTTON_PRIMARY}
+            className={`${BUTTON_PRIMARY} shrink-0 whitespace-nowrap`}
             disabled={busy || text.trim().length === 0}
           >
             Send
           </button>
         </div>
       </form>
+      <div ref={end} aria-hidden="true" />
     </div>
   );
 }
