@@ -56,9 +56,20 @@ IPV6_PREFIX=<same as infra/private/prod.env>
 CF_DNS_API_TOKEN=<Edit-zone-DNS token, same as infra/private/traefik.env>
 ```
 
-Deploys (`prod:deploy`) don't restart this unit. After a merge that changes
-`apps/worker`, run `sudo systemctl restart homehost-worker` and check
-`journalctl -u homehost-worker -n 20` for `worker up (prod)`.
+Deploys (`prod:deploy`) don't restart this unit, and the unit runs from this
+checkout's source, not from an image. After a merge that changes
+`apps/worker` or anything it imports (`packages/shared`), update the checkout
+and its dependencies first, then restart:
+
+```bash
+git pull --ff-only && bun install --frozen-lockfile
+sudo systemctl restart homehost-worker
+journalctl -u homehost-worker -n 20   # expect: worker up (prod)
+```
+
+Skipping `bun install` crash-loops the worker when a workspace package gains a
+dependency (e.g. `Cannot find module 'zod/v4'` after `@homehost/shared` added
+zod).
 
 ## Tenant IPv6 gateway
 
