@@ -235,7 +235,7 @@ export const agentRuns = pgTable(
   (t) => [
     check(
       "agent_runs_kind_check",
-      sql`${t.kind} IN ('site_build','site_edit','site_import','concierge','bench')`,
+      sql`${t.kind} IN ('site_build','site_edit','site_import','concierge','agent_chat','bench')`,
     ),
     check(
       "agent_runs_purpose_check",
@@ -372,5 +372,64 @@ export const ipAssignments = pgTable(
       .where(sql`${t.releasedAt} IS NULL`),
     index("ip_assignments_address_assigned_at_idx").on(t.address, t.assignedAt),
     index("ip_assignments_request_id_idx").on(t.requestId),
+  ],
+);
+
+export const agentConversations = pgTable(
+  "agent_conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: text("status").notNull().default("idle"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("agent_conversations_owner_updated_idx").on(t.userId, t.updatedAt),
+    check(
+      "agent_conversations_status_check",
+      sql`${t.status} IN ('pending','running','idle')`,
+    ),
+  ],
+);
+
+export const agentMessages = pgTable(
+  "agent_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    toolName: text("tool_name"),
+    toolArgs: jsonb("tool_args"),
+    toolResult: jsonb("tool_result"),
+    requestId: uuid("request_id").references(() => serverRequests.id, {
+      onDelete: "set null",
+    }),
+    dedupeKey: text("dedupe_key"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("agent_messages_conversation_seq_unique").on(
+      t.conversationId,
+      t.seq,
+    ),
+    uniqueIndex("agent_messages_conversation_dedupe_unique").on(
+      t.conversationId,
+      t.dedupeKey,
+    ),
+    index("agent_messages_request_idx").on(t.requestId),
   ],
 );

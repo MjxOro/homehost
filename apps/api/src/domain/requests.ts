@@ -15,6 +15,7 @@ import type {
   StoredRecipeId,
 } from "@homehost/shared";
 import * as schema from "../db/schema.js";
+import { appendMessagesInTx } from "./agent-storage.js";
 import { DatabaseTag } from "./Database.js";
 import {
   DbFailure,
@@ -40,6 +41,7 @@ function isUniqueViolation(e: unknown): boolean {
 }
 
 export interface CreateInput {
+  agentProposalId?: string;
   user: PortalUser;
   name: string;
   plan: Plan;
@@ -52,13 +54,13 @@ export interface CreateInput {
 }
 
 type CreateOutcome =
-  { ok: true; row: RequestRow } | { ok: false; reason: "quota" };
+  { ok: true; row: RequestRow } | { ok: false; reason: "quota" | "proposal" };
 
 export const createRequest = (
   input: CreateInput,
 ): Effect.Effect<
   RequestRow,
-  QuotaExceeded | SubdomainTaken | DbFailure,
+  QuotaExceeded | SubdomainTaken | RequestNotFound | DbFailure,
   DatabaseTag
 > =>
   Effect.gen(function* () {
@@ -70,6 +72,56 @@ export const createRequest = (
           await tx.execute(
             sql`SELECT 1 FROM users WHERE id = ${input.user.id} FOR UPDATE`,
           );
+          let proposal: typeof schema.agentMessages.$inferSelect | undefined;
+          if (input.agentProposalId) {
+            const rows = await tx
+              .select({ message: schema.agentMessages })
+              .from(schema.agentMessages)
+              .innerJoin(
+                schema.agentConversations,
+                eq(
+                  schema.agentMessages.conversationId,
+                  schema.agentConversations.id,
+                ),
+              )
+              .where(
+                and(
+                  eq(schema.agentMessages.id, input.agentProposalId),
+                  eq(schema.agentConversations.userId, input.user.id),
+                ),
+              );
+            proposal = rows[0]?.message;
+            const result = proposal?.toolResult as {
+              ok?: boolean;
+              proposal?: { name?: string; planId?: string; recipeId?: string };
+            } | null;
+            if (
+              !proposal ||
+              proposal.role !== "tool" ||
+              proposal.toolName !== "propose_server" ||
+              result?.ok !== true ||
+              result.proposal?.name !== input.name ||
+              result.proposal.planId !== input.plan.id ||
+              result.proposal.recipeId !== (input.recipeId ?? "none")
+            )
+              return { ok: false as const, reason: "proposal" as const };
+            // The user-row lock serializes repeated clicks. A linked proposal
+            // returns its existing request rather than consuming quota again.
+            if (proposal.requestId) {
+              const [row] = await tx
+                .select()
+                .from(schema.serverRequests)
+                .where(
+                  and(
+                    eq(schema.serverRequests.id, proposal.requestId),
+                    eq(schema.serverRequests.ownerId, input.user.id),
+                  ),
+                );
+              return row && row.status !== "deleted"
+                ? { ok: true as const, row }
+                : { ok: false as const, reason: "proposal" as const };
+            }
+          }
           const held = await tx
             .select()
             .from(schema.serverRequests)
@@ -140,6 +192,19 @@ export const createRequest = (
             action: "requested",
             serverName: input.name,
           });
+          if (proposal) {
+            await tx
+              .update(schema.agentMessages)
+              .set({ requestId: id })
+              .where(eq(schema.agentMessages.id, proposal.id));
+            await appendMessagesInTx(tx, proposal.conversationId, [
+              {
+                role: "event",
+                content: "Request sent. Waiting for operator approval.",
+                requestId: id,
+              },
+            ]);
+          }
           return { ok: true as const, row: inserted[0] };
         }),
       catch: (cause): SubdomainTaken | DbFailure =>
@@ -147,7 +212,10 @@ export const createRequest = (
           ? new SubdomainTaken()
           : new DbFailure({ cause }),
     });
-    if (!outcome.ok) return yield* new QuotaExceeded();
+    if (!outcome.ok)
+      return yield* outcome.reason === "proposal"
+        ? new RequestNotFound()
+        : new QuotaExceeded();
     return outcome.row;
   });
 

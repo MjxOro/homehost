@@ -10,15 +10,13 @@ import { z } from "zod";
 import {
   PLANS,
   QUOTA_HOLDING_STATUSES,
-  RECIPE_IDS,
   RECIPES,
-  SSH_KEY_MAX,
   SuggestBody,
   TECHNICAL_LEVELS,
   TIER_QUOTAS,
   gameAddressOf,
-  isValidSshPublicKey,
-  recipeRequestProblem,
+  containsSecret,
+  SECRET_GUARD_COPY,
 } from "@homehost/shared";
 import type {
   ActivityEvent,
@@ -66,6 +64,20 @@ import {
   type ConciergeConfig,
   type ConciergeError,
 } from "./domain/concierge.js";
+import {
+  AgentProblem,
+  AgentTextBody,
+  AgentTurnBody,
+  agentTurn,
+  createConversation,
+  getConversation,
+  listConversations,
+  type AgentChatConfig,
+} from "./domain/agent-chat.js";
+import {
+  CreateRequestBody,
+  validateServerSetup,
+} from "./domain/request-validation.js";
 import { lookupAddress } from "./domain/ipAssignments.js";
 
 import {
@@ -103,22 +115,6 @@ const DEMO_PERSONAS: DemoPersona[] = [
 const DemoSessionBody = z
   .object({ personaId: z.enum(["alice", "bob", "operator"]) })
   .strict();
-const CreateRequestBody = z
-  .object({
-    name: z.string().trim().min(1).max(48),
-    planId: z.string().min(1),
-    desktopEnv: z.enum(["ubuntu-xfce", "omarchy"]).optional(),
-    sshPubkey: z.string().trim().max(SSH_KEY_MAX).optional(),
-    recipeId: z.enum(RECIPE_IDS).optional(),
-    eulaAccepted: z.boolean().optional(),
-  })
-  .strict()
-  .refine(
-    (b) => b.sshPubkey === undefined || isValidSshPublicKey(b.sshPubkey),
-    {
-      message: "sshPubkey must be a single-line <type> <base64> [comment] key",
-    },
-  );
 const DecisionBody = z
   .object({
     decision: z.enum(["approve", "reject"]),
@@ -210,6 +206,7 @@ export interface BuildAppOptions {
   appExtraOrigins?: string[];
   /** Concierge transport/config; null disables it. Defaults from env. */
   concierge?: ConciergeConfig | null;
+  agentChat?: AgentChatConfig | null;
 }
 
 interface Session {
@@ -401,6 +398,18 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         ? {
             apiKey: env.openrouterApiKey,
             dailyCap: env.conciergeDailyCap,
+            fetch: globalThis.fetch,
+            now: () => new Date(),
+          }
+        : null;
+
+  const agentChat =
+    opts?.agentChat !== undefined
+      ? opts.agentChat
+      : env.openrouterApiKey
+        ? {
+            apiKey: env.openrouterApiKey,
+            dailyCap: env.agentChatDailyTurns,
             fetch: globalThis.fetch,
             now: () => new Date(),
           }
@@ -714,6 +723,92 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       })),
     };
   });
+
+  // Chat tools have no creation capability. Only POST /api/requests above
+  // can create, and only a user's click supplies agentProposalId.
+  async function agentResponse(
+    reply: FastifyReply,
+    action: () => Promise<unknown>,
+  ) {
+    try {
+      return reply.send(await action());
+    } catch (error) {
+      if (error instanceof AgentProblem)
+        return sendErr(reply, error.status, error.message, error.code);
+      // SQL/provider error causes may contain message text. Never log or echo them.
+      return sendErr(
+        reply,
+        500,
+        "Chat couldn't respond just now. Please try again.",
+        "agent_failed",
+      );
+    }
+  }
+  app.get("/api/agent/conversations", async (req, reply) => {
+    const session = await requireApprovedUser(req, reply);
+    if (!session) return;
+    return agentResponse(reply, () => listConversations(db, session.user));
+  });
+  app.post("/api/agent/conversations", async (req, reply) => {
+    const session = await requireApprovedUser(req, reply);
+    if (!session) return;
+    if (!agentChat)
+      return sendErr(
+        reply,
+        503,
+        "Chat isn't available right now.",
+        "agent_unavailable",
+      );
+    if (!requireJsonBody(req, reply)) return;
+    const parsed = AgentTextBody.safeParse(req.body);
+    if (!parsed.success)
+      return sendErr(reply, 400, "Please send a short message.", "invalid");
+    reply.code(201);
+    return agentResponse(reply, () =>
+      createConversation(db, session.user, parsed.data.text),
+    );
+  });
+  app.get<{ Params: { id: string } }>(
+    "/api/agent/conversations/:id",
+    async (req, reply) => {
+      const session = await requireApprovedUser(req, reply);
+      if (!session) return;
+      const params = IdParams.safeParse(req.params);
+      if (!params.success)
+        return sendErr(reply, 400, "Invalid conversation.", "invalid");
+      return agentResponse(reply, () =>
+        getConversation(db, session.user, params.data.id),
+      );
+    },
+  );
+  app.post<{ Params: { id: string } }>(
+    "/api/agent/conversations/:id/turns",
+    async (req, reply) => {
+      const session = await requireApprovedUser(req, reply);
+      if (!session) return;
+      if (!agentChat)
+        return sendErr(
+          reply,
+          503,
+          "Chat isn't available right now.",
+          "agent_unavailable",
+        );
+      if (!requireJsonBody(req, reply)) return;
+      const params = IdParams.safeParse(req.params);
+      const parsed = AgentTurnBody.safeParse(req.body);
+      if (!params.success || !parsed.success)
+        return sendErr(reply, 400, "Please send a short message.", "invalid");
+      return agentResponse(reply, () =>
+        agentTurn(
+          db,
+          session.user,
+          params.data.id,
+          parsed.data.text,
+          agentChat,
+        ),
+      );
+    },
+  );
 
   app.delete<{ Params: { id: string } }>(
     "/api/invites/:id",
@@ -1029,37 +1124,15 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     const parsed = CreateRequestBody.safeParse(req.body);
     if (!parsed.success)
       return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
-    const plan = PLANS.find((p) => p.id === parsed.data.planId);
-    if (!plan) return sendErr(reply, 404, "unknown plan", "not_found");
-    if (plan.technicalOnly && session.user.tier !== "technical") {
-      return sendErr(reply, 403, "plan requires technical tier", "forbidden");
-    }
-    // Desktop env must match the plan's GUI stack; a headless plan with a
-    // desktopEnv (or a desktop plan with the wrong env) is a 403, mirroring
-    // the technicalOnly gate. Desktop plans may omit it (defaults to the
-    // plan's env).
-    const desktop = plan.desktop;
-    if (
-      desktop &&
-      parsed.data.desktopEnv !== undefined &&
-      parsed.data.desktopEnv !== desktop.env
-    ) {
+    const validation = validateServerSetup(parsed.data, session.user.tier);
+    if (!validation.ok)
       return sendErr(
         reply,
-        403,
-        "desktop env does not match plan",
-        "forbidden",
+        validation.status,
+        validation.message,
+        validation.code,
       );
-    }
-    if (!desktop && parsed.data.desktopEnv !== undefined) {
-      return sendErr(reply, 403, "plan has no desktop", "forbidden");
-    }
-    const recipeProblem = recipeRequestProblem(
-      plan,
-      parsed.data.recipeId,
-      parsed.data.eulaAccepted,
-    );
-    if (recipeProblem) return sendErr(reply, 400, recipeProblem, "invalid");
+    const plan = validation.plan;
     const recipeId: StoredRecipeId | null =
       parsed.data.recipeId === undefined || parsed.data.recipeId === "none"
         ? null
@@ -1069,6 +1142,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
       Effect.either(
         createRequest({
           user: session.user,
+          agentProposalId: parsed.data.agentProposalId,
           name: parsed.data.name,
           plan,
           baseDomain,
@@ -1105,6 +1179,8 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     const parsed = SuggestBody.safeParse(req.body);
     if (!parsed.success)
       return sendErr(reply, 400, zodMessage(parsed.error.issues), "invalid");
+    if (containsSecret(parsed.data.text))
+      return sendErr(reply, 400, SECRET_GUARD_COPY, "secret_detected");
     const result = await runtime.runPromise(
       Effect.either(
         suggest({

@@ -7,6 +7,8 @@ import {
 } from "react";
 import {
   SUGGEST_TEXT_MAX,
+  SECRET_GUARD_COPY,
+  containsSecret,
   type OfferedUseCaseId,
   type Plan,
   type RecipeId,
@@ -213,6 +215,7 @@ export function useConcierge<T extends HTMLElement>(
   const [result, setResult] = useState<Suggestion | null>(null);
   // Bumped on every settled call: re-keys the result so it fades in again.
   const [seq, setSeq] = useState(0);
+  const [secretError, setSecretError] = useState<Error | null>(null);
   const inputRef = useRef<T>(null);
   const resultFocus = useRef<HTMLElement | null>(null);
   const focusResult = useRef(false);
@@ -229,6 +232,11 @@ export function useConcierge<T extends HTMLElement>(
 
   const run = (body: SuggestBody, fromResult: boolean) => {
     if (busy || disabled || unavailable) return;
+    if (containsSecret(body.text)) {
+      setSecretError(new Error(SECRET_GUARD_COPY));
+      return;
+    }
+    setSecretError(null);
     focusResult.current = fromResult;
     setLastBody(body);
     suggest.mutate(body, {
@@ -253,7 +261,7 @@ export function useConcierge<T extends HTMLElement>(
     busy,
     unavailable,
     result,
-    error: suggest.isError ? suggest.error : null,
+    error: secretError ?? (suggest.isError ? suggest.error : null),
     lastBody,
     seq,
     inputRef,
@@ -270,6 +278,7 @@ export function useConcierge<T extends HTMLElement>(
       if (lastBody) run(lastBody, true);
     },
     startOver: () => {
+      setSecretError(null);
       suggest.reset();
       setResult(null);
       setLastBody(null);

@@ -192,7 +192,7 @@ const JevAnswersSchema = z.object({
 type JevAnswers = z.infer<typeof JevAnswersSchema>;
 const JevAnswersEnvelope = z.object({ answers: JevAnswersSchema });
 
-const ChatUsage = z.object({
+export const ChatUsage = z.object({
   id: z.string().optional(),
   model: z.string().min(1),
   usage: z.object({
@@ -219,7 +219,7 @@ const ChatChoices = z.object({
     .min(1),
 });
 
-interface Usage {
+export interface Usage {
   model: string;
   requestId: string | null;
   inputTokens: number;
@@ -231,7 +231,7 @@ interface Usage {
 }
 
 /** What one response yielded: its bill if readable, and a value or our error code. */
-type Parsed<A> = { usage: Usage | null } & (
+export type Parsed<A> = { usage: Usage | null } & (
   { ok: true; value: A } | { ok: false; error: string }
 );
 
@@ -240,7 +240,7 @@ export function usdToMicroUsd(usd: number): bigint {
   return BigInt(Math.ceil(Math.round(usd * 1e12) / 1e6));
 }
 
-interface CallContext {
+export interface CallContext {
   config: ConciergeConfig;
   agentRunId: string;
   userId: string;
@@ -255,7 +255,7 @@ interface CallContext {
  * surface as ConciergeUpstream with our own code; provider bodies and causes
  * are dropped.
  */
-const callOpenRouter = <A>(
+export const callOpenRouter = <A>(
   ctx: CallContext,
   call: {
     path: string;
@@ -501,36 +501,7 @@ export const suggest = (
       deadline:
         config.now().getTime() + (config.deadlineMs ?? CONCIERGE_DEADLINE_MS),
     };
-    const tier = input.user.tier;
-    const suggestion = yield* Effect.gen(function* () {
-      const first = yield* askJev(ctx, tier, input.text);
-      let answers = toAnswers(first.answers);
-      let model = first.model;
-      let translated = false;
-      // A refusal on the original text stands: never translate it away. Only
-      // translate when the use case or game is unsure.
-      if (
-        answers.abuse < ABUSE_REFUSE &&
-        answers.is_english < ENGLISH_MIN &&
-        needsTranslation(answers)
-      ) {
-        const english = yield* translate(ctx, input.text);
-        const second = yield* askJev(ctx, tier, english);
-        const retried = toAnswers(second.answers);
-        // Policy signals only ever get stricter across the two passes.
-        answers = {
-          ...retried,
-          abuse: Math.max(answers.abuse, retried.abuse),
-          scraping: Math.max(answers.scraping, retried.scraping),
-        };
-        model = second.model;
-        translated = true;
-      }
-      const decision = decideSuggestion(answers, {
-        userTier: tier,
-      });
-      return { ...decision, translated, model };
-    }).pipe(
+    const suggestion = yield* suggestForRun(input, ctx).pipe(
       Effect.tapErrorCause(() =>
         Effect.ignore(finishAgentRun(run.id, "failed")),
       ),
@@ -545,3 +516,36 @@ export const suggest = (
       AgentRunNotRunning: (e) => Effect.die(e),
     }),
   );
+
+/** Reuse concierge decisions inside an existing metered run and deadline. */
+export const suggestForRun = (input: SuggestInput, ctx: CallContext) =>
+  Effect.gen(function* () {
+    const tier = input.user.tier;
+    const first = yield* askJev(ctx, tier, input.text);
+    let answers = toAnswers(first.answers);
+    let model = first.model;
+    let translated = false;
+    // A refusal on the original text stands: never translate it away. Only
+    // translate when the use case or game is unsure.
+    if (
+      answers.abuse < ABUSE_REFUSE &&
+      answers.is_english < ENGLISH_MIN &&
+      needsTranslation(answers)
+    ) {
+      const english = yield* translate(ctx, input.text);
+      const second = yield* askJev(ctx, tier, english);
+      const retried = toAnswers(second.answers);
+      // Policy signals only ever get stricter across the two passes.
+      answers = {
+        ...retried,
+        abuse: Math.max(answers.abuse, retried.abuse),
+        scraping: Math.max(answers.scraping, retried.scraping),
+      };
+      model = second.model;
+      translated = true;
+    }
+    const decision = decideSuggestion(answers, {
+      userTier: tier,
+    });
+    return { ...decision, translated, model };
+  });

@@ -36,3 +36,5 @@ export * from "./ledger.js";
 export * from "./concierge.js";
 export * from "./concierge-catalog.js";
 export * from "./setup.js";
+export * from "./agent-chat.js";
+export { containsSecret } from "./secrets.js";

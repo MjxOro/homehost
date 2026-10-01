@@ -15,6 +15,7 @@ export const AGENT_RUN_KINDS = [
   "site_edit",
   "site_import",
   "concierge",
+  "agent_chat",
   "bench",
 ] as const;
 export type AgentRunKind = (typeof AGENT_RUN_KINDS)[number];

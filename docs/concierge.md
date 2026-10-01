@@ -141,8 +141,15 @@ Every provider call of one suggestion shares a single 15 s deadline
 
 ## Privacy and what is logged
 
-homehost does not persist request text: not in run metadata, activity events,
-the ledger, error values or logs. The text (and its translation) is processed
+The standalone `POST /api/concierge/suggest` endpoint does not persist request
+text: not in run metadata, activity events, the ledger, error values or logs.
+Agent chat reuses this decision path inside its own metered turn and retains
+its guarded conversation messages and tool arguments/results; see
+[agent-chat.md](agent-chat.md) for the storage boundary. Both input paths run the
+shared deterministic secret scanner before model input. A detected secret
+returns the fixed guard message without a provider call; chat stores only a
+placeholder for that user message. Detection is best effort, not a guarantee
+that arbitrary text contains no secret. The text (and its translation) is processed
 by Jev and the translation model through OpenRouter and their providers; the
 translation call asks OpenRouter to route only to providers that do not
 collect data (`provider.data_collection: "deny"`). The alpha Jev decisions
