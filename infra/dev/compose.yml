@@ -77,7 +77,9 @@ services:
     volumes:
       - ../..:/app
       - /var/lib/incus/unix.socket:/var/lib/incus/unix.socket
+      # Zabbly Incus: /usr/bin/incus is a wrapper that execs /opt/incus/bin/incus.
       - /usr/bin/incus:/usr/bin/incus:ro
+      - /opt/incus:/opt/incus:ro
     command: ["bun", "apps/worker/src/index.ts"]
     # Host network: the readiness gate and setup checks TCP-connect to each
     # box's public IPv6, and Docker's bridge network has no IPv6. Postgres is
