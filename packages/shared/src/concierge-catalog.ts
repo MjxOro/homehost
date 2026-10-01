@@ -79,7 +79,7 @@ export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
 /** Plain-language step labels shown while a box is being set up. */
 export const SETUP_STEPS: Record<SetupStepId, { label: string }> = {
   update_packages: { label: "Updating the system packages" },
-  install_java: { label: "Installing Java 21" },
+  install_java: { label: "Installing the Java version Minecraft needs" },
   download_minecraft: { label: "Downloading the official Minecraft server" },
   configure_minecraft: { label: "Creating the world and server settings" },
   install_node: { label: "Installing Node.js and npm" },

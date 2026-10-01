@@ -13,6 +13,8 @@ export const SETUP_ERROR_CODES = [
   "apt_failed",
   "download_failed",
   "checksum_mismatch",
+  // The Java the chosen Minecraft release needs isn't in the guest's apt sources.
+  "java_unavailable",
   "service_failed",
   "not_ready",
   "timeout",
@@ -103,6 +105,7 @@ export const SETUP_EXIT_CODES = {
   checksum_mismatch: 12,
   service_failed: 13,
   not_ready: 14,
+  java_unavailable: 15,
 } as const satisfies Partial<Record<SetupErrorCode, number>>;
 
 const STEP_DEFAULT_ERROR: Record<SetupStepId, SetupErrorCode> = {
