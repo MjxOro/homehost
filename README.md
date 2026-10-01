@@ -94,7 +94,7 @@ bun run dev:check
 
 Prod: built images tagged by git SHA (`TAG=$(git rev-parse --short HEAD)`). Secrets live in `infra/private/prod.env` (gitignored): `GITHUB_CLIENT_ID/SECRET`, `OPERATOR_EMAILS`, `APP_ORIGIN=https://homehost.risktozero.sh`, `BASE_DOMAIN=homehost.risktozero.sh`, `IPV6_PREFIX`. `bun run prod:build && bun run prod:up` (`--wait` on the api healthcheck, so a bad image fails loud instead of 502ing). Caddy serves the static web app and reverse-proxies `/api` to the api container, so cookies stay first-party. Cutover: point `infra/traefik/routes/panel.yml` at `http://host.docker.internal:5180`.
 
-Public dev (`https://hhfrontdev…`, `https://hhbackdev…`) is intentional and unauthenticated at the edge — treat the dev stack as public: no real user data, dev-only OAuth creds where possible. CI (`.github/workflows/ci.yml`) runs on every push: typecheck, shared tests, integration tests against a Postgres service, web build, both image builds. CD (`deploy.yml`) runs `bun run prod:deploy` (checkout main → pull → build → migrate → up) on push to `main`, and needs one self-hosted runner on the prod host:
+The dev stack is LAN-only staging: it provisions real boxes and showcase mode lets anyone pick the operator persona, so its ports bind to loopback (or the LAN address via `DEV_BIND_IP`) and it has no public hostname. CI (`.github/workflows/ci.yml`) runs on every push: typecheck, shared tests, integration tests against a Postgres service, web build, both image builds. CD (`deploy.yml`) runs `bun run prod:deploy` (checkout main → pull → build → migrate → up) on push to `main`, and needs one self-hosted runner on the prod host:
 
 ```bash
 # on the prod host, as the deploy user, in /opt/homehost-runner
