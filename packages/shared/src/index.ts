@@ -34,3 +34,4 @@ export type {
 } from "./streaming.js";
 export * from "./ledger.js";
 export * from "./concierge.js";
+export * from "./concierge-catalog.js";

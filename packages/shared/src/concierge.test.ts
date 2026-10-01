@@ -10,7 +10,6 @@ import {
   PLAYERS_MIN,
   RECIPE_MIN,
   SCRAPING_REVIEW,
-  SUGGEST_TEXT_MAX,
   SuggestBody,
   Suggestion,
   USE_CASE_MIN,
@@ -19,6 +18,7 @@ import {
   picksProblem,
   uncertainSlots,
 } from "./concierge.js";
+import { SUGGEST_TEXT_MAX } from "./concierge-catalog.js";
 import type {
   ConciergeAnswers,
   SuggestPicks,
