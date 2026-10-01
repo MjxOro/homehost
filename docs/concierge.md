@@ -5,9 +5,9 @@ and 4 friends") into a suggested use case, plan and first-boot recipe. It
 creates nothing: the client shows a confirm card and then calls the existing
 `POST /api/requests`, which enforces tiers and quotas on its own. Installable
 recipes are then set up by the worker once the box is running (see
-[recipes.md](recipes.md)); "coming soon" recipes are only suggested. A
-refusal is advice, not
-enforcement: nothing stops a user from creating a plain request directly.
+[recipes.md](recipes.md)); "coming soon" recipes are only suggested. A refusal
+is advice, not enforcement: nothing stops a user from creating a plain request
+directly.
 
 ## Request
 
