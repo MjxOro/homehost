@@ -8,7 +8,12 @@ import {
   toDesktopHostname,
   toSubdomain,
 } from "@homehost/shared";
-import type { Plan, PortalUser, ProvisionAction } from "@homehost/shared";
+import type {
+  Plan,
+  PortalUser,
+  ProvisionAction,
+  StoredRecipeId,
+} from "@homehost/shared";
 import * as schema from "../db/schema.js";
 import { DatabaseTag } from "./Database.js";
 import {
@@ -22,10 +27,16 @@ import {
 
 export type RequestRow = typeof schema.serverRequests.$inferSelect;
 
+// Drizzle wraps driver errors in DrizzleQueryError; the Postgres code sits on
+// its `cause`, so walk a few levels down.
 function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === "object" && e !== null && "code" in e && e.code === "23505"
-  );
+  let current = e;
+  for (let depth = 0; depth < 4; depth++) {
+    if (typeof current !== "object" || current === null) return false;
+    if ("code" in current && current.code === "23505") return true;
+    current = "cause" in current ? current.cause : null;
+  }
+  return false;
 }
 
 export interface CreateInput {
@@ -34,6 +45,10 @@ export interface CreateInput {
   plan: Plan;
   baseDomain: string;
   sshPubkey?: string;
+  /** Validated against the plan by the route; null = plain Ubuntu. */
+  recipeId: StoredRecipeId | null;
+  /** Set when the recipe's EULA was accepted with this request. */
+  eulaAccepted: boolean;
 }
 
 type CreateOutcome =
@@ -112,6 +127,9 @@ export const createRequest = (
               desktopEnv: desktop ? desktop.env : null,
               desktopHostname,
               desktopPort: desktop ? desktop.kasmPort : null,
+              recipeId: input.recipeId,
+              setupStatus: input.recipeId ? "pending" : "none",
+              eulaAcceptedAt: input.eulaAccepted ? now : null,
               createdAt: now,
               updatedAt: now,
             })
@@ -550,6 +568,70 @@ export const retryProvision = (input: {
         ? new RequestNotFound()
         : new InvalidTransition({
             message: "only approved requests can be retried",
+          });
+    }
+    return outcome.row;
+  });
+
+export const retrySetup = (
+  input: InstanceInput,
+): Effect.Effect<
+  RequestRow,
+  RequestNotFound | InvalidTransition | DbFailure,
+  DatabaseTag
+> =>
+  Effect.gen(function* () {
+    const db = yield* DatabaseTag;
+    const outcome: PowerOutcome = yield* Effect.tryPromise({
+      try: () =>
+        db.transaction(async (tx) => {
+          await tx.execute(
+            sql`SELECT 1 FROM server_requests WHERE id = ${input.id} FOR UPDATE`,
+          );
+          const found = await tx
+            .select()
+            .from(schema.serverRequests)
+            .where(eq(schema.serverRequests.id, input.id))
+            .limit(1);
+          const row = found[0];
+          if (
+            !row ||
+            row.ownerId !== input.user.id ||
+            row.status === "deleted"
+          ) {
+            return { ok: false as const, reason: "missing" as const };
+          }
+          // Only a failed setup on a live box re-runs: the step scripts are
+          // idempotent, so the box is never reimaged for a retry.
+          if (row.status !== "running" || row.setupStatus !== "failed") {
+            return { ok: false as const, reason: "state" as const };
+          }
+          const updated = await tx
+            .update(schema.serverRequests)
+            .set({
+              setupStatus: "pending",
+              setupStep: null,
+              setupError: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.serverRequests.id, row.id))
+            .returning();
+          await tx.insert(schema.provisionJobs).values({
+            requestId: row.id,
+            action: "setup",
+          });
+          return { ok: true as const, row: updated[0] };
+        }),
+      catch: (cause): InvalidTransition | DbFailure =>
+        isUniqueViolation(cause)
+          ? new InvalidTransition({ message: "a setup job is already queued" })
+          : new DbFailure({ cause }),
+    });
+    if (!outcome.ok) {
+      return yield* outcome.reason === "missing"
+        ? new RequestNotFound()
+        : new InvalidTransition({
+            message: "only a failed setup on a running server can be retried",
           });
     }
     return outcome.row;
