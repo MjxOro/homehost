@@ -1,3 +1,4 @@
+import { DESKTOP_SANDBOX, DESKTOP_BRIDGE_CHANNEL } from "@homehost/shared";
 import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { isApiError } from "../lib/api";
@@ -19,9 +20,9 @@ import {
 
 /**
  * Panel-hosted desktop canvas: no password form at all. The panel session
- * cookie gates `/api/requests/:id/desktop`, which returns a same-origin
- * proxied KasmVNC URL; the API injects Basic auth toward the guest from
- * `desktop_password` (never leaves the server) and the URL hash carries
+ * cookie gates `/api/requests/:id/desktop`, which returns a capability-gated
+ * KasmVNC URL in an opaque sandbox; the API injects Basic auth toward the guest from
+ * `desktop_password`; the URL hash carries
  * Kasm's `password` (RFB autoconnect, no login form) plus `resize=scale`
  * so Kasm's Local Scaling fits the guest to the frame — no Kasm
  * scrollbars at any frame size. Refresh re-fetches the session URL —
@@ -159,7 +160,6 @@ function DesktopCanvas() {
     meta: false,
   });
   // True while dispatching synthetic keys — the guest Esc interceptor skips.
-  const sendingKeyRef = useRef(false);
   useEffect(() => {
     if (!announce) return;
     const timer = window.setTimeout(() => setAnnounce(null), 4000);
@@ -477,68 +477,45 @@ function DesktopCanvas() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [focused]);
 
-  // While focused the pointer lives inside the guest document, whose events
-  // never bubble to the parent — so track it there (same-origin proxy, and
-  // Esc, which the guest would otherwise swallow). Re-attaches on guest
-  // reloads while focused.
+  // The opaque guest reports bounded input coordinates. It receives no panel
+  // authority; only this exact frame can release focus or move the viewport.
   useEffect(() => {
     if (!focused) {
       cursorRef.current = null;
       return;
     }
-    const iframe = frameRef.current;
-    if (!iframe) return;
-    const onGuestMove = (e: MouseEvent) => {
-      const { zoom: z, pan: p } = viewRef.current;
-      // Guest viewport px -> wrap-relative screen px. The stage is
-      // translate-then-scale, so visual = offset + zoom * viewport.
-      cursorRef.current = { x: p.x + z * e.clientX, y: p.y + z * e.clientY };
-    };
-    const onGuestLeave = () => {
-      cursorRef.current = null;
-    };
-    const onGuestTouch = (e: TouchEvent) => {
-      const t = e.changedTouches.item(0);
-      if (!t) return;
-      const { zoom: z, pan: p } = viewRef.current;
-      cursorRef.current = { x: p.x + z * t.clientX, y: p.y + z * t.clientY };
-    };
-    const onGuestKey = (e: KeyboardEvent) => {
-      // Synthetic keys from the on-screen keyboard pass through — Esc from
-      // the popup belongs to the guest, physical Esc still releases.
-      if (sendingKeyRef.current) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (
+        event.source !== frameRef.current?.contentWindow ||
+        event.origin !== "null" ||
+        !data ||
+        data.channel !== DESKTOP_BRIDGE_CHANNEL
+      )
+        return;
+      if (data.type === "release") {
         exitFocus();
+        return;
       }
+      if (data.type === "leave") {
+        cursorRef.current = null;
+        return;
+      }
+      if (
+        data.type !== "pointer" ||
+        !Number.isFinite(data.x) ||
+        !Number.isFinite(data.y)
+      )
+        return;
+      const { w, h } = frameSize();
+      const { zoom: z, pan: p } = viewRef.current;
+      cursorRef.current = {
+        x: p.x + z * Math.max(0, Math.min(w, data.x)),
+        y: p.y + z * Math.max(0, Math.min(h, data.y)),
+      };
     };
-    let doc: Document | null = null;
-    const opts = { capture: true } as const;
-    const attach = () => {
-      doc = iframe.contentDocument;
-      doc?.addEventListener("mousemove", onGuestMove, opts);
-      doc?.addEventListener("touchstart", onGuestTouch, opts);
-      doc?.addEventListener("touchmove", onGuestTouch, opts);
-      doc?.addEventListener("mouseleave", onGuestLeave, opts);
-      doc?.addEventListener("keydown", onGuestKey, opts);
-    };
-    const detach = () => {
-      doc?.removeEventListener("mousemove", onGuestMove, opts);
-      doc?.removeEventListener("touchstart", onGuestTouch, opts);
-      doc?.removeEventListener("touchmove", onGuestTouch, opts);
-      doc?.removeEventListener("mouseleave", onGuestLeave, opts);
-      doc?.removeEventListener("keydown", onGuestKey, opts);
-    };
-    const onLoad = () => {
-      detach();
-      attach();
-    };
-    attach();
-    iframe.addEventListener("load", onLoad);
-    return () => {
-      detach();
-      iframe.removeEventListener("load", onLoad);
-    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, [focused]);
 
   // Edge-follow traverse: whenever the guest overflows the frame, the view
@@ -735,12 +712,14 @@ function DesktopCanvas() {
     // Let state commit, then move keyboard focus into the guest.
     requestAnimationFrame(() => {
       frameRef.current?.focus();
-      frameRef.current?.contentWindow?.focus();
+      frameRef.current?.contentWindow?.postMessage(
+        { channel: DESKTOP_BRIDGE_CHANNEL, type: "focus" },
+        "*",
+      );
     });
   };
 
-  // On-screen keyboard: synthetic key events straight into the guest
-  // document (same-origin proxy, so noVNC's own handlers receive them).
+  // On-screen keyboard: bounded messages to the opaque guest input bridge.
   // Modifiers arm once and ride on the next key — nothing latches, so no
   // stuck Ctrl when the popup closes. Sending a key takes control, like tap.
   const toggleMod = (id: KbModId) => {
@@ -750,16 +729,13 @@ function DesktopCanvas() {
       return next;
     });
   };
-  const guestKeyTarget = (doc: Document): Element =>
-    doc.activeElement ?? doc.body ?? doc.documentElement;
+  const postGuestKeys = (events: (KeyboardEventInit & { type: string })[]) => {
+    frameRef.current?.contentWindow?.postMessage(
+      { channel: DESKTOP_BRIDGE_CHANNEL, type: "keys", events },
+      "*",
+    );
+  };
   const sendGuestKey = (key: string, code: string) => {
-    const doc = frameRef.current?.contentDocument;
-    if (!doc) {
-      setAnnounce(
-        "Desktop is still loading — try the keyboard again in a moment.",
-      );
-      return;
-    }
     const init: KeyboardEventInit = {
       key,
       code,
@@ -771,27 +747,16 @@ function DesktopCanvas() {
       cancelable: true,
       composed: true,
     };
-    sendingKeyRef.current = true;
-    try {
-      const target = guestKeyTarget(doc);
-      target.dispatchEvent(new KeyboardEvent("keydown", init));
-      target.dispatchEvent(new KeyboardEvent("keyup", init));
-    } finally {
-      sendingKeyRef.current = false;
-    }
+    postGuestKeys([
+      { ...init, type: "keydown" },
+      { ...init, type: "keyup" },
+    ]);
     if (armed.ctrl || armed.alt || armed.shift || armed.meta) {
       setArmed({ ctrl: false, alt: false, shift: false, meta: false });
     }
     if (!focused) enterFocus();
   };
   const sendCtrlAltDel = () => {
-    const doc = frameRef.current?.contentDocument;
-    if (!doc) {
-      setAnnounce(
-        "Desktop is still loading — try the keyboard again in a moment.",
-      );
-      return;
-    }
     const base = { bubbles: true, cancelable: true, composed: true } as const;
     const down: KeyboardEventInit[] = [
       { ...base, key: "Control", code: "ControlLeft", ctrlKey: true },
@@ -803,16 +768,10 @@ function DesktopCanvas() {
       { ...base, key: "Alt", code: "AltLeft", ctrlKey: true },
       { ...base, key: "Control", code: "ControlLeft" },
     ];
-    sendingKeyRef.current = true;
-    try {
-      const target = guestKeyTarget(doc);
-      for (const init of down)
-        target.dispatchEvent(new KeyboardEvent("keydown", init));
-      for (const init of up)
-        target.dispatchEvent(new KeyboardEvent("keyup", init));
-    } finally {
-      sendingKeyRef.current = false;
-    }
+    postGuestKeys([
+      ...down.map((init) => ({ ...init, type: "keydown" })),
+      ...up.map((init) => ({ ...init, type: "keyup" })),
+    ]);
     setAnnounce("Sent Ctrl Alt Delete to the desktop.");
     if (!focused) enterFocus();
   };
@@ -1109,6 +1068,8 @@ function DesktopCanvas() {
             src={desktop.data.url}
             tabIndex={-1}
             className="block h-full w-full border-0 bg-black"
+            sandbox={DESKTOP_SANDBOX}
+            referrerPolicy="no-referrer"
             allow="clipboard-read; clipboard-write"
             allowFullScreen
           />
