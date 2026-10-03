@@ -56,15 +56,16 @@ IPV6_PREFIX=<same as infra/private/prod.env>
 CF_DNS_API_TOKEN=<Edit-zone-DNS token, same as infra/private/traefik.env>
 ```
 
-Deploys (`prod:deploy`) don't restart this unit, and the unit runs from this
-checkout's source, not from an image. After a merge that changes
-`apps/worker` or anything it imports (`packages/shared`), update the checkout
-and its dependencies first, then restart:
+The unit runs from this checkout's source, not from an image, so
+`prod:deploy` (run by `.github/workflows/deploy.yml` on every merge to `main`)
+finishes with `bun install --frozen-lockfile` and `bun run prod:worker`
+(`infra/worker/restart.sh`). That script restarts the unit and fails the deploy
+unless the worker logs `worker up` within 30s, since `Restart=always` would
+otherwise hide a crash loop. To restart by hand after updating the checkout:
 
 ```bash
 git pull --ff-only && bun install --frozen-lockfile
-sudo systemctl restart homehost-worker
-journalctl -u homehost-worker -n 20   # expect: worker up (prod)
+bun run prod:worker   # expect: homehost-worker restarted on <sha>
 ```
 
 Skipping `bun install` crash-loops the worker when a workspace package gains a

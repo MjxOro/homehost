@@ -14,8 +14,8 @@ Host-side provisioning loop: leases `provision_jobs` from Postgres and drives In
 | Setup recipes | `src/recipes.ts` | `setupScript` shell builder |
 
 ## RUNTIME FACTS
-- Started by `infra/worker/homehost-worker.service` (or `bun run worker`). Runs from this checkout's source, not an image: `prod:deploy` does NOT restart it.
-- After changes here or in `packages/shared`: `git pull --ff-only && bun install --frozen-lockfile && sudo systemctl restart homehost-worker`.
+- Started by `infra/worker/homehost-worker.service` (or `bun run worker`). Runs from this checkout's source, not an image.
+- `prod:deploy` restarts it via `bun run prod:worker` (`infra/worker/restart.sh`), which fails the deploy unless `worker up` is logged within 30s. Manual: `git pull --ff-only && bun install --frozen-lockfile && bun run prod:worker`.
 - Env: `DATABASE_URL`, `IPV6_PREFIX`, `CF_DNS_API_TOKEN`, `WORKER_ENV`, `WORKER_BASE_DOMAIN`. Prod values come from `infra/private/worker.env` via a systemd drop-in.
 - Startup requeues every `leased` job (crash recovery) and reconciles `ip_assignments`.
 - Leasing: `SELECT ... FOR UPDATE SKIP LOCKED`, status `queued -> leased`, attempts++.

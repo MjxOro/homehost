@@ -29,7 +29,7 @@ The cross-process contract: API types, plans, provisioning math, readiness, stre
 ## CHANGE CHECKLIST
 - New export: add it to `src/index.ts`, or consumers cannot see it.
 - Changing a type here changes api, web and worker at once: run root `typecheck`.
-- Worker runs from source: shared changes it imports need a worker restart on the host (see `apps/worker`).
+- Worker runs from source: `prod:deploy` restarts it (`bun run prod:worker`); a manual checkout update needs the same restart (see `apps/worker`).
 - Plan ids are persisted (migration `0014_plan_ids`); never rename/reuse an id in `PLANS`.
 
 ## ANTI-PATTERNS
