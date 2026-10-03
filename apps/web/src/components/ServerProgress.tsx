@@ -261,23 +261,30 @@ function SetupStage({
   );
 }
 
-/** Where to go from here once the box is ready: address, login, console. */
+/**
+ * Where to go from here once the box is ready: address, login, console.
+ * `focusOnMount` moves focus to the heading on the dedicated progress page;
+ * inline surfaces (chat) pass false so reading history never jumps.
+ */
 export function ReadyCard({
   request,
   redirectIn = null,
   onStay,
+  focusOnMount = true,
 }: {
   request: ServerRequest;
   redirectIn?: number | null;
   onStay?: () => void;
+  focusOnMount?: boolean;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
+    if (!focusOnMount) return;
     // Take focus only from nowhere in particular, never from a control.
     const active = document.activeElement;
     if (active === document.body || active?.tagName === "H1")
       headingRef.current?.focus();
-  }, []);
+  }, [focusOnMount]);
   const minecraft = request.recipeId === "minecraft_java";
   const ssh = `ssh root@${request.subdomain}`;
 
