@@ -118,4 +118,4 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 ## Notes
 
 - DB ports (all loopback): `55432` retired showcase/host-dev (`db:up`), `55433` dev, `55434` prod. Never point repo `.env` or the worker unit at the prod DB from the dev loop, or vice versa.
-- `prod:deploy` does NOT restart the worker. After changing `apps/worker` or `packages/shared`: `bun install --frozen-lockfile` then `systemctl restart homehost-worker`.
+- `prod:deploy` (CI on every merge to `main`) runs `bun install --frozen-lockfile` and ends with `bun run prod:worker`, which restarts the host worker and fails unless it logs `worker up` within 30s. Manual restart: `bun run prod:worker`.

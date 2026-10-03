@@ -27,7 +27,7 @@ infra/
 | Edge routes | `traefik/routes/panel.yml` | HTTP only (no TCP routes, per V6-only policy) |
 
 ## GOTCHAS
-- `prod:deploy` rebuilds containers only; the worker unit runs from the checkout and needs a manual restart.
+- The worker unit runs from the checkout, not an image; `prod:deploy` ends with `bun run prod:worker` (`worker/restart.sh`) to restart it and confirm `worker up`. Keep that step if you touch the deploy chain.
 - Worker prod env comes from `infra/private/worker.env` via drop-in `/etc/systemd/system/homehost-worker.service.d/env.conf`; the repo `.env` is the host dev loop and must never point at prod.
 - DB ports: 55432 = retired showcase/host-dev, 55433 = dev, 55434 = prod. Everything binds 127.0.0.1.
 - Docker sets FORWARD policy DROP, killing tenant egress; `iptables -I FORWARD -i/-o incusbr0 -j ACCEPT` + `netfilter-persistent save` after Docker restarts.
