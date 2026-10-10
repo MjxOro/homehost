@@ -12,7 +12,6 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { Effect, Either } from "effect";
 import type { FastifyInstance } from "fastify";
-import ts from "typescript";
 import { buildApp } from "../src/app.js";
 import * as schema from "../src/db/schema.js";
 import { DatabaseLive } from "../src/domain/Database.js";
@@ -31,7 +30,6 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
   let member: string;
   let fixtureIds: string[] = [];
   let migration: string;
-  let workerFunctions: Record<string, string>;
 
   async function login(personaId: string) {
     const response = await app.inject({
@@ -80,111 +78,6 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
     );
   }
 
-  // Execute the actual worker functions, not a SQL copy. Never import index.ts:
-  // its top-level main would start leasing real jobs and contacting Incus.
-  function workerFunction(name: string, dependencies: Record<string, unknown>) {
-    return new Function(
-      ...Object.keys(dependencies),
-      `${workerFunctions[name]}\nreturn ${name};`,
-    )(...Object.values(dependencies));
-  }
-
-  function setIpv6(requestId: string, ip = address): Promise<void> {
-    return workerFunction("setIpv6", { sql: client })(requestId, ip);
-  }
-
-  function releaseIpv6(requestId: string): Promise<void> {
-    return workerFunction("releaseIpv6", { sql: client })(requestId);
-  }
-
-  function reconcileIpv6Assignments(): Promise<number> {
-    return workerFunction("reconcileIpv6Assignments", { sql: client })();
-  }
-
-  // The real IncusError (one class, so instanceof holds), so not-found matching
-  // runs on the shape the worker sees.
-  let incusErrorClass:
-    (new (a: string[], c: number, o: string) => Error) | undefined;
-  function incusErrorCtor() {
-    incusErrorClass ??= workerFunction("IncusError", {
-      redactArgs: workerFunction("redactArgs", {}),
-    });
-    return incusErrorClass!;
-  }
-  function incusError(output: string): Error {
-    return new (incusErrorCtor())(["delete", "x"], 1, output);
-  }
-
-  async function teardown(
-    owner: Awaited<ReturnType<typeof fixture>>,
-    mode = "success",
-    attempts = 1,
-    noName = false,
-  ) {
-    const events: string[] = [];
-    const instanceName = `req-${owner.requestId}`;
-    const handler = workerFunction("handleTeardown", {
-      loadRequest: async () =>
-        mode === "purged"
-          ? null
-          : {
-              id: owner.requestId,
-              instanceName: noName ? null : instanceName,
-              subdomain: owner.subdomain,
-              planId: "container-small",
-            },
-      instanceNameOf: () => instanceName,
-      projectForReq: () => "fixture-project",
-      isIncusNotFound: workerFunction("isIncusNotFound", {
-        IncusError: incusErrorCtor(),
-      }),
-      incus: async (args: string[]) => {
-        events.push(args[0]!);
-        expect(args[1]).toBe(instanceName);
-        if (args[0] === "delete" && mode === "instance-not-found")
-          throw incusError("Error: Instance not found");
-        if (
-          args[0] === "delete" &&
-          (mode.startsWith("incus") || mode.startsWith("list-"))
-        )
-          throw new Error("delete unavailable");
-        if (args[0] === "list" && mode === "incus-list-fails")
-          throw new Error("list unavailable");
-        if (args[0] === "list" && mode === "list-project-not-found")
-          throw incusError("Error: Project not found");
-        if (args[0] === "list" && mode === "list-daemon-down")
-          throw incusError("Error: cannot connect to daemon");
-        return mode === "incus-still-present" ? instanceName : "";
-      },
-      cfToken: true,
-      deleteAAAA: async () => {
-        events.push("dns");
-        // The instance is already gone, so history must be closed before DNS.
-        expect((await lookup())[0]?.releasedAt).not.toBeNull();
-        if (mode === "dns-fails") throw new Error("DNS unavailable");
-      },
-      PLANS: [],
-      loadDesktopFields: async () => null,
-      removeDesktopRoute: async () => {},
-      releaseIpv6: async (id: string) => {
-        events.push("release");
-        if (mode === "ledger-fails") throw new Error("ledger unavailable");
-        await releaseIpv6(id);
-      },
-      finishJob: async (_id: string, status: string) => {
-        events.push(status);
-        if (status === "done")
-          expect((await lookup())[0]?.releasedAt).not.toBeNull();
-      },
-      requeue: async () => {
-        events.push("retry");
-      },
-      teardownAttempts: 25,
-    });
-    await handler({ id: randomUUID(), requestId: owner.requestId, attempts });
-    return events;
-  }
-
   beforeAll(async () => {
     admin = postgres(databaseUrl!, { max: 1 });
     await admin.unsafe(`CREATE SCHEMA ${namespace}`);
@@ -200,38 +93,6 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
       await client.unsafe(source);
       if (file === "0013_ip_assignments.sql") migration = source;
     }
-    const source = await readFile(
-      new URL("../../worker/src/index.ts", import.meta.url),
-      "utf8",
-    );
-    const ast = ts.createSourceFile(
-      "index.ts",
-      source,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
-    );
-    workerFunctions = {};
-    for (const node of ast.statements) {
-      if (
-        (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
-        node.name &&
-        [
-          "setIpv6",
-          "releaseIpv6",
-          "reconcileIpv6Assignments",
-          "handleTeardown",
-          "isIncusNotFound",
-          "IncusError",
-          "redactArgs",
-        ].includes(node.name.text)
-      ) {
-        workerFunctions[node.name.text] = new Bun.Transpiler({
-          loader: "ts",
-        }).transformSync(node.getText(ast));
-      }
-    }
-    expect(Object.keys(workerFunctions)).toHaveLength(7);
     app = buildApp({ db: drizzle(client, { schema }) });
     [operator, member] = await Promise.all([login("operator"), login("alice")]);
   });
@@ -479,159 +340,6 @@ describe.skipIf(!databaseUrl)("IP assignment history", () => {
         })
       ).statusCode,
     ).toBe(401);
-  });
-
-  test("worker opens atomically and concurrent retries preserve the first assignment snapshot", async () => {
-    const owner = await fixture();
-    await setIpv6(owner.requestId);
-    const original = (await lookup())[0]!;
-    await client`UPDATE users SET email = ${`${randomUUID()}@example.test`} WHERE id = ${owner.userId}`;
-    await Promise.all([
-      setIpv6(owner.requestId),
-      setIpv6(owner.requestId, "2001:0DB8:ABCD:0:0:0:0:A"),
-    ]);
-    const rows = await lookup();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.id).toBe(original.id);
-    expect(rows[0]?.assignedAt).toEqual(original.assignedAt);
-    expect(rows[0]?.ownerEmail).toBe(owner.ownerEmail);
-    expect(
-      (
-        await client`SELECT ipv6 FROM server_requests WHERE id = ${owner.requestId}`
-      )[0]?.ipv6,
-    ).toBeTruthy();
-  });
-
-  test("worker collision rolls back live address and any attempted rotation", async () => {
-    const first = await fixture();
-    const second = await fixture();
-    await setIpv6(first.requestId);
-    await setIpv6(second.requestId, "2001:db8:abcd::b");
-    await expect(setIpv6(second.requestId)).rejects.toThrow(
-      "IPv6 address already assigned",
-    );
-    expect(
-      (
-        await client`SELECT ipv6 FROM server_requests WHERE id = ${second.requestId}`
-      )[0]?.ipv6,
-    ).toBe("2001:db8:abcd::b");
-    expect((await lookup("2001:db8:abcd::b"))[0]?.releasedAt).toBeNull();
-    expect((await lookup())[0]?.userId).toBe(first.userId);
-  });
-
-  test("worker prefix rotation closes old address and opens the new one", async () => {
-    const owner = await fixture();
-    await setIpv6(owner.requestId);
-    await setIpv6(owner.requestId, "2001:db8:ffff::a");
-    expect((await lookup())[0]?.releasedAt).not.toBeNull();
-    expect((await lookup("2001:db8:ffff::a"))[0]?.prefix).toBe(
-      "2001:db8:ffff::/64",
-    );
-  });
-
-  test("worker teardown closes once the instance is gone, before DNS, and release is idempotent", async () => {
-    const owner = await fixture();
-    await setIpv6(owner.requestId);
-    expect(await teardown(owner)).toEqual(["delete", "release", "dns", "done"]);
-    const releasedAt = (await lookup())[0]?.releasedAt;
-    await releaseIpv6(owner.requestId);
-    expect((await lookup())[0]?.releasedAt).toEqual(releasedAt);
-    await setIpv6(owner.requestId);
-    expect(await lookup()).toHaveLength(2);
-    expect((await lookup())[0]?.releasedAt).toBeNull();
-  });
-
-  test("worker retries Incus, verification and ledger failures without releasing history", async () => {
-    const owner = await fixture();
-    await setIpv6(owner.requestId);
-    for (const mode of [
-      "incus-still-present",
-      "incus-list-fails",
-      "list-daemon-down",
-      "ledger-fails",
-    ]) {
-      const events = await teardown(owner, mode);
-      expect(events.at(-1)).toBe("retry");
-      expect((await lookup())[0]?.releasedAt).toBeNull();
-    }
-  });
-
-  test("failing DNS delete after the instance is gone still leaves the assignment closed", async () => {
-    const owner = await fixture();
-    await setIpv6(owner.requestId);
-    expect(await teardown(owner, "dns-fails")).toEqual([
-      "delete",
-      "release",
-      "dns",
-      "retry",
-    ]);
-    expect((await lookup())[0]?.releasedAt).not.toBeNull();
-    expect((await teardown(owner, "dns-fails", 25)).at(-1)).toBe("failed");
-    expect((await lookup())[0]?.releasedAt).not.toBeNull();
-  });
-
-  test("worker verifies already-gone instances and derives a missing instance name", async () => {
-    const owner = await fixture();
-    await setIpv6(owner.requestId);
-    expect(await teardown(owner, "incus-already-gone", 1, true)).toEqual([
-      "delete",
-      "list",
-      "release",
-      "dns",
-      "done",
-    ]);
-  });
-
-  test("Incus not-found on delete or list counts as gone", async () => {
-    const deleteMissing = await fixture();
-    await setIpv6(deleteMissing.requestId);
-    expect(await teardown(deleteMissing, "instance-not-found")).toEqual([
-      "delete",
-      "release",
-      "dns",
-      "done",
-    ]);
-    const projectMissing = await fixture();
-    await setIpv6(projectMissing.requestId, "2001:db8:abcd::b");
-    expect(await teardown(projectMissing, "list-project-not-found")).toEqual([
-      "delete",
-      "list",
-      "release",
-      "dns",
-      "done",
-    ]);
-  });
-
-  test("teardown of a purged request releases its assignment", async () => {
-    const owner = await fixture();
-    await setIpv6(owner.requestId);
-    expect(await teardown(owner, "purged")).toEqual(["release", "done"]);
-    expect((await lookup())[0]?.releasedAt).not.toBeNull();
-  });
-
-  test("reconcile inserts missing open assignments once and is idempotent", async () => {
-    const live = await fixture("running", address);
-    const parked = await fixture("approved", "2001:db8:abcd::d");
-    const covered = await fixture("running", "2001:db8:abcd::e");
-    await assign(covered, start, null, "2001:db8:abcd::e");
-    const holder = await fixture("running");
-    await assign(holder, start, null, "2001:db8:abcd::f");
-    await fixture("running", "2001:db8:abcd::f");
-    await fixture("deleted", "2001:db8:abcd::b");
-    await fixture("rejected", "2001:db8:abcd::c");
-    await fixture("running");
-    await fixture("running", "not-an-ip");
-    expect(await reconcileIpv6Assignments()).toBe(2);
-    expect(await reconcileIpv6Assignments()).toBe(0);
-    const rows =
-      await client`SELECT request_id, owner_email, assigned_at, released_at
-      FROM ip_assignments ORDER BY assigned_at, request_id`;
-    expect(rows).toHaveLength(4);
-    const inserted = rows.find((row) => row.request_id === live.requestId)!;
-    expect(inserted.owner_email).toBe(live.ownerEmail);
-    expect(new Date(inserted.assigned_at).toISOString()).toBe(start);
-    expect(inserted.released_at).toBeNull();
-    expect(rows.some((row) => row.request_id === parked.requestId)).toBe(true);
   });
 
   test("backfill skips malformed ipv6 text instead of aborting the migration", async () => {

@@ -8,3 +8,4 @@ infra/private/
 letsencrypt/
 *.log
 coverage/
+apps/worker/bin/

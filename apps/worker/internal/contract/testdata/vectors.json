@@ -1,0 +1,2130 @@
+{
+  "ipv6ForInstance": [
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": "2001:db8:abcd:12:9a10:5d6e:7f80:9a1b"
+    },
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0002"
+    },
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0003"
+    },
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": "2001:db8:abcd:12:8000:0000:0000:10000"
+    },
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0003"
+    },
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12",
+      "requestId": "",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": "2001:db8:abcd:12:9a10:5d6e:7f80:9a1b"
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0002"
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0003"
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": "2001:db8:abcd:12:8000:0000:0000:10000"
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0003"
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12::",
+      "requestId": "",
+      "want": null
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": "2001:db8:abcd:12:9a10:5d6e:7f80:9a1b"
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0002"
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0003"
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": "2001:db8:abcd:12:8000:0000:0000:10000"
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": "2001:db8:abcd:12:8000:0000:0000:0003"
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": " 2001:db8:abcd:12:: ",
+      "requestId": "",
+      "want": null
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": "2001:DB8:ABCD:0012:9a10:5d6e:7f80:9a1b"
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": "2001:DB8:ABCD:0012:8000:0000:0000:0002"
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": "2001:DB8:ABCD:0012:8000:0000:0000:0003"
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": "2001:DB8:ABCD:0012:8000:0000:0000:10000"
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": "2001:DB8:ABCD:0012:8000:0000:0000:0003"
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": "2001:DB8:ABCD:0012",
+      "requestId": "",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8::",
+      "requestId": "",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": "2001:db8:abcd:12:5",
+      "requestId": "",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": "",
+      "requestId": "",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "3f2c9a1e-7b4d-4c8e-9a10-5d6e7f809a1b",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "00000000-0000-4000-8000-00000000ffff",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "00000000-0000-4000-8000-000000000003",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "3F2C9A1E-7B4D-4C8E-9A10-5D6E7F809A1B",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "not-a-uuid",
+      "want": null
+    },
+    {
+      "prefix": "bogus",
+      "requestId": "",
+      "want": null
+    }
+  ],
+  "toDesktopHostname": [
+    {
+      "subdomain": "box-alice-3f2c9a1e7b4d4c8e9a105d6e7f809a1b.homehost.risktozero.sh",
+      "want": "box-alice-3f2c9a1e7b4d4c8e9a105d6e7f809a1b-vnc.homehost.risktozero.sh"
+    },
+    {
+      "subdomain": "box-alice-3f2c9a1e7b4d4c8e9a105d6e7f809a1b.dev.homehost.risktozero.sh",
+      "want": "box-alice-3f2c9a1e7b4d4c8e9a105d6e7f809a1b-vnc.dev.homehost.risktozero.sh"
+    },
+    {
+      "subdomain": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.test",
+      "want": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-vnc.example.test"
+    },
+    {
+      "subdomain": "single-label",
+      "want": "single-label-vnc"
+    },
+    {
+      "subdomain": ".leading-dot.example",
+      "want": "srv-vnc.leading-dot.example"
+    },
+    {
+      "subdomain": "",
+      "want": "srv-vnc"
+    }
+  ],
+  "normalizeIpv6": [
+    {
+      "input": "2001:db8::1",
+      "want": "2001:0db8:0000:0000:0000:0000:0000:0001"
+    },
+    {
+      "input": "2001:0DB8:0000:0000:0000:0000:0000:0001",
+      "want": "2001:0db8:0000:0000:0000:0000:0000:0001"
+    },
+    {
+      "input": "::",
+      "want": "0000:0000:0000:0000:0000:0000:0000:0000"
+    },
+    {
+      "input": "::1",
+      "want": "0000:0000:0000:0000:0000:0000:0000:0001"
+    },
+    {
+      "input": "2001:db8::",
+      "want": "2001:0db8:0000:0000:0000:0000:0000:0000"
+    },
+    {
+      "input": "1:2:3:4:5:6:7:8",
+      "want": "0001:0002:0003:0004:0005:0006:0007:0008"
+    },
+    {
+      "input": "1:2:3:4:5:6:7::",
+      "want": "0001:0002:0003:0004:0005:0006:0007:0000"
+    },
+    {
+      "input": "1::2::3",
+      "want": null
+    },
+    {
+      "input": "1:2:3:4:5:6:7:8:9",
+      "want": null
+    },
+    {
+      "input": "12345::1",
+      "want": null
+    },
+    {
+      "input": "::ffff:192.0.2.1",
+      "want": null
+    },
+    {
+      "input": "fe80::1%eth0",
+      "want": null
+    },
+    {
+      "input": "[2001:db8::1]",
+      "want": null
+    },
+    {
+      "input": "  2001:db8::a  ",
+      "want": "2001:0db8:0000:0000:0000:0000:0000:000a"
+    },
+    {
+      "input": "",
+      "want": null
+    },
+    {
+      "input": "g::1",
+      "want": null
+    }
+  ],
+  "sameIpv6": [
+    {
+      "a": "2001:db8::1",
+      "b": "2001:db8::1",
+      "want": true
+    },
+    {
+      "a": "2001:db8::1",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "2001:db8::1",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "2001:0DB8:0000:0000:0000:0000:0000:0001",
+      "b": "2001:db8::1",
+      "want": true
+    },
+    {
+      "a": "2001:0DB8:0000:0000:0000:0000:0000:0001",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "2001:0DB8:0000:0000:0000:0000:0000:0001",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "::",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "::",
+      "b": "::",
+      "want": true
+    },
+    {
+      "a": "::",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "::1",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "::1",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "::1",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "2001:db8::",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "2001:db8::",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "2001:db8::",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7:8",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7:8",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7:8",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7::",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7::",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7::",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "1::2::3",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "1::2::3",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "1::2::3",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7:8:9",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7:8:9",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "1:2:3:4:5:6:7:8:9",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "12345::1",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "12345::1",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "12345::1",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "::ffff:192.0.2.1",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "::ffff:192.0.2.1",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "::ffff:192.0.2.1",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "fe80::1%eth0",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "fe80::1%eth0",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "fe80::1%eth0",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "[2001:db8::1]",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "[2001:db8::1]",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "[2001:db8::1]",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "  2001:db8::a  ",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "  2001:db8::a  ",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "  2001:db8::a  ",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "",
+      "b": "bogus",
+      "want": false
+    },
+    {
+      "a": "g::1",
+      "b": "2001:db8::1",
+      "want": false
+    },
+    {
+      "a": "g::1",
+      "b": "::",
+      "want": false
+    },
+    {
+      "a": "g::1",
+      "b": "bogus",
+      "want": false
+    }
+  ],
+  "dohHasAaaa": [
+    {
+      "body": {
+        "Status": 0,
+        "Answer": [
+          {
+            "type": 28,
+            "data": "2001:db8::1"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": true
+    },
+    {
+      "body": {
+        "Status": 0,
+        "Answer": [
+          {
+            "type": 28,
+            "data": "2001:0db8::0001"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": true
+    },
+    {
+      "body": {
+        "Status": 0,
+        "Answer": [
+          {
+            "type": 28,
+            "data": "2001:db8::2"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": {
+        "Status": 0,
+        "Answer": [
+          {
+            "type": 5,
+            "data": "2001:db8::1"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": {
+        "Status": 0,
+        "Answer": []
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": {
+        "Status": 0
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": {
+        "Status": 3,
+        "Answer": [
+          {
+            "type": 28,
+            "data": "2001:db8::1"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": {
+        "Status": "0",
+        "Answer": [
+          {
+            "type": 28,
+            "data": "2001:db8::1"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": {
+        "Status": 0,
+        "Answer": [
+          {
+            "type": "28",
+            "data": "2001:db8::1"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": {
+        "Status": 0,
+        "Answer": [
+          null,
+          {
+            "type": 28,
+            "data": "2001:db8::1"
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": true
+    },
+    {
+      "body": {
+        "Status": 0,
+        "Answer": [
+          {
+            "type": 28,
+            "data": 42
+          }
+        ]
+      },
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": null,
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": [],
+      "expected": "2001:db8::1",
+      "want": false
+    },
+    {
+      "body": "text",
+      "expected": "2001:db8::1",
+      "want": false
+    }
+  ],
+  "setupErrorOf": [
+    {
+      "step": "update_packages",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "update_packages",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_java",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_java",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "install_java",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "download_minecraft",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "unknown"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "unknown"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "unknown"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "configure_minecraft",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_node",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_node",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "install_node",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_python",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_python",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "install_python",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "install_docker",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "start_service",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "start_service",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "start_service",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 0,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": null,
+      "timedOut": true,
+      "want": "timeout"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": null,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 1,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 137,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 10,
+      "timedOut": false,
+      "want": "apt_failed"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 11,
+      "timedOut": false,
+      "want": "download_failed"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 12,
+      "timedOut": false,
+      "want": "checksum_mismatch"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 13,
+      "timedOut": false,
+      "want": "service_failed"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 14,
+      "timedOut": false,
+      "want": "not_ready"
+    },
+    {
+      "step": "wait_ready",
+      "exitCode": 15,
+      "timedOut": false,
+      "want": "java_unavailable"
+    }
+  ],
+  "isTransientSetupFailure": [
+    {
+      "error": "apt_failed",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "curl: (28) Operation timed out",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "apt_failed",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "apt_failed",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "Hash Sum mismatch",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "connect: Network is unreachable",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "read: Connection reset by peer",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "ssh: Connection timed out",
+      "want": true
+    },
+    {
+      "error": "apt_failed",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "apt_failed",
+      "output": "",
+      "want": false
+    },
+    {
+      "error": "download_failed",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "curl: (28) Operation timed out",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "download_failed",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "download_failed",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "Hash Sum mismatch",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "connect: Network is unreachable",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "read: Connection reset by peer",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "ssh: Connection timed out",
+      "want": true
+    },
+    {
+      "error": "download_failed",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "download_failed",
+      "output": "",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "curl: (28) Operation timed out",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "Hash Sum mismatch",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "connect: Network is unreachable",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "read: Connection reset by peer",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "ssh: Connection timed out",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "checksum_mismatch",
+      "output": "",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "curl: (28) Operation timed out",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "Hash Sum mismatch",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "connect: Network is unreachable",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "read: Connection reset by peer",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "ssh: Connection timed out",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "service_failed",
+      "output": "",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "curl: (28) Operation timed out",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "Hash Sum mismatch",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "connect: Network is unreachable",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "read: Connection reset by peer",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "ssh: Connection timed out",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "not_ready",
+      "output": "",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "curl: (28) Operation timed out",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "Hash Sum mismatch",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "connect: Network is unreachable",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "read: Connection reset by peer",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "ssh: Connection timed out",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "java_unavailable",
+      "output": "",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "curl: (28) Operation timed out",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "Hash Sum mismatch",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "connect: Network is unreachable",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "read: Connection reset by peer",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "ssh: Connection timed out",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "unknown",
+      "output": "",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "E: Could not get lock /var/lib/dpkg/lock-frontend",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "E: unable to acquire the dpkg frontend lock",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "Temporary failure resolving 'archive.ubuntu.com'",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "curl: (6) Could not resolve host: example.com",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "curl: (28) Operation timed out",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "curl: (22) The requested URL returned error: 404",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "CURL: (7) failed",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "W: Failed to fetch http://archive.ubuntu.com/",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "Hash Sum mismatch",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "connect: Network is unreachable",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "read: Connection reset by peer",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "ssh: Connection timed out",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "E: Unable to locate package nope",
+      "want": false
+    },
+    {
+      "error": "timeout",
+      "output": "",
+      "want": false
+    }
+  ],
+  "gameAddressOf": [
+    {
+      "recipeId": "none",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "none",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "none",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "node",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "node",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "node",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "python",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "python",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "python",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "docker",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "docker",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "docker",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "code_server",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "code_server",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "code_server",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "minecraft_java",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": "box.homehost.risktozero.sh"
+    },
+    {
+      "recipeId": "minecraft_java",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "minecraft_java",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "minecraft_bedrock",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": "box.homehost.risktozero.sh"
+    },
+    {
+      "recipeId": "minecraft_bedrock",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "minecraft_bedrock",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "valheim",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": "box.homehost.risktozero.sh"
+    },
+    {
+      "recipeId": "valheim",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "valheim",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "unknown_recipe",
+      "setupStatus": "done",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "unknown_recipe",
+      "setupStatus": "running",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    },
+    {
+      "recipeId": "unknown_recipe",
+      "setupStatus": "pending",
+      "subdomain": "box.homehost.risktozero.sh",
+      "want": null
+    }
+  ]
+}
