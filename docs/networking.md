@@ -8,8 +8,11 @@ Reach any box directly with `ssh root@<subdomain>` over IPv6: default port
 Readiness gate: for boxes with an IPv6, the worker marks a request `running`
 only after the host can open a TCP connection to `[ipv6]:22` and, when
 `CF_DNS_API_TOKEN` is set, Cloudflare DoH returns the box's AAAA with the
-expected address (the user's resolvers are never queried, and only after the
-record exists, so the name is never negative-cached). It polls every 2s for
+expected address (the user's resolvers are never queried). DoH is asked only
+once the zone's authoritative nameservers serve that exact address: a fresh
+record takes a few seconds to propagate, and until then lookups hit the
+`*.homehost` wildcard (edge host), which a resolver would cache for the
+wildcard's TTL, longer than the whole gate. It polls every 2s for
 up to `WORKER_READY_TIMEOUT_MS` (default 120000). If the budget runs out the
 job fails with the check that never passed and follows the normal attempts-capped
 requeue, which relaunches the same instance name and address. Boxes without an
