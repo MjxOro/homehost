@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -25,7 +26,7 @@ type Cloudflare struct {
 	client *http.Client
 
 	mu    sync.Mutex
-	zones map[string]string // zone name -> zone id
+	zones map[string]zone // zone name -> zone
 }
 
 var _ DNS = (*Cloudflare)(nil)
@@ -34,7 +35,7 @@ func NewCloudflare(token string) *Cloudflare {
 	return &Cloudflare{
 		token:  token,
 		client: &http.Client{Timeout: 30 * time.Second},
-		zones:  map[string]string{},
+		zones:  map[string]zone{},
 	}
 }
 
@@ -70,10 +71,16 @@ func (c *Cloudflare) do(ctx context.Context, method, endpoint string, body any, 
 	return res.StatusCode, nil
 }
 
+// zone is a Cloudflare zone: its id and the authoritative nameservers.
+type zone struct {
+	id          string
+	nameServers []string
+}
+
 // zoneOf finds the apex zone owning name: Cloudflare has no parent lookup,
 // so probe from the longest suffix down (dev.homehost.risktozero.sh ->
 // homehost.risktozero.sh -> risktozero.sh) and cache the winner.
-func (c *Cloudflare) zoneOf(ctx context.Context, name string) (string, error) {
+func (c *Cloudflare) zoneOf(ctx context.Context, name string) (zone, error) {
 	var parts []string
 	for _, p := range strings.Split(name, ".") {
 		if p != "" {
@@ -83,34 +90,36 @@ func (c *Cloudflare) zoneOf(ctx context.Context, name string) (string, error) {
 	for i := 0; i <= len(parts)-2; i++ {
 		candidate := strings.Join(parts[i:], ".")
 		c.mu.Lock()
-		cached := c.zones[candidate]
+		cached, ok := c.zones[candidate]
 		c.mu.Unlock()
-		if cached != "" {
+		if ok {
 			return cached, nil
 		}
 		var body struct {
 			Result []struct {
-				ID   string `json:"id"`
-				Name string `json:"name"`
+				ID          string   `json:"id"`
+				Name        string   `json:"name"`
+				NameServers []string `json:"name_servers"`
 			} `json:"result"`
 		}
 		status, err := c.do(ctx, http.MethodGet, "/zones?"+url.Values{"name": {candidate}}.Encode(), nil, &body)
 		if err != nil {
-			return "", err
+			return zone{}, err
 		}
 		if status < 200 || status > 299 {
-			return "", fmt.Errorf("cf zones failed: %d", status)
+			return zone{}, fmt.Errorf("cf zones failed: %d", status)
 		}
 		for _, r := range body.Result {
 			if r.Name == candidate && r.ID != "" {
+				z := zone{id: r.ID, nameServers: r.NameServers}
 				c.mu.Lock()
-				c.zones[candidate] = r.ID
+				c.zones[candidate] = z
 				c.mu.Unlock()
-				return r.ID, nil
+				return z, nil
 			}
 		}
 	}
-	return "", errors.New("cf zone not found")
+	return zone{}, errors.New("cf zone not found")
 }
 
 type dnsRecord struct {
@@ -130,11 +139,11 @@ func (c *Cloudflare) aaaaRecords(ctx context.Context, zone, name string) ([]dnsR
 }
 
 func (c *Cloudflare) EnsureAAAA(ctx context.Context, name, ipv6 string) error {
-	zone, err := c.zoneOf(ctx, name)
+	z, err := c.zoneOf(ctx, name)
 	if err != nil {
 		return err
 	}
-	records, err := c.aaaaRecords(ctx, zone, name)
+	records, err := c.aaaaRecords(ctx, z.id, name)
 	if err != nil {
 		return err
 	}
@@ -143,7 +152,7 @@ func (c *Cloudflare) EnsureAAAA(ctx context.Context, name, ipv6 string) error {
 			return nil
 		}
 	}
-	status, err := c.do(ctx, http.MethodPost, "/zones/"+zone+"/dns_records", map[string]any{
+	status, err := c.do(ctx, http.MethodPost, "/zones/"+z.id+"/dns_records", map[string]any{
 		"type":    "AAAA",
 		"name":    name,
 		"content": ipv6,
@@ -160,11 +169,11 @@ func (c *Cloudflare) EnsureAAAA(ctx context.Context, name, ipv6 string) error {
 }
 
 func (c *Cloudflare) DeleteAAAA(ctx context.Context, name string) error {
-	zone, err := c.zoneOf(ctx, name)
+	z, err := c.zoneOf(ctx, name)
 	if err != nil {
 		return err
 	}
-	records, err := c.aaaaRecords(ctx, zone, name)
+	records, err := c.aaaaRecords(ctx, z.id, name)
 	if err != nil {
 		return err
 	}
@@ -172,7 +181,7 @@ func (c *Cloudflare) DeleteAAAA(ctx context.Context, name string) error {
 		if r.ID == "" {
 			continue
 		}
-		status, err := c.do(ctx, http.MethodDelete, "/zones/"+zone+"/dns_records/"+r.ID, nil, nil)
+		status, err := c.do(ctx, http.MethodDelete, "/zones/"+z.id+"/dns_records/"+r.ID, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -183,11 +192,22 @@ func (c *Cloudflare) DeleteAAAA(ctx context.Context, name string) error {
 	return nil
 }
 
-// Visible asks Cloudflare DoH, not the host's resolvers. Only called after
-// EnsureAAAA, so the lookup cannot negative-cache the name.
+// Visible reports whether Cloudflare DoH (not the host's resolvers) answers
+// name with ipv6. It asks DoH only once the zone's authoritative nameservers
+// serve the exact address: until the new record propagates they answer with
+// the zone's wildcard (*.homehost -> edge host), and a resolver that sees
+// that answer caches it for the wildcard's TTL, which outlasts the whole
+// readiness budget.
 func (c *Cloudflare) Visible(ctx context.Context, name, ipv6 string) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	z, err := c.zoneOf(ctx, name)
+	if err != nil {
+		return false, err
+	}
+	if published, err := publishedAuthoritatively(ctx, z.nameServers, name, ipv6); !published {
+		return false, err
+	}
 	endpoint := "https://cloudflare-dns.com/dns-query?" + url.Values{"name": {name}, "type": {"AAAA"}}.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -207,4 +227,35 @@ func (c *Cloudflare) Visible(ctx context.Context, name, ipv6 string) (bool, erro
 		return false, err
 	}
 	return contract.DohHasAaaa(body, ipv6), nil
+}
+
+// publishedAuthoritatively asks the zone's own nameservers, which answer
+// from the zone itself and cache nothing, whether name already serves ipv6.
+func publishedAuthoritatively(ctx context.Context, nameServers []string, name, ipv6 string) (bool, error) {
+	lastErr := errors.New("cf zone has no name servers")
+	for _, ns := range nameServers {
+		resolver := &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, network, net.JoinHostPort(ns, "53"))
+			},
+		}
+		ips, err := resolver.LookupIP(ctx, "ip6", name+".")
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			return false, nil
+		}
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		for _, ip := range ips {
+			if contract.SameIpv6(ip.String(), ipv6) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	return false, lastErr
 }
