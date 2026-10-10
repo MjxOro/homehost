@@ -69,18 +69,18 @@ services:
       - api
 
   worker:
-    image: oven/bun:1
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
     user: "${UID:-1000}:${GID:-1000}"
     group_add:
       - "986"
     working_dir: /app
     volumes:
-      - ../..:/app
+      # Desktop route files land where the edge Traefik watches.
+      - ../traefik/routes:/app/infra/traefik/routes
+      # Native Incus API: the socket is all the worker needs (no CLI).
       - /var/lib/incus/unix.socket:/var/lib/incus/unix.socket
-      # Zabbly Incus: /usr/bin/incus is a wrapper that execs /opt/incus/bin/incus.
-      - /usr/bin/incus:/usr/bin/incus:ro
-      - /opt/incus:/opt/incus:ro
-    command: ["bun", "apps/worker/src/index.ts"]
     # Host network: the readiness gate and setup checks TCP-connect to each
     # box's public IPv6, and Docker's bridge network has no IPv6. Postgres is
     # reached on its loopback publish instead of the compose network.

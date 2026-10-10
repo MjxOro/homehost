@@ -1,0 +1,570 @@
+{
+  "plans": [
+    {
+      "id": "container-small",
+      "kind": "container",
+      "image": "images:ubuntu/24.04",
+      "cpu": 2,
+      "memoryMb": 2048,
+      "diskGb": 20,
+      "desktop": null
+    },
+    {
+      "id": "vm-medium",
+      "kind": "vm",
+      "image": "images:ubuntu/24.04/cloud",
+      "cpu": 4,
+      "memoryMb": 4096,
+      "diskGb": 40,
+      "desktop": null
+    },
+    {
+      "id": "vm-large",
+      "kind": "vm",
+      "image": "images:ubuntu/24.04/cloud",
+      "cpu": 8,
+      "memoryMb": 8192,
+      "diskGb": 80,
+      "desktop": null
+    },
+    {
+      "id": "desktop-ubuntu",
+      "kind": "vm",
+      "image": "images:ubuntu/24.04/cloud",
+      "cpu": 2,
+      "memoryMb": 2048,
+      "diskGb": 20,
+      "desktop": {
+        "env": "ubuntu-xfce",
+        "user": "ubuntu",
+        "display": ":5",
+        "kasmPort": 6090,
+        "vncPort": 5905,
+        "webPort": 6090
+      }
+    },
+    {
+      "id": "desktop-omarchy",
+      "kind": "vm",
+      "image": "images:archlinux/cloud",
+      "cpu": 4,
+      "memoryMb": 4096,
+      "diskGb": 40,
+      "desktop": {
+        "env": "omarchy",
+        "user": "omarchy",
+        "display": ":5",
+        "kasmPort": 6090,
+        "vncPort": 5905,
+        "webPort": 6090
+      }
+    }
+  ],
+  "recipes": {
+    "none": {
+      "eula": null,
+      "game": false
+    },
+    "node": {
+      "eula": null,
+      "game": false
+    },
+    "python": {
+      "eula": null,
+      "game": false
+    },
+    "docker": {
+      "eula": null,
+      "game": false
+    },
+    "code_server": {
+      "eula": null,
+      "game": false
+    },
+    "minecraft_java": {
+      "eula": "minecraft",
+      "game": true
+    },
+    "minecraft_bedrock": {
+      "eula": null,
+      "game": true
+    },
+    "valheim": {
+      "eula": null,
+      "game": true
+    }
+  },
+  "setupPlans": {
+    "none": {
+      "container-small": null,
+      "vm-medium": null,
+      "vm-large": null,
+      "desktop-ubuntu": null,
+      "desktop-omarchy": null
+    },
+    "node": {
+      "container-small": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_node",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "vm-medium": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_node",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "vm-large": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_node",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "desktop-ubuntu": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_node",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "desktop-omarchy": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_node",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      }
+    },
+    "python": {
+      "container-small": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_python",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "vm-medium": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_python",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "vm-large": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_python",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "desktop-ubuntu": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_python",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "desktop-omarchy": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_python",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      }
+    },
+    "docker": {
+      "container-small": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_docker",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "vm-medium": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_docker",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "vm-large": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_docker",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "desktop-ubuntu": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_docker",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "desktop-omarchy": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_docker",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      }
+    },
+    "code_server": {
+      "container-small": null,
+      "vm-medium": null,
+      "vm-large": null,
+      "desktop-ubuntu": null,
+      "desktop-omarchy": null
+    },
+    "minecraft_java": {
+      "container-small": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_java",
+            "timeoutMs": 900000
+          },
+          {
+            "id": "download_minecraft",
+            "timeoutMs": 600000
+          },
+          {
+            "id": "configure_minecraft",
+            "timeoutMs": 120000
+          },
+          {
+            "id": "start_service",
+            "timeoutMs": 180000
+          },
+          {
+            "id": "wait_ready",
+            "timeoutMs": 420000
+          }
+        ],
+        "heapMb": 1536
+      },
+      "vm-medium": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_java",
+            "timeoutMs": 900000
+          },
+          {
+            "id": "download_minecraft",
+            "timeoutMs": 600000
+          },
+          {
+            "id": "configure_minecraft",
+            "timeoutMs": 120000
+          },
+          {
+            "id": "start_service",
+            "timeoutMs": 180000
+          },
+          {
+            "id": "wait_ready",
+            "timeoutMs": 420000
+          }
+        ],
+        "heapMb": 3584
+      },
+      "vm-large": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_java",
+            "timeoutMs": 900000
+          },
+          {
+            "id": "download_minecraft",
+            "timeoutMs": 600000
+          },
+          {
+            "id": "configure_minecraft",
+            "timeoutMs": 120000
+          },
+          {
+            "id": "start_service",
+            "timeoutMs": 180000
+          },
+          {
+            "id": "wait_ready",
+            "timeoutMs": 420000
+          }
+        ],
+        "heapMb": 7680
+      },
+      "desktop-ubuntu": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_java",
+            "timeoutMs": 900000
+          },
+          {
+            "id": "download_minecraft",
+            "timeoutMs": 600000
+          },
+          {
+            "id": "configure_minecraft",
+            "timeoutMs": 120000
+          },
+          {
+            "id": "start_service",
+            "timeoutMs": 180000
+          },
+          {
+            "id": "wait_ready",
+            "timeoutMs": 420000
+          }
+        ],
+        "heapMb": 1536
+      },
+      "desktop-omarchy": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_java",
+            "timeoutMs": 900000
+          },
+          {
+            "id": "download_minecraft",
+            "timeoutMs": 600000
+          },
+          {
+            "id": "configure_minecraft",
+            "timeoutMs": 120000
+          },
+          {
+            "id": "start_service",
+            "timeoutMs": 180000
+          },
+          {
+            "id": "wait_ready",
+            "timeoutMs": 420000
+          }
+        ],
+        "heapMb": 3584
+      }
+    },
+    "minecraft_bedrock": {
+      "container-small": null,
+      "vm-medium": null,
+      "vm-large": null,
+      "desktop-ubuntu": null,
+      "desktop-omarchy": null
+    },
+    "valheim": {
+      "container-small": null,
+      "vm-medium": null,
+      "vm-large": null,
+      "desktop-ubuntu": null,
+      "desktop-omarchy": null
+    }
+  },
+  "setupStepAttempts": 3,
+  "setupExitCodes": {
+    "apt_failed": 10,
+    "download_failed": 11,
+    "checksum_mismatch": 12,
+    "service_failed": 13,
+    "not_ready": 14,
+    "java_unavailable": 15
+  },
+  "setupStepDefaultError": {
+    "update_packages": "apt_failed",
+    "install_java": "apt_failed",
+    "download_minecraft": "download_failed",
+    "configure_minecraft": "unknown",
+    "install_node": "apt_failed",
+    "install_python": "apt_failed",
+    "install_docker": "apt_failed",
+    "start_service": "service_failed",
+    "wait_ready": "not_ready"
+  },
+  "setupTransientOutput": [
+    {
+      "source": "Could not get lock",
+      "flags": "i"
+    },
+    {
+      "source": "Unable to acquire the dpkg frontend lock",
+      "flags": "i"
+    },
+    {
+      "source": "Temporary failure resolving",
+      "flags": "i"
+    },
+    {
+      "source": "Could not resolve host",
+      "flags": "i"
+    },
+    {
+      "source": "Failed to fetch",
+      "flags": "i"
+    },
+    {
+      "source": "Hash Sum mismatch",
+      "flags": "i"
+    },
+    {
+      "source": "Connection timed out",
+      "flags": "i"
+    },
+    {
+      "source": "Network is unreachable",
+      "flags": "i"
+    },
+    {
+      "source": "Connection reset by peer",
+      "flags": "i"
+    },
+    {
+      "source": "curl: \\((6|7|18|28|35|52|56)\\)",
+      "flags": ""
+    }
+  ],
+  "minecraftPort": 25565,
+  "streamProfiles": {
+    "mobile": {
+      "frameRate": 30,
+      "dynamicQualityMin": 5,
+      "dynamicQualityMax": 7,
+      "videoTime": 3,
+      "videoArea": 15,
+      "treatLossless": 7,
+      "maxVideoResolution": "1280x720",
+      "videoScaling": 2
+    },
+    "standard": {
+      "frameRate": 30,
+      "dynamicQualityMin": 7,
+      "dynamicQualityMax": 9,
+      "videoTime": 5,
+      "videoArea": 25,
+      "treatLossless": 7,
+      "maxVideoResolution": "1280x720",
+      "videoScaling": 0
+    },
+    "sharp": {
+      "frameRate": 60,
+      "dynamicQualityMin": 8,
+      "dynamicQualityMax": 9,
+      "videoTime": 5,
+      "videoArea": 45,
+      "treatLossless": 7,
+      "maxVideoResolution": "1280x720",
+      "videoScaling": 0
+    }
+  }
+}

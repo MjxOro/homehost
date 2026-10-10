@@ -15,7 +15,8 @@ EnvironmentFile=/home/mjxoro/projects/homehost/.env
 # WORKER_BASE_DOMAIN fences dev rows even if the DBs ever share a backend.
 Environment=WORKER_ENV=prod
 Environment=WORKER_BASE_DOMAIN=homehost.risktozero.sh
-ExecStart=/home/mjxoro/.bun/bin/bun apps/worker/src/index.ts
+# Built from apps/worker by infra/worker/restart.sh (bun run prod:worker).
+ExecStart=/home/mjxoro/projects/homehost/apps/worker/bin/homehost-worker
 Restart=always
 RestartSec=5
 

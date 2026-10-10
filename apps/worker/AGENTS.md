@@ -1,37 +1,52 @@
 # apps/worker
 
 ## OVERVIEW
-Host-side provisioning loop: leases `provision_jobs` from Postgres and drives Incus (launch, power, setup, desktop), Cloudflare DNS and IPv6 assignment. Earned its file: distinct runtime (host systemd, runs from source), high blast radius.
+
+Go host-side provisioning loop: leases `provision_jobs` from Postgres and drives Incus (launch, power, setup, desktop) through the native Incus API, plus Cloudflare DNS and IPv6 assignment. Earned its file: distinct runtime (host systemd binary), high blast radius.
 
 ## WHERE TO LOOK
-| Task | Location | Notes |
-|------|----------|-------|
-| Main loop, job dispatch | `src/index.ts` (~1300 lines) | `main()` -> `leaseJob()` -> `handle(job)` switch on `job.action` |
-| Incus invocation | `src/index.ts` `incus()` | `spawn` with stdin ignored, 300s timeout |
-| Error redaction | `IncusError`, `redactArgs` | masks `--config`, `-c`, `-euc` argv values |
-| Project / instance naming | `projectOf`, `projectForReq`, `instanceNameOf` | dev vs prod placement |
-| Desktop (KasmVNC / Omarchy) | `src/desktop.ts` | `desktopPackages`, `kasmLaunchCommand`, `desktopSystemdUnit`, ... |
-| Setup recipes | `src/recipes.ts` | `setupScript` shell builder |
+
+| Task                                         | Location                                                      | Notes                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Entry, env parsing, signals                  | `main.go`                                                     | builds `worker.Config`, connects pgx pool (max 4) + Incus socket            |
+| Main loop, job dispatch                      | `internal/worker/worker.go`, `jobs.go`                        | `Run()` -> `tick()` -> `leaseJob()` -> `handle(job)` switch on `job.action` |
+| SQL                                          | `internal/worker/store.go`                                    | raw pgx SQL, ids cast `::text`                                              |
+| Incus calls                                  | `internal/incus/incus.go`                                     | implements `worker.Incus` (`internal/worker/ports.go`) on the unix socket   |
+| Project / instance naming                    | `projectOf`, `projectForReq`, `instanceNameOf` in `worker.go` | dev vs prod placement                                                       |
+| Cloud-init, container sshd, netplan          | `internal/worker/access.go`                                   |                                                                             |
+| Desktop (KasmVNC / Omarchy) + Traefik routes | `internal/worker/desktop.go`                                  |                                                                             |
+| Setup recipes                                | `internal/worker/recipes.go`                                  | `setupScript` text/template step scripts                                    |
+| Cloudflare AAAA + DoH                        | `internal/worker/cloudflare.go`                               | `worker.DNS`; nil without `CF_DNS_API_TOKEN`                                |
+| Shared catalog + ported helpers              | `internal/contract`                                           | `contract.json` + `testdata/vectors.json` are generated, never hand-edited  |
 
 ## RUNTIME FACTS
-- Started by `infra/worker/homehost-worker.service` (or `bun run worker`). Runs from this checkout's source, not an image.
-- `prod:deploy` restarts it via `bun run prod:worker` (`infra/worker/restart.sh`), which fails the deploy unless `worker up` is logged within 30s. Manual: `git pull --ff-only && bun install --frozen-lockfile && bun run prod:worker`.
-- Env: `DATABASE_URL`, `IPV6_PREFIX`, `CF_DNS_API_TOKEN`, `WORKER_ENV`, `WORKER_BASE_DOMAIN`. Prod values come from `infra/private/worker.env` via a systemd drop-in.
+
+- Prod: `infra/worker/homehost-worker.service` runs `apps/worker/bin/homehost-worker` with the checkout as cwd (route files go to `infra/traefik/routes`). `bun run prod:worker` (`infra/worker/restart.sh`) builds the binary atomically, installs the unit if it changed, restarts, and fails the deploy unless `worker up` is logged within 30s.
+- Dev stack: `infra/dev/compose.yml` builds `apps/worker/Dockerfile`; it mounts only the Incus socket and the routes dir. `bun run worker` runs it from source with the repo `.env`.
+- Env: `DATABASE_URL`, `IPV6_PREFIX`, `CF_DNS_API_TOKEN`, `WORKER_ENV`, `WORKER_BASE_DOMAIN`, tuning `WORKER_POLL_MS`, `WORKER_*_ATTEMPTS`, `WORKER_BOOT_TIMEOUT_MS`, `WORKER_READY_TIMEOUT_MS`. A malformed number fails startup. Prod values come from `infra/private/worker.env` via a systemd drop-in.
 - Startup requeues every `leased` job (crash recovery) and reconciles `ip_assignments`.
 - Leasing: `SELECT ... FOR UPDATE SKIP LOCKED`, status `queued -> leased`, attempts++.
+- SIGINT/SIGTERM: the current job finishes (setup requeues between steps); jobs never run on a cancelled context.
 
 ## ENV SCOPING
+
 - `WORKER_BASE_DOMAIN` set => only handle requests whose subdomain sits under it; other-env jobs are requeued (`wrong-env:`) untouched.
 - Dev rows (`*.dev.homehost.risktozero.sh`) live in Incus project `tenant-dev-<owner>` with instance `dev-req-<id8>`; prod/showcase keep legacy `tenant-<owner>` / `req-<id8>`.
 - Teardown/power MUST resolve the project with `projectForReq` (stored name wins), never `projectOf`, or pre-split VMs become orphans.
 
 ## CONVENTIONS
+
 - Relaunches must be idempotent: instance names are derived from the request id.
-- Uses raw `postgres` tagged SQL, not Drizzle; table/column names must match `apps/api/migrations`.
-- Shared helpers (`ipv6ForInstance`, `toSubdomain`, `PLANS`, setup recipes) come from `@homehost/shared`; don't fork them here.
+- Table/column names must match `apps/api/migrations`.
+- Shared rules come from `@homehost/shared` through `internal/contract`: change them in shared, run `bun run worker:contract`, commit. Helpers the worker re-implements (`Ipv6ForInstance`, `ToDesktopHostname`, `SameIpv6`, `DohHasAaaa`, `SetupErrorOf`, `IsTransientSetupFailure`, `GameAddressOf`) are pinned to the TS originals by `TestSharedHelperParity`.
+- Incus errors: 404 (missing instance or project) wraps `worker.ErrNotFound`; teardown treats it as gone.
+- `gofmt` clean; `bun run test:worker` before committing (set `TEST_DATABASE_URL` to run the DB suites).
 
 ## ANTI-PATTERNS
-- `execFile` for incus: its inherited stdin keeps `incus launch` blocked forever.
-- Logging incus argv or cloud-init without `redactArgs` / `IncusError`.
+
+- Shelling out to the `incus` CLI: user-data (passwords, keys) would travel in argv and error text.
+- `Exec` without a closed stdin: an open stdin lets a guest prompt block forever.
+- Putting instance config or guest scripts into error messages or logs.
 - Pointing the host unit at the dev DB (`:55433`) or the retired showcase DB (`:55432`); prod is `:55434`.
 - Moving existing VMs between projects by changing naming helpers.
+- Hand-editing `internal/contract/contract.json` or `testdata/vectors.json`.
