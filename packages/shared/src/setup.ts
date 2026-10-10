@@ -108,7 +108,8 @@ export const SETUP_EXIT_CODES = {
   java_unavailable: 15,
 } as const satisfies Partial<Record<SetupErrorCode, number>>;
 
-const STEP_DEFAULT_ERROR: Record<SetupStepId, SetupErrorCode> = {
+/** Fallback code per step when the exit code names no failure. */
+export const SETUP_STEP_DEFAULT_ERROR: Record<SetupStepId, SetupErrorCode> = {
   update_packages: "apt_failed",
   install_java: "apt_failed",
   download_minecraft: "download_failed",
@@ -129,10 +130,11 @@ export function setupErrorOf(
   for (const [code, exit] of Object.entries(SETUP_EXIT_CODES)) {
     if (result.exitCode === exit) return code as SetupErrorCode;
   }
-  return STEP_DEFAULT_ERROR[step];
+  return SETUP_STEP_DEFAULT_ERROR[step];
 }
 
-const TRANSIENT_OUTPUT = [
+/** Output patterns marking an apt/download failure as transient. */
+export const SETUP_TRANSIENT_OUTPUT: readonly RegExp[] = [
   /Could not get lock/i,
   /Unable to acquire the dpkg frontend lock/i,
   /Temporary failure resolving/i,
@@ -154,7 +156,7 @@ export function isTransientSetupFailure(
   output: string,
 ): boolean {
   if (error !== "apt_failed" && error !== "download_failed") return false;
-  return TRANSIENT_OUTPUT.some((pattern) => pattern.test(output));
+  return SETUP_TRANSIENT_OUTPUT.some((pattern) => pattern.test(output));
 }
 
 export interface SetupPlanStep {
