@@ -8,7 +8,7 @@ Read this before touching the repo. Violations get reverted.
 
 ## Overview
 
-Self-hosted VM/container hosting portal: Fastify + Effect control plane, React SPA, and a host-side Bun worker that provisions Incus instances with v6 addresses and Cloudflare DNS.
+Self-hosted VM/container hosting portal: Fastify + Effect control plane, React SPA, and a host-side Go worker that provisions Incus instances (native Incus API) with v6 addresses and Cloudflare DNS.
 
 ## Structure
 
@@ -16,14 +16,14 @@ Self-hosted VM/container hosting portal: Fastify + Effect control plane, React S
 homehost/
 ├── apps/api/          # control plane; routes in src/app.ts (OAuth in src/auth/oauth.ts), domain in src/domain, SQL in migrations/
 ├── apps/web/          # SPA (TanStack Router/Query, Tailwind v4)
-├── apps/worker/       # provisioning loop; runs from checkout source via host systemd, NOT containerized
+├── apps/worker/       # Go provisioning loop; binary built from the checkout, run by host systemd (dev stack: image)
 ├── packages/shared/   # @homehost/shared cross-process contract; no build step, consumed from src
 ├── packages/sites/    # @homehost/sites: JSON site spec -> static site, LLM generation via OpenRouter
 ├── packages/bench/    # hh-bench replay-cached grading harness for sites generation (README covers it)
 ├── infra/             # dev/prod/traefik compose, host Incus prep, worker unit; private/ is gitignored
 ├── docs/              # design notes (networking, ledger, concierge, recipes, roadmap)
 ├── scripts/test-reset.ts  # clean-room instance/request/DNS wipe
-└── .github/workflows/ # ci.yml (typecheck+unit, integration on pg service, gitleaks, web image), deploy.yml
+└── .github/workflows/ # ci.yml (typecheck+unit, worker contract freshness, integration + Go tests on pg service, gitleaks, images), deploy.yml
 ```
 
 Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`, `packages/shared/AGENTS.md`, `packages/sites/AGENTS.md`, `infra/AGENTS.md`.
@@ -35,9 +35,9 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 | Add/change an API route | `apps/api/src/app.ts` | errors mapped only in `send*Error` helpers |
 | Domain logic / DB access | `apps/api/src/domain`, `apps/api/src/db/schema.ts` | Effect services, Drizzle tables |
 | Schema change | `apps/api/migrations/` | runner `apps/api/src/db/migrate.ts` |
-| Shared API types / plans | `packages/shared/src/control-plane.ts`, `plans.ts` | contract for api + web + worker |
+| Shared API types / plans | `packages/shared/src/control-plane.ts`, `plans.ts` | contract for api + web; worker reads it via generated `apps/worker/internal/contract/contract.json` |
 | Web data fetching | `apps/web/src/lib/api.ts`, `lib/query.ts` | entry `src/main.tsx` -> `router.tsx` |
-| Provisioning behaviour | `apps/worker/src/index.ts` | prod unit `infra/worker/homehost-worker.service` |
+| Provisioning behaviour | `apps/worker/internal/worker/jobs.go` | Incus adapter `internal/incus`; prod unit `infra/worker/homehost-worker.service` |
 | Site generation | `packages/sites/src/index.ts`, `cli.ts` | graded by `packages/bench/src/cli.ts` |
 | Ports / compose stacks | `infra/` | |
 
@@ -53,13 +53,13 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 | `DomainError` | tagged union | apps/api/src/domain/errors.ts | domain + app.ts | error contract |
 | `queryKeys` / `queryClient` / `useSession` | TanStack Query | apps/web/src/lib/query.ts | most routes | server state |
 | `api` / `ApiError` | method object / class | apps/web/src/lib/api.ts | all web data code | fetch wrapper |
-| `leaseJob` / `handle` | fn | apps/worker/src/index.ts | main loop | job execution |
+| `leaseJob` / `handle` | Go func | apps/worker/internal/worker/{store,jobs}.go | `Worker.Run` loop | job execution |
 | `renderSite` / `validateSpec` / `generateSite` | fn | packages/sites/src/index.ts | bench + tests | sites pipeline |
 
 ## Stack
 
-- Runtime `bun`, language TypeScript, auth GitHub OAuth, DB Postgres 17, edge Traefik, containers Incus.
-- Packages: `apps/api` (Fastify control plane), `apps/web` (React + Vite + Tailwind), `apps/worker` (Bun, runs as systemd unit on the host), `packages/shared` (`@homehost/shared`), `packages/sites`, `packages/bench`.
+- Runtime `bun`, language TypeScript (worker: Go), auth GitHub OAuth, DB Postgres 17, edge Traefik, containers Incus.
+- Packages: `apps/api` (Fastify control plane), `apps/web` (React + Vite + Tailwind), `apps/worker` (Go module, systemd unit on the host), `packages/shared` (`@homehost/shared`), `packages/sites`, `packages/bench`.
 - `tsconfig.base.json` is `strict` everywhere; only `apps/web` adds `noUncheckedIndexedAccess`.
 - No new dependencies without asking. Tailwind only for styling.
 
@@ -70,6 +70,8 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 - `bun test` (root script) — unit tests for shared, sites, bench (`bun test packages/shared` for shared only). `bun run test:integration` — needs live DB (`TEST_DATABASE_URL`); forces `SHOWCASE_MODE=true` (suites log in via `/api/demo/session`), one `test_<uuid>` schema per suite.
 - `bun run build` — api (`tsc`) + web (`vite build`) only; shared/sites/bench are source-consumed.
 - `bun run db:migrate` — ledger-tracked, advisory-locked, safe to re-run.
+- `bun run worker:contract` — regenerate the Go worker's contract + parity vectors from `@homehost/shared`; run after changing plans, recipes, setup rules or stream profiles, and commit the output (CI diffs it).
+- `bun run test:worker` — `go vet` + `go test` for the worker; DB suites run when `TEST_DATABASE_URL` is set.
 - Also: `dev:check`, `dev:migrate`, `host:check`, `host:setup`, `prod:build|up|down|logs|deploy`, `worker`, `bench`, `test:reset`, `format`, `format:check`.
 
 ## Live vs showcase
@@ -110,7 +112,7 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 
 - Secrets only in environment or `infra/private/` (never tracked). OAuth/CF tokens stay server-side; the browser never sees them.
 - GitHub scanner alerts on fixture literals: test passwords are `randomUUID()` per run, never string literals.
-- Passwords: `randomBytes(18).base64url`, one-read `credentials`, then `CONSUMED`. Shred temp keys. `IncusError` redacts.
+- Passwords: `randomBytes(18).base64url`, one-read `credentials`, then `CONSUMED`. Shred temp keys. The worker passes user-data through the Incus API, never argv or error text.
 - Cookies: `__Host-` prefix, `Secure`, `HttpOnly`, `SameSite=Lax`. No auth state in `localStorage`.
 - Containers: `PermitRootLogin` + one-time password or request-time pubkey only; keys `600`.
 - Multi-agent work: disjoint file ownership per agent, contracts up front (shared types in `@homehost/shared`), orchestrator runs gates — workers skip them.
@@ -118,4 +120,4 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 ## Notes
 
 - DB ports (all loopback): `55432` retired showcase/host-dev (`db:up`), `55433` dev, `55434` prod. Never point repo `.env` or the worker unit at the prod DB from the dev loop, or vice versa.
-- `prod:deploy` (CI on every merge to `main`) runs `bun install --frozen-lockfile` and ends with `bun run prod:worker`, which restarts the host worker and fails unless it logs `worker up` within 30s. Manual restart: `bun run prod:worker`.
+- `prod:deploy` (CI on every merge to `main`) ends with `bun run prod:worker`, which builds `apps/worker/bin/homehost-worker` (needs `go` on the runner's PATH), syncs the unit file, restarts the host worker and fails unless it logs `worker up` within 30s. Manual restart: `bun run prod:worker`.

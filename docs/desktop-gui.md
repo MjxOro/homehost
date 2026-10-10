@@ -191,9 +191,10 @@ Custom-image spike path if bake-in is wanted later: launch
 Bake status (2026-09-18): pure builders for the future bake exist behind
 the fail-closed gate — `omarchyPackages`, `omarchyRunCommands`, plus the
 `desktop.env` branch in `appendDesktopToUserData`
-(`apps/worker/src/desktop.ts`; Ubuntu cloud-init output byte-identical).
-The Omarchy installer itself is still interactive-only (boot.sh needs a
-TTY), so `index.ts` still refuses desktop-omarchy jobs. Flip = remove the
+(`apps/worker/internal/worker/desktop.go`; Ubuntu cloud-init output
+byte-identical). The Omarchy installer itself is still interactive-only
+(boot.sh needs a TTY), so `handleProvision` still refuses desktop-omarchy
+jobs. Flip = remove the
 gate + take the arch user-data path. KasmVNC AUR package name and build
 flags are unverified — see the `omarchyRunCommands` comments.
 

@@ -56,21 +56,24 @@ IPV6_PREFIX=<same as infra/private/prod.env>
 CF_DNS_API_TOKEN=<Edit-zone-DNS token, same as infra/private/traefik.env>
 ```
 
-The unit runs from this checkout's source, not from an image, so
-`prod:deploy` (run by `.github/workflows/deploy.yml` on every merge to `main`)
-finishes with `bun install --frozen-lockfile` and `bun run prod:worker`
-(`infra/worker/restart.sh`). That script restarts the unit and fails the deploy
-unless the worker logs `worker up` within 30s, since `Restart=always` would
-otherwise hide a crash loop. To restart by hand after updating the checkout:
+The unit runs a binary built from this checkout (`apps/worker/bin/homehost-worker`,
+gitignored), not an image, so `prod:deploy` (run by
+`.github/workflows/deploy.yml` on every merge to `main`) finishes with
+`bun run prod:worker` (`infra/worker/restart.sh`). That script builds the
+binary beside the live one and swaps it in (a failed build fails the deploy
+and leaves the running worker untouched), installs
+`infra/worker/homehost-worker.service` into `/etc/systemd/system` when it
+differs, restarts the unit, and fails the deploy unless the worker logs
+`worker up` within 30s, since `Restart=always` would otherwise hide a crash
+loop. It needs `go` (version per `apps/worker/go.mod`) on the PATH of the
+deploy runner; this host installs it under `~/.local/go` with
+`~/.local/bin/go` on the runner's `.path`. To restart by hand after updating
+the checkout:
 
 ```bash
-git pull --ff-only && bun install --frozen-lockfile
+git pull --ff-only
 bun run prod:worker   # expect: homehost-worker restarted on <sha>
 ```
-
-Skipping `bun install` crash-loops the worker when a workspace package gains a
-dependency (e.g. `Cannot find module 'zod/v4'` after `@homehost/shared` added
-zod).
 
 ## Tenant IPv6 gateway
 

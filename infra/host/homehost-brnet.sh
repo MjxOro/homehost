@@ -14,7 +14,7 @@ set -euo pipefail
 env_file="${1:?usage: homehost-brnet <worker.env>}"
 dev=incusbr0
 
-# Same derivation as the worker (apps/worker/src/index.ts): strip trailing
+# Same derivation as the worker (gatewayOf in apps/worker/internal/worker/access.go): strip trailing
 # colons from IPV6_PREFIX, then append ::ffff.
 prefix="$(sed -n 's/^IPV6_PREFIX=//p' "$env_file" | tail -n 1)"
 prefix="${prefix%\"}"
