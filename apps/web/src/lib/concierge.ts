@@ -84,7 +84,7 @@ const RECIPE_SLUG: Record<Exclude<RecipeId, "none">, string> = {
 const USE_CASE_SLUG: Record<OfferedUseCaseId, string> = {
   game_server: "game-server",
   dev_box: "dev-box",
-  always_on: "always-on",
+  always_on: "app",
   remote_desktop: "desktop",
   learn_linux: "linux-lab",
   website: "website",
