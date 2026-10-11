@@ -332,7 +332,7 @@ export function AppLayout() {
               if (event.detail !== 0) event.currentTarget.blur();
               else navToggleRef.current?.focus();
             }}
-            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors duration-(--duration-fast) ease-out-quint [-webkit-tap-highlight-color:transparent] hover:bg-ink-2 active:scale-[0.98] motion-reduce:active:scale-100 lg:hidden"
+            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors duration-(--duration-fast) ease-out-quint hover:bg-ink-2 active:scale-[0.98] motion-reduce:active:scale-100 lg:hidden"
           >
             <XIcon width={20} height={20} className="h-5 w-5" />
           </button>
@@ -370,7 +370,7 @@ export function AppLayout() {
             ref={navToggleRef}
             aria-controls="primary-navigation"
             type="button"
-            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors duration-(--duration-fast) ease-out-quint [-webkit-tap-highlight-color:transparent] hover:bg-ink-2 active:scale-[0.98] motion-reduce:active:scale-100 lg:hidden"
+            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border-0 bg-transparent text-text-1 transition-colors duration-(--duration-fast) ease-out-quint hover:bg-ink-2 active:scale-[0.98] motion-reduce:active:scale-100 lg:hidden"
             aria-label={navOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={navOpen}
             onClick={(event) => {

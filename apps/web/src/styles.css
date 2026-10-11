@@ -121,6 +121,10 @@
   html {
     color-scheme: dark;
     background-color: var(--color-ink-0);
+    /* Mobile browsers paint a pale overlay on every tapped link/button, which
+       reads as a white flash on this dark UI. Controls carry their own
+       hover/active states instead. Inherited by every element. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
