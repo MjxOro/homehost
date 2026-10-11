@@ -84,6 +84,9 @@ func (w *Worker) handleProvision(ctx context.Context, j *job) error {
 		return w.failProvision(ctx, req, j, omarchyUnavailable(plan.ID, plan.Image))
 	}
 	if err := w.provision(ctx, req, plan, j); err != nil {
+		if errors.Is(err, ErrImageMissing) {
+			return w.failProvision(ctx, req, j, err.Error())
+		}
 		return w.retryOrFail(ctx, j, err, w.cfg.ProvisionAttempts, func(msg string) error {
 			return w.failProvision(ctx, req, j, msg)
 		})

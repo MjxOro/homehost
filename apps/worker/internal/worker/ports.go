@@ -10,9 +10,14 @@ import (
 // as the desired end state.
 var ErrNotFound = errors.New("not found")
 
+// ErrImageMissing marks a plan image that was never baked on this host
+// (infra/host/build-images.sh). Retrying cannot help, so provisioning fails
+// the job at once instead of falling back to a slow upstream image.
+var ErrImageMissing = errors.New("baked image missing")
+
 // LaunchSpec is one tenant instance as `incus launch` would create it.
 type LaunchSpec struct {
-	// Image is a remote-qualified alias, e.g. images:ubuntu/24.04.
+	// Image is a baked image alias, e.g. homehost/ubuntu-24.04/vm.
 	Image string
 	VM    bool
 	// Config holds instance config keys (limits, user-data, nesting).

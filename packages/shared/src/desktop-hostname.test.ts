@@ -39,7 +39,7 @@ describe("toDesktopHostname", () => {
 });
 
 describe("desktop plans", () => {
-  test("desktop-ubuntu carries the xfce bake on ubuntu/cloud", () => {
+  test("desktop-ubuntu boots the baked xfce desktop image", () => {
     const plan = PLANS.find((p) => p.id === "desktop-ubuntu");
     expect(plan).toMatchObject({
       cpu: 2,
@@ -47,7 +47,7 @@ describe("desktop plans", () => {
       diskGb: 20,
       technicalOnly: true,
       kind: "vm",
-      image: "images:ubuntu/24.04/cloud",
+      image: "homehost/ubuntu-24.04/desktop-xfce",
       desktop: {
         env: "ubuntu-xfce",
         user: "ubuntu",
