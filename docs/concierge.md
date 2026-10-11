@@ -121,12 +121,12 @@ bundle zod into the browser.
 
 ## Defaults
 
-| Use case                                          | Software                                                                  | Plan when Jev is unsure                                                             |
-| ------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `learn_linux`                                     | None (plain Ubuntu to SSH into), even if containers come up               | Always the smallest eligible fitting plan; currently Container Small in either tier |
-| `always_on` (apps and bots), `website`, `dev_box` | None, or Docker when `wants_containers >= CONTAINERS_MIN`                 | Smallest eligible fitting plan; currently Container Small in either tier            |
-| `game_server`                                     | Most probable game, or Minecraft Java without positive game probabilities | Smallest eligible fitting plan; currently Container Small for all catalog games     |
-| `remote_desktop`                                  | None (the desktop is built into its plan)                                 | Desktop Ubuntu for technical accounts; `tier_locked` for nontechnical accounts      |
+| Use case                                                                        | Software                                                                  | Plan when Jev is unsure                                                             |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `learn_linux`                                                                   | None (plain Ubuntu to SSH into), even if containers come up               | Always the smallest eligible fitting plan; currently Container Small in either tier |
+| `always_on` (apps, APIs, bots and jobs), `website` (sites and blogs), `dev_box` | None, or Docker when `wants_containers >= CONTAINERS_MIN`                 | Smallest eligible fitting plan; currently Container Small in either tier            |
+| `game_server`                                                                   | Most probable game, or Minecraft Java without positive game probabilities | Smallest eligible fitting plan; currently Container Small for all catalog games     |
+| `remote_desktop`                                                                | None (the desktop is built into its plan)                                 | Desktop Ubuntu for technical accounts; `tier_locked` for nontechnical accounts      |
 
 A confident fitting VM choice is kept, except for Linux learners. Node.js, Python and code-server remain
 in the recipe catalog for manual selection; the helper does not suggest them.

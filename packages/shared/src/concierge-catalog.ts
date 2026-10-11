@@ -28,9 +28,9 @@ export const USE_CASES: Record<
     description: "A remote Linux machine to write, build and test code",
   },
   always_on: {
-    label: "Always-on app",
+    label: "Apps & services",
     description:
-      "Keep a bot, script, scheduled job or small service running 24/7",
+      "Deploy and run your own apps, web apps, APIs, bots, scripts or background jobs on a server you control",
   },
   remote_desktop: {
     label: "Remote desktop",
@@ -41,8 +41,9 @@ export const USE_CASES: Record<
     description: "Learn Linux and the command line on a safe machine",
   },
   website: {
-    label: "Website",
-    description: "Host a website, blog or web app",
+    label: "Website or blog",
+    description:
+      "A website, blog or portfolio: mostly pages for people to read",
   },
   not_offered: {
     label: "Not offered",
