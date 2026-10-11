@@ -22,7 +22,14 @@ import {
   ICON_BTN_QUIET,
   StatusPill,
 } from "./primitives";
-import { CheckIcon, CopyIcon, Spinner, TrashIcon } from "./icons";
+import {
+  CheckIcon,
+  CopyIcon,
+  PlayIcon,
+  Spinner,
+  StopIcon,
+  TrashIcon,
+} from "./icons";
 
 const CODE_BADGE =
   "rounded-md border border-line bg-ink-2 px-1.5 py-0.5 font-mono text-[12.5px] text-accent [overflow-wrap:anywhere]";
@@ -53,7 +60,7 @@ export function CopyCode({
   const title = name.charAt(0).toUpperCase() + name.slice(1);
   return (
     <span
-      className={`${className} inline-flex min-w-0 flex-wrap items-center gap-0.5`}
+      className={`${className} inline-flex min-w-0 max-w-full items-center gap-0.5`}
     >
       <code className={`${CODE_BADGE} min-w-0 break-all`}>{value}</code>
       <button
@@ -340,7 +347,7 @@ export function SshAccess({
           <span className="mt-2.5 inline-flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className={BUTTON_GHOST_SM}
+              className={`${BUTTON_GHOST_SM} -ml-3`}
               disabled={credentials.isPending}
               onClick={() => {
                 credentials.mutate(request.id, {
@@ -597,6 +604,7 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
                     disabled={busy}
                     onClick={() => power(request, "stop")}
                   >
+                    <StopIcon />
                     Stop
                   </button>
                 ) : null}
@@ -607,6 +615,7 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
                     disabled={busy}
                     onClick={() => power(request, "start")}
                   >
+                    <PlayIcon />
                     Start
                   </button>
                 ) : null}

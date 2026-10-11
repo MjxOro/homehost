@@ -599,8 +599,11 @@ function DesktopCanvas() {
   }
   if (!session?.user) {
     return (
-      <SignInGate title="Sign in to open this desktop">
-        Pick a demo persona to continue to the desktop.
+      <SignInGate
+        title="Sign in to open this desktop"
+        showcaseHint="Pick a demo persona to continue to the desktop."
+      >
+        Sign in to continue to the desktop.
       </SignInGate>
     );
   }
@@ -610,9 +613,10 @@ function DesktopCanvas() {
   if (dashboard.isError) {
     if (isApiError(dashboard.error) && dashboard.error.status === 401) {
       return (
-        <SignInGate title="Your session has ended">
-          Pick a demo persona to sign back in.
-        </SignInGate>
+        <SignInGate
+          title="Your session has ended"
+          showcaseHint="Pick a demo persona to sign back in."
+        />
       );
     }
     return (
@@ -657,9 +661,10 @@ function DesktopCanvas() {
   if (desktop.isError) {
     if (isApiError(desktop.error) && desktop.error.status === 401) {
       return (
-        <SignInGate title="Your session has ended">
-          Pick a demo persona to sign back in.
-        </SignInGate>
+        <SignInGate
+          title="Your session has ended"
+          showcaseHint="Pick a demo persona to sign back in."
+        />
       );
     }
     if (isApiError(desktop.error) && desktop.error.status === 404) {

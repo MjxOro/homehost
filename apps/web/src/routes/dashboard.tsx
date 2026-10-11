@@ -208,9 +208,10 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
     const error = dashboard.error;
     if (isApiError(error) && error.status === 401) {
       return (
-        <SignInGate title="Your session has ended">
-          Pick a demo persona to sign back in.
-        </SignInGate>
+        <SignInGate
+          title="Your session has ended"
+          showcaseHint="Pick a demo persona to sign back in."
+        />
       );
     }
     if (isNetworkError(error)) {

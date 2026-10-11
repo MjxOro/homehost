@@ -460,8 +460,11 @@ export function NewRequestPage() {
   if (isPending) return <PageLoading label="Loading your session…" />;
   if (!session?.user) {
     return (
-      <SignInGate title="Sign in to request a server">
-        Pick a demo persona to open the request form.
+      <SignInGate
+        title="Sign in to request a server"
+        showcaseHint="Pick a demo persona to open the request form."
+      >
+        Sign in to open the request form.
       </SignInGate>
     );
   }

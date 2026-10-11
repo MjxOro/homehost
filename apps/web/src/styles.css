@@ -121,6 +121,10 @@
   html {
     color-scheme: dark;
     background-color: var(--color-ink-0);
+    /* Mobile browsers paint a pale overlay on every tapped link/button, which
+       reads as a white flash on this dark UI. Controls carry their own
+       hover/active states instead. Inherited by every element. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -142,6 +146,13 @@
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  /* Programmatic focus targets (headings, result copy moved into view for
+     screen readers) are not controls: no ring on page load or after a route
+     change. Real tab stops keep the ring above. */
+  [tabindex="-1"]:focus-visible {
+    outline: none;
   }
 }
 
