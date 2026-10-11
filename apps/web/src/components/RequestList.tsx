@@ -53,7 +53,7 @@ export function CopyCode({
   const title = name.charAt(0).toUpperCase() + name.slice(1);
   return (
     <span
-      className={`${className} inline-flex min-w-0 flex-wrap items-center gap-0.5`}
+      className={`${className} inline-flex min-w-0 max-w-full items-center gap-0.5`}
     >
       <code className={`${CODE_BADGE} min-w-0 break-all`}>{value}</code>
       <button
