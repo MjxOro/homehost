@@ -46,6 +46,7 @@ Go host-side provisioning loop: leases `provision_jobs` from Postgres and drives
 
 - Shelling out to the `incus` CLI: user-data (passwords, keys) would travel in argv and error text.
 - `Exec` without a closed stdin: an open stdin lets a guest prompt block forever.
+- Querying DoH (or any recursive resolver) for a box before the zone's authoritative nameservers serve its exact AAAA: until the record propagates, the name matches the `*.homehost` wildcard and the resolver caches the edge address for the wildcard's TTL, outlasting the readiness gate (`Visible` in `cloudflare.go`).
 - Putting instance config or guest scripts into error messages or logs.
 - Pointing the host unit at the dev DB (`:55433`) or the retired showcase DB (`:55432`); prod is `:55434`.
 - Moving existing VMs between projects by changing naming helpers.
