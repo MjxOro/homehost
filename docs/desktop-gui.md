@@ -148,6 +148,18 @@ Follows the `panel.yml`/`dev.yml` pattern (per-file redirect middleware,
 `letsencrypt` resolver). No edge-network fix needed: guest IPv4 on
 incusbr0 is directly dialable from the Traefik container (verified above).
 
+## Desktop image
+
+`desktop-ubuntu` launches from the baked `homehost/ubuntu-24.04/desktop-xfce`
+VM image (`infra/host/build-images.sh`): `openssh-server`, XFCE
+(`xfce4`, `dbus-x11`, `tigervnc-standalone-server`, `websockify`), KasmVNC
+1.3.3 from its GitHub release deb and its runtime needs (`ssl-cert`,
+`xauth`, `sudo`) are preinstalled. Cloud-init only does per-box config
+(`desktopRunCommands` in `apps/worker/internal/worker/desktop.go`): the
+`ubuntu` user and its `ssl-cert` group, a fresh snakeoil TLS cert (the
+image ships none, so no two desktops share a key), the KasmVNC password,
+xstartup, and the `kasmvnc-desktop.service` unit. First boot runs no apt.
+
 ## KasmVNC reference (desk2 proof box, live 2026-09-17)
 
 ```text
@@ -163,7 +175,7 @@ Observed `ps` flags match plus `-sslOnly 1`,
 headless (`/home/ubuntu/.kasmpasswd`, 0600). First-run prompts (user
 permission + DE select) were pre-answered non-interactively
 (`~/.vnc/.de-was-selected` present; `kasmvnc.yaml` logging-only).
-Required packages: `dbus-x11`, `ssl-cert` (both installed on desk2).
+Required packages: `dbus-x11`, `ssl-cert` (both installed on desk2; baked into the desktop image).
 xstartup:
 
 ```sh

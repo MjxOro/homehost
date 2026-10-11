@@ -44,7 +44,8 @@ supports nested Docker correctly. Guests never receive the host Docker socket.
 All steps run apt non-interactively, wait for cloud-init (`cloud-init status
 --wait`) and the dpkg lock first, and force IPv4 for apt and `curl -4`
 because guests may lack an IPv6 default route. `update_packages` runs
-`apt-get update` and installs `ca-certificates` and `curl`.
+`apt-get update` and installs `ca-certificates` and `curl`; it always runs
+first because the baked plan images ship without apt lists.
 
 ### Minecraft Java
 

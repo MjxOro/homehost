@@ -20,7 +20,7 @@ homehost/
 ├── packages/shared/   # @homehost/shared cross-process contract; no build step, consumed from src
 ├── packages/sites/    # @homehost/sites: JSON site spec -> static site, LLM generation via OpenRouter
 ├── packages/bench/    # hh-bench replay-cached grading harness for sites generation (README covers it)
-├── infra/             # dev/prod/traefik compose, host Incus prep, worker unit; private/ is gitignored
+├── infra/             # dev/prod/traefik compose, host Incus prep + baked plan images, worker unit; private/ is gitignored
 ├── docs/              # design notes (networking, ledger, concierge, recipes, roadmap)
 ├── scripts/test-reset.ts  # clean-room instance/request/DNS wipe
 └── .github/workflows/ # ci.yml (typecheck+unit, worker contract freshness, integration + Go tests on pg service, gitleaks, images), deploy.yml
@@ -39,6 +39,7 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 | Web data fetching | `apps/web/src/lib/api.ts`, `lib/query.ts` | entry `src/main.tsx` -> `router.tsx` |
 | Provisioning behaviour | `apps/worker/internal/worker/jobs.go` | Incus adapter `internal/incus`; prod unit `infra/worker/homehost-worker.service` |
 | Site generation | `packages/sites/src/index.ts`, `cli.ts` | graded by `packages/bench/src/cli.ts` |
+| Plan images (what boxes boot from) | `infra/host/build-images.sh` | aliases in `plans.ts`; weekly `homehost-images.timer` |
 | Ports / compose stacks | `infra/` | |
 
 ## Code map
