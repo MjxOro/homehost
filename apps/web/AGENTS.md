@@ -27,7 +27,7 @@ React 18 SPA (Vite 8, TanStack Router + Query, Tailwind v4 via `@tailwindcss/vit
 - Persona switch / logout runs `clearTenantData`: cancels in-flight queries and removes tenant-scoped caches (dashboard, approvals, conversations) while keeping the session and public plans. One tenant's cached data must never leak to another; add new tenant query keys there.
 - `api` throws `ApiError` with a `code` mirroring the server `code`, or `"network"` when the request never reached the API. Branch on `code`, not message text.
 - Style tokens come from `primitives.tsx` string constants; reuse them rather than re-typing button class lists.
-- Router uses `defaultViewTransition: true` (cross-fade between `.vt-page` columns) and `defaultPreload: "intent"`.
+- Router uses `defaultPreload: "intent"`. No route view transition: the old/new page cross-fade overlapped both pages (Chrome blends them `plus-lighter`) and read as a white flash; pages bring their own `animate-fade-up` entrances instead.
 - Types come from `@homehost/shared` (`import type`); don't redeclare API shapes locally.
 - Only package with `noUncheckedIndexedAccess` in its tsconfig.
 

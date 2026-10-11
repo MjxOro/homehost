@@ -90,33 +90,6 @@
   transform: none;
 }
 
-/* Route changes: the router starts a view transition; only the element with
-   .vt-page (the main content column) cross-fades, the shell stays put. */
-.vt-page {
-  view-transition-name: page;
-}
-
-::view-transition-old(page) {
-  animation: vt-out var(--duration-fast) var(--ease-in-out-soft) both;
-}
-
-::view-transition-new(page) {
-  animation: vt-in var(--duration-base) var(--ease-out-quint) both;
-}
-
-@keyframes vt-out {
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes vt-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-
 @layer base {
   html {
     color-scheme: dark;
@@ -244,12 +217,6 @@
   .reveal {
     opacity: 1;
     transform: none;
-  }
-
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
   }
 }
 
