@@ -51,6 +51,9 @@ type Worker struct {
 
 	stopOnce sync.Once
 	stop     chan struct{}
+	// wake ends an idle wait early: the job listener pokes it on every
+	// provision_jobs notification.
+	wake chan struct{}
 	// probeTCP reports whether host:port accepts a connection.
 	probeTCP func(ctx context.Context, host string, port int) bool
 }
@@ -63,6 +66,7 @@ func New(cfg Config, db *pgxpool.Pool, incus Incus, dns DNS, logger *log.Logger)
 		dns:      dns,
 		log:      logger,
 		stop:     make(chan struct{}),
+		wake:     make(chan struct{}, 1),
 		probeTCP: tcpConnects,
 	}
 }
@@ -91,11 +95,34 @@ func (w *Worker) sleep(d time.Duration) {
 	}
 }
 
-// Run recovers state from a previous process, then polls until Shutdown.
-// Jobs run on a background context: a stop request lets the current job
-// reach its own shutdown checks instead of aborting mid-write.
+// idle waits up to d for new work: a job notification or shutdown ends it
+// early. The poll interval stays the safety net for missed notifications.
+func (w *Worker) idle(d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+	case <-w.stop:
+	case <-w.wake:
+	}
+}
+
+// Run recovers state from a previous process, then takes jobs as they are
+// notified (polling as the fallback) until Shutdown. Jobs run on a
+// background context: a stop request lets the current job reach its own
+// shutdown checks instead of aborting mid-write.
 func (w *Worker) Run() error {
 	ctx := context.Background()
+	listenCtx, stopListening := context.WithCancel(ctx)
+	listening := make(chan struct{})
+	go func() {
+		defer close(listening)
+		w.listen(listenCtx)
+	}()
+	defer func() {
+		stopListening()
+		<-listening
+	}()
 	// Crash recovery: leases die with the process; requeue so jobs resume.
 	// Instance names make relaunches idempotent.
 	if err := w.requeueLeased(ctx); err != nil {
@@ -106,7 +133,7 @@ func (w *Worker) Run() error {
 		return err
 	}
 	w.log.Printf("ip_assignments reconcile: inserted %d row(s)", reconciled)
-	w.log.Printf("worker up (%s): polling provision_jobs", w.cfg.Env)
+	w.log.Printf("worker up (%s): listening + polling provision_jobs", w.cfg.Env)
 	for !w.shuttingDown() {
 		if err := w.tick(ctx); err != nil {
 			w.log.Printf("worker loop error: %v", err)
@@ -123,7 +150,7 @@ func (w *Worker) tick(ctx context.Context) error {
 		return err
 	}
 	if j == nil {
-		w.sleep(w.cfg.PollInterval)
+		w.idle(w.cfg.PollInterval)
 		return nil
 	}
 	// Env scoping: leave other-env jobs queued for their own worker. No
