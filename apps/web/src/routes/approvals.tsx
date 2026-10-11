@@ -321,9 +321,10 @@ function ApprovalsQueue({ user }: { user: PortalUser }) {
     const error = approvals.error;
     if (isApiError(error) && error.status === 401) {
       return (
-        <SignInGate title="Your session has ended">
-          Pick a demo persona to sign back in.
-        </SignInGate>
+        <SignInGate
+          title="Your session has ended"
+          showcaseHint="Pick a demo persona to sign back in."
+        />
       );
     }
     if (isApiError(error) && error.status === 403) {
@@ -389,8 +390,11 @@ export function ApprovalsPage() {
   if (isPending) return <PageLoading label="Loading your session…" />;
   if (!session?.user) {
     return (
-      <SignInGate title="Operator sign-in required">
-        Pick the operator demo persona to open the approval queue.
+      <SignInGate
+        title="Operator sign-in required"
+        showcaseHint="Pick the operator demo persona to open the approval queue."
+      >
+        Sign in with an operator account to open the approval queue.
       </SignInGate>
     );
   }

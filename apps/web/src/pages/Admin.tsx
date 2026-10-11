@@ -130,9 +130,10 @@ function AdminPanel({ user }: { user: PortalUser }) {
         </div>
       ) : usersQuery.isError ? (
         sessionExpired ? (
-          <SignInGate title="Your session has ended">
-            Pick a demo persona to sign back in.
-          </SignInGate>
+          <SignInGate
+            title="Your session has ended"
+            showcaseHint="Pick a demo persona to sign back in."
+          />
         ) : roleRevoked ? (
           <EmptyState
             title="Not authorized (403)"
@@ -220,8 +221,11 @@ export function AdminPage() {
   if (isPending) return <PageLoading label="Loading your session…" />;
   if (!session?.user) {
     return (
-      <SignInGate title="Operator sign-in required">
-        Pick the operator demo persona to open the administration panel.
+      <SignInGate
+        title="Operator sign-in required"
+        showcaseHint="Pick the operator demo persona to open the administration panel."
+      >
+        Sign in with an operator account to open the administration panel.
       </SignInGate>
     );
   }

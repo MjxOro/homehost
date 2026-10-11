@@ -145,25 +145,28 @@ export function OAuthButtons({
 /**
  * Gate shown wherever an authenticated view is reached without a session
  * (signed out, expired cookie). Showcase mode renders the demo persona
- * picker with the caller's copy; live mode renders the real provider
- * sign-in panel plus the product context from OAuthButtons.
+ * picker and prefers `showcaseHint` (persona copy); live mode renders the real
+ * provider sign-in panel and never shows `showcaseHint`.
  */
 export function SignInGate({
   title,
   children,
+  showcaseHint,
 }: {
   title: string;
   children?: ReactNode;
+  showcaseHint?: string;
 }) {
   const { data: session } = useSession();
   const showcase = session?.mode === "showcase";
+  const copy = (showcase ? showcaseHint : undefined) ?? children;
   return (
     <div className="mx-auto my-12 flex max-w-[660px] flex-col items-center gap-2.5 text-center">
       <h1 className="text-[clamp(22px,3.4vw,30px)] font-[750] tracking-[-0.01em]">
         {title}
       </h1>
       <p className="max-w-[54ch] leading-[1.6] text-text-2">
-        {children ?? "Sign in with your provider account to continue."}
+        {copy ?? "Sign in with your provider account to continue."}
       </p>
       {showcase ? <PersonaPicker /> : <OAuthButtons />}
     </div>
