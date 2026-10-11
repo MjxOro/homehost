@@ -282,7 +282,7 @@ export function AppLayout() {
         )}
         <main
           id="main"
-          className="vt-page [overflow-wrap:anywhere] mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
+          className="[overflow-wrap:anywhere] mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
           tabIndex={-1}
         >
           <Outlet />
@@ -399,7 +399,7 @@ export function AppLayout() {
         )}
         <main
           id="main"
-          className="vt-page scroll-mt-20 [overflow-wrap:anywhere] mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
+          className="scroll-mt-20 [overflow-wrap:anywhere] mx-auto w-full max-w-[1120px] px-[clamp(16px,4vw,44px)] pb-[88px] pt-7 focus:outline-none"
           tabIndex={-1}
         >
           {isPending ? (
