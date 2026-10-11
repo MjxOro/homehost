@@ -8,6 +8,13 @@
 	}
 	handle {
 		root * /srv
+		# Vite fingerprints /assets/*, so they never change under a name. Every
+		# other path (index.html via the SPA fallback) must revalidate, or a
+		# browser keeps running the previous deploy's bundle.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@unhashed not path /assets/*
+		header @unhashed Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}

@@ -1,4 +1,3 @@
-import { useListEntrance } from "../lib/app-motion";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PortalUser, ServerRequest } from "@homehost/shared";
@@ -46,9 +45,7 @@ function ApprovalRow({
   request,
   planName,
   onDecided,
-  entrance,
 }: {
-  entrance: ReturnType<ReturnType<typeof useListEntrance>>;
   request: ServerRequest;
   planName: string;
   onDecided: (message: string) => void;
@@ -77,10 +74,7 @@ function ApprovalRow({
   };
 
   return (
-    <li
-      className={`${entrance.className} flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start`}
-      style={entrance.style}
-    >
+    <li className="flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-[15.5px] font-[650]">{request.name}</h3>
@@ -200,7 +194,6 @@ function ApprovalRow({
 function ProvisionedSection({ user }: { user: PortalUser }) {
   const instances = useInstances(user);
   const retry = useRetryProvision();
-  const entrance = useListEntrance(instances.data?.requests ?? []);
   const [message, setMessage] = useState<string | null>(null);
   if (instances.isPending) {
     return (
@@ -235,8 +228,7 @@ function ProvisionedSection({ user }: { user: PortalUser }) {
           {rows.map((request) => (
             <li
               key={request.id}
-              className={`${entrance(request.id).className} flex flex-col gap-2 px-0.5 py-4 sm:flex-row sm:items-center sm:justify-between`}
-              style={entrance(request.id).style}
+              className="flex flex-col gap-2 px-0.5 py-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
@@ -289,7 +281,6 @@ function ProvisionedSection({ user }: { user: PortalUser }) {
 
 function ApprovalsQueue({ user }: { user: PortalUser }) {
   const approvals = useApprovals(user);
-  const entrance = useListEntrance(approvals.data?.requests ?? []);
   const queryClient = useQueryClient();
   const plans = usePlans();
   const [liveMessage, setLiveMessage] = useState<string | null>(null);
@@ -371,7 +362,6 @@ function ApprovalsQueue({ user }: { user: PortalUser }) {
               <ApprovalRow
                 key={request.id}
                 request={request}
-                entrance={entrance(request.id)}
                 planName={planNames.get(request.planId) ?? request.planId}
                 onDecided={setLiveMessage}
               />

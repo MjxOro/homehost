@@ -1,4 +1,3 @@
-import { useListEntrance } from "../lib/app-motion";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -323,7 +322,7 @@ export function SshAccess({
         </p>
       ) : null}
       {request.status === "running" ? (
-        <div className="animate-fade-in mt-2.5 flex flex-col items-start gap-1 [&>span]:mt-0">
+        <div className="mt-2.5 flex flex-col items-start gap-1 [&>span]:mt-0">
           <span className={LABEL_CHIP}>SSH</span>
           <CopyCode
             value={`ssh root@${request.subdomain}`}
@@ -474,7 +473,6 @@ function focusRequestsHeading() {
 }
 
 export function RequestList({ requests, onAnnounce }: RequestListProps) {
-  const entrance = useListEntrance(requests);
   const plansQuery = usePlans();
   const planNames = useMemo(() => {
     const map = new Map<string, string>();
@@ -539,8 +537,7 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
         {requests.map((request) => (
           <li
             key={request.id}
-            className={`${entrance(request.id).className} flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start`}
-            style={entrance(request.id).style}
+            className="flex flex-col justify-between gap-4 px-0.5 py-4 sm:flex-row sm:items-start"
           >
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">

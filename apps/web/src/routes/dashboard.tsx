@@ -41,10 +41,6 @@ const PLAN_GRID =
 const LABEL =
   "m-0 text-[12px] font-bold uppercase tracking-[0.07em] text-text-3";
 
-const stagger = (i: number): CSSProperties => ({
-  animationDelay: `${i * 70}ms`,
-});
-
 const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
 function PlansHeader() {
@@ -231,10 +227,10 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
   const { quota, usage, requests, activity } = dashboard.data;
   return (
     <div className="flex flex-col gap-5">
-      <div className="animate-fade-up pb-2">
+      <div className="pb-2">
         <ConciergeSearch />
       </div>
-      <div className="flex animate-fade-up flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[clamp(22px,3vw,28px)] font-bold tracking-[-0.01em]">
             Dashboard
@@ -251,15 +247,9 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
         </Link>
       </div>
 
-      <div className="animate-fade-up" style={stagger(1)}>
-        <QuotaCard quota={quota} usage={usage} tier={user.tier} />
-      </div>
+      <QuotaCard quota={quota} usage={usage} tier={user.tier} />
 
-      <section
-        className={`${CARD} animate-fade-up`}
-        style={stagger(2)}
-        aria-labelledby="requests-heading"
-      >
+      <section className={CARD} aria-labelledby="requests-heading">
         <div className={CARD_HEAD}>
           <div>
             <h2 id="requests-heading" className={CARD_TITLE} tabIndex={-1}>
@@ -286,11 +276,7 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
         )}
       </section>
 
-      <section
-        className={`${CARD} animate-fade-up`}
-        style={stagger(3)}
-        aria-labelledby="activity-heading"
-      >
+      <section className={CARD} aria-labelledby="activity-heading">
         <div className={CARD_HEAD}>
           <div>
             <h2 id="activity-heading" className={CARD_TITLE}>

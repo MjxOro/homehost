@@ -1,5 +1,4 @@
 import { BUTTON_OUTLINE_SM } from "./primitives";
-import { useListEntrance } from "../lib/app-motion";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { ActivityEvent, ActivityPageResponse } from "@homehost/shared";
@@ -114,7 +113,6 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
     }
   }
   const visible = [...firstPage, ...appended];
-  const entrance = useListEntrance(visible);
   // Terminal actions end provisioning for a request. `visible` is newest
   // first, so a provisioning row is superseded when a terminal event for the
   // same request was already seen above it. A paged-out successor is simply
@@ -194,11 +192,7 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
           const detail = detailText(event);
           const Icon = meta.icon;
           return (
-            <li
-              key={event.id}
-              className={`${entrance(event.id).className} flex items-start gap-3 px-0.5 py-3`}
-              style={entrance(event.id).style}
-            >
+            <li key={event.id} className="flex items-start gap-3 px-0.5 py-3">
               <Icon
                 className={`mt-0.5 size-[18px] shrink-0 ${meta.className}`}
               />

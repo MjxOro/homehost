@@ -1,4 +1,3 @@
-import { useListEntrance } from "../../lib/app-motion";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { BUTTON_OUTLINE_SM } from "../primitives";
@@ -133,7 +132,6 @@ export function AuditTrail({
     }
   }
   const visible = [...firstPage, ...appended];
-  const entrance = useListEntrance(visible);
 
   const showMore = hasMore ?? firstPage.length >= PAGE_SIZE;
 
@@ -193,11 +191,7 @@ export function AuditTrail({
           const meta = ACTION_META[item.action] ?? fallbackMeta(item.action);
           const Icon = meta.icon;
           return (
-            <li
-              key={item.id}
-              className={`${entrance(item.id).className} flex items-start gap-3 px-0.5 py-3`}
-              style={entrance(item.id).style}
-            >
+            <li key={item.id} className="flex items-start gap-3 px-0.5 py-3">
               <Icon
                 className={`mt-0.5 size-[18px] shrink-0 ${meta.className}`}
               />
