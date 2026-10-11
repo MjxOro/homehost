@@ -389,7 +389,7 @@ export function ServerTimeline({
       className={
         compact
           ? "rounded-control border border-line bg-ink-2 p-3 [&_li]:pb-3 [&_p]:text-[12.5px]"
-          : `${CARD} animate-fade-up`
+          : CARD
       }
       style={{ animationDelay: "70ms" }}
     >

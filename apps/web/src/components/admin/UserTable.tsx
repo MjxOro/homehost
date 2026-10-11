@@ -1,4 +1,3 @@
-import { useListEntrance } from "../../lib/app-motion";
 import { useState } from "react";
 import type { AccountStatus, AdminUser } from "../../lib/api-admin";
 import { ModerationDialog, type ModerationAction } from "./ModerationDialog";
@@ -105,8 +104,6 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
     safePage * PAGE_SIZE + PAGE_SIZE,
   );
 
-  const entrance = useListEntrance(visible);
-
   if (users.length === 0) {
     return (
       <EmptyState title="No users" copy="No accounts match this filter yet." />
@@ -143,8 +140,7 @@ export function UserTable({ users, onAnnounce }: UserTableProps) {
             {visible.map((user) => (
               <tr
                 key={user.id}
-                className={`${entrance(user.id).className} grid grid-cols-2 align-top lg:table-row`}
-                style={entrance(user.id).style}
+                className="grid grid-cols-2 align-top lg:table-row"
               >
                 <td className="col-span-2 block min-w-0 px-2 py-3 pr-3 lg:table-cell">
                   <div className="flex min-w-0 flex-col gap-1">

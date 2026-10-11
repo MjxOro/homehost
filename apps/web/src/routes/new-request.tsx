@@ -247,7 +247,7 @@ function RequestForm({ user }: { user: PortalUser }) {
 
   return (
     <form
-      className="animate-fade-in lg:min-h-[1100px] lg:@min-[500px]:min-h-[800px] lg:@min-[750px]:min-h-[700px] lg:@min-[900px]:min-h-[600px] flex flex-col gap-[18px]"
+      className="lg:min-h-[1100px] lg:@min-[500px]:min-h-[800px] lg:@min-[750px]:min-h-[700px] lg:@min-[900px]:min-h-[600px] flex flex-col gap-[18px]"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();

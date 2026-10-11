@@ -103,7 +103,7 @@ function ProgressView({
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5">
       <LiveRegion message={announcement} />
-      <div className="flex animate-fade-up flex-col gap-2">
+      <div className="flex flex-col gap-2">
         <Link to="/" className={`${LINK_GHOST} -ml-3 w-fit px-3 text-[13.5px]`}>
           ← My servers
         </Link>
