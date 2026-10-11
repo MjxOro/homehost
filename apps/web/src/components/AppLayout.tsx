@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import type { PortalUser } from "@homehost/shared";
-import { useApprovals, useSession } from "../lib/query";
+import { useApprovals, useLogout, useSession } from "../lib/query";
 import {
   DashboardIcon,
   InboxIcon,
   InfoIcon,
+  LogoutIcon,
   PlusIcon,
   ServerIcon,
   SidebarIcon,
@@ -16,19 +17,68 @@ import {
 } from "./icons";
 import { useScrollLock } from "../lib/useScrollLock";
 import { PersonaMenu } from "./PersonaMenu";
-import { ErrorState, PageLoading } from "./primitives";
+import { BUTTON_GHOST_SM, ErrorState, PageLoading } from "./primitives";
 
 const NAV_ITEM_BASE =
   "flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-[14.5px] font-medium no-underline transition-colors duration-(--duration-fast) ease-out-quint hover:bg-ink-2";
 const NAV_ITEM_IDLE = `${NAV_ITEM_BASE} text-text-2 hover:text-text-1`;
 const NAV_ITEM_ACTIVE = `${NAV_ITEM_BASE} bg-accent-dim text-accent`;
 
-function ShowcaseBadge() {
+function ShowcaseBadge({ className = "inline-flex" }: { className?: string }) {
   return (
-    <span className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-full border border-accent-line bg-accent-dim px-2.5 py-[5px] font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
+    <span
+      className={`${className} items-center gap-[7px] whitespace-nowrap rounded-full border border-accent-line bg-accent-dim px-2.5 py-[5px] font-mono text-[11px] uppercase tracking-[0.08em] text-accent`}
+    >
       <span className="size-[7px] rounded-full bg-accent" aria-hidden="true" />
       Showcase
     </span>
+  );
+}
+
+/**
+ * Sidebar footer identity + sign-out. Lives in the nav (persistent at lg, in
+ * the drawer below) so both modes share one exit, with visible pending and
+ * failure states instead of a silent no-op.
+ */
+function AccountPanel({ user }: { user: PortalUser }) {
+  const logout = useLogout();
+  const initial = user.name.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="flex w-full flex-col gap-1.5">
+      <div className="flex min-w-0 items-center gap-3 px-1.5 py-1">
+        <span
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-line-strong bg-ink-2 text-[14px] font-[650] text-text-1"
+          aria-hidden="true"
+        >
+          {initial}
+        </span>
+        <div className="flex min-w-0 flex-col leading-[1.35]">
+          <span className="truncate text-[14px] font-[650] text-text-1">
+            {user.name}
+          </span>
+          <span className="truncate text-[12.5px] text-text-3">
+            {user.email ?? `${user.tier} tier`}
+          </span>
+        </div>
+      </div>
+      <button
+        type="button"
+        className={`${BUTTON_GHOST_SM} w-full justify-start`}
+        disabled={logout.isPending}
+        onClick={() => logout.mutate()}
+      >
+        {logout.isPending ? <Spinner className="spinner-sm" /> : <LogoutIcon />}
+        {logout.isPending ? "Signing out…" : "Sign out"}
+      </button>
+      {logout.isError ? (
+        <p
+          className="animate-fade-in m-0 px-3 text-[12.5px] text-[#f0a8a8]"
+          role="alert"
+        >
+          Sign-out failed — check the connection and try again.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -300,19 +350,22 @@ export function AppLayout() {
             onNavigate={() => setNavOpen(false)}
           />
         )}
-        <div className="mt-auto flex flex-col items-start gap-2 border-t border-line pt-4">
+        <div className="mt-auto flex flex-col gap-3 border-t border-line pt-4">
           {live ? null : (
-            <>
+            <div className="flex flex-col items-start gap-2 px-1.5 pb-1">
               <ShowcaseBadge />
               <p className="m-0 text-[12px] leading-[1.5] text-text-3">
                 Requests reserve capacity on paper only.
               </p>
-            </>
+            </div>
           )}
+          {session?.user ? <AccountPanel user={session.user} /> : null}
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-ink-0/[0.88] px-[clamp(16px,4vw,44px)] py-2 backdrop-blur">
+        <header
+          className={`sticky top-0 z-30 flex items-center ${live ? "lg:hidden" : ""} justify-between gap-3 border-b border-line bg-ink-0/[0.88] px-[clamp(16px,4vw,44px)] py-2 backdrop-blur`}
+        >
           <button
             ref={navToggleRef}
             aria-controls="primary-navigation"
@@ -328,7 +381,9 @@ export function AppLayout() {
             <SidebarIcon width={24} height={24} className="h-6 w-6" />
           </button>
           <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3 [&>*]:min-w-0">
-            {live ? null : <ShowcaseBadge />}
+            {live ? null : (
+              <ShowcaseBadge className="hidden sm:inline-flex lg:hidden" />
+            )}
             <PersonaMenu />
           </div>
         </header>
