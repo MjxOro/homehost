@@ -116,6 +116,16 @@ fi
 sock=/var/lib/incus/unix.socket
 if [ -S "$sock" ] && [ -r "$sock" ] && [ -w "$sock" ]; then
   ok "incus socket present + RW"
+  # The dev worker provisions from the same baked images as prod.
+  contract="$ROOT/apps/worker/internal/contract/contract.json"
+  if command -v jq >/dev/null 2>&1 && command -v incus >/dev/null 2>&1; then
+    for alias in $(jq -r '[.plans[].image | select(startswith("homehost/"))] | unique[]' "$contract"); do
+      incus query "/1.0/images/aliases/$alias" >/dev/null 2>&1 \
+        && ok "image $alias" || miss "image $alias missing (bash infra/host/build-images.sh)"
+    done
+  else
+    warn "jq or incus CLI missing (baked image check skipped)"
+  fi
 else
   warn "incus socket $sock missing or not RW (worker container needs the mount)"
 fi

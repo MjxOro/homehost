@@ -1,0 +1,12 @@
+# Rebuilds the baked plan images (security updates). Installed with
+# homehost-images.timer; see infra/host/README.md ("Baked plan images").
+[Unit]
+Description=Homehost baked Incus image rebuild
+After=incus.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homehost-build-images
+Nice=10
+TimeoutStartSec=2h

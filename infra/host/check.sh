@@ -30,6 +30,16 @@ if command -v incus >/dev/null 2>&1 && incus info >/dev/null 2>&1; then
   incus storage list --format csv 2>/dev/null | grep -q . \
     && ok "incus storage pools: $(incus storage list --format csv 2>/dev/null | cut -d, -f1 | tr '\n' ' ')" \
     || miss "no incus storage pool (run host:setup)"
+  # Baked plan images: the worker fails a job whose image alias is missing.
+  contract="$(dirname "${BASH_SOURCE[0]}")/../../apps/worker/internal/contract/contract.json"
+  if command -v jq >/dev/null 2>&1; then
+    for alias in $(jq -r '[.plans[].image | select(startswith("homehost/"))] | unique[]' "$contract"); do
+      incus query "/1.0/images/aliases/$alias" >/dev/null 2>&1 \
+        && ok "image $alias" || miss "image $alias missing (bash infra/host/build-images.sh)"
+    done
+  else
+    miss "jq not installed (needed to check baked images)"
+  fi
 else
   miss "incus daemon not initialized"
 fi
