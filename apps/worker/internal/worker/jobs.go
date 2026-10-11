@@ -284,7 +284,7 @@ func (w *Worker) waitForAddress(ctx context.Context, project, name string) strin
 		if err == nil && state.Status == "Running" && state.IPv4 != "" {
 			return state.IPv4
 		}
-		w.sleep(5 * time.Second)
+		w.sleep(time.Second)
 	}
 	return ""
 }
