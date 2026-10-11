@@ -26,6 +26,8 @@ Go host-side provisioning loop: leases `provision_jobs` from Postgres and drives
 - Env: `DATABASE_URL`, `IPV6_PREFIX`, `CF_DNS_API_TOKEN`, `WORKER_ENV`, `WORKER_BASE_DOMAIN`, tuning `WORKER_POLL_MS`, `WORKER_*_ATTEMPTS`, `WORKER_BOOT_TIMEOUT_MS`, `WORKER_READY_TIMEOUT_MS`. A malformed number fails startup. Prod values come from `infra/private/worker.env` via a systemd drop-in.
 - Startup requeues every `leased` job (crash recovery) and reconciles `ip_assignments`.
 - Leasing: `SELECT ... FOR UPDATE SKIP LOCKED`, status `queued -> leased`, attempts++.
+- Pickup: a dedicated pgx connection `LISTEN`s on `provision_jobs` (trigger from migration `0017`) and wakes the idle loop at once, reconnecting with backoff; `WORKER_POLL_MS` polling stays the fallback. The boot wait polls instance state every 1s.
+- Images: plans name baked aliases in the `default` project (`infra/host/build-images.sh`). `Launch` copies the current build into the tenant project by fingerprint (tenant projects have `features.images`) and deletes older builds there. A missing alias wraps `worker.ErrImageMissing` and fails the job without retries.
 - SIGINT/SIGTERM: the current job finishes (setup requeues between steps); jobs never run on a cancelled context.
 
 ## ENV SCOPING
@@ -44,6 +46,7 @@ Go host-side provisioning loop: leases `provision_jobs` from Postgres and drives
 
 ## ANTI-PATTERNS
 
+- Falling back to `images:` when a baked alias is missing, or apt-installing at first boot what every box needs (bake it into the image instead).
 - Shelling out to the `incus` CLI: user-data (passwords, keys) would travel in argv and error text.
 - `Exec` without a closed stdin: an open stdin lets a guest prompt block forever.
 - Querying DoH (or any recursive resolver) for a box before the zone's authoritative nameservers serve its exact AAAA: until the record propagates, the name matches the `*.homehost` wildcard and the resolver caches the edge address for the wildcard's TTL, outlasting the readiness gate (`Visible` in `cloudflare.go`).

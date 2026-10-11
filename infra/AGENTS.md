@@ -10,7 +10,7 @@ infra/
 ├── dev/               # containerized dev stack: pg :55433, api :3001, web :5174, worker (Go image, host network)
 ├── prod/              # prod stack: pg 127.0.0.1:55434, homehost-api/web images tagged by git sha, web 127.0.0.1:5180
 ├── traefik/           # edge: :80/:443, DNS-01 ACME, file routes in routes/
-├── host/              # Incus + ZFS host setup, readiness probe, bridge-net unit/timer
+├── host/              # Incus + ZFS host setup, readiness probe, bridge-net unit/timer, baked image build + weekly timer
 ├── worker/            # homehost-worker.service (prod worker binary, host systemd) + restart.sh (build, sync unit, restart)
 └── private/           # gitignored secrets: prod.env, worker.env, traefik.env
 ```
@@ -20,6 +20,7 @@ infra/
 |------|----------|-------|
 | Host readiness (read-only) | `host/check.sh` | `bun run host:check`; detects CGNAT |
 | Install/init Incus | `host/setup-incus.sh`, `host/incus-preseed.yml.tpl` | idempotent; ZFS loop pool `homehost`, bridge `incusbr0` |
+| Baked plan images | `host/build-images.sh`, `host/homehost-images.{service,timer}` | aliases in `default`; `host:check`/`dev:check` report missing ones |
 | Tenant bridge networking | `host/homehost-brnet.{sh,service,timer}` | re-applied periodically |
 | Host procedures | `host/README.md` | DNS records, CF token, worker drop-in, FORWARD rules |
 | Prod deploy | `prod/compose.yml`, `prod/api-entrypoint.sh` | `bun run prod:deploy` (pull, build with `TAG`, up) |
@@ -31,6 +32,7 @@ infra/
 - Worker prod env comes from `infra/private/worker.env` via drop-in `/etc/systemd/system/homehost-worker.service.d/env.conf`; the repo `.env` is the host dev loop and must never point at prod.
 - DB ports: 55432 = retired showcase/host-dev, 55433 = dev, 55434 = prod. Everything binds 127.0.0.1.
 - Docker sets FORWARD policy DROP, killing tenant egress; `iptables -I FORWARD -i/-o incusbr0 -j ACCEPT` + `netfilter-persistent save` after Docker restarts.
+- Plans boot from baked images in the `default` project; a missing alias fails provisioning outright. Rebuild with `bash infra/host/build-images.sh` (weekly timer); never hand-edit the published images.
 - Tenant bridges have no IPv6 route for egress: guest installs force IPv4 (`Acquire::ForceIPv4`) in cloud-init.
 - Dev worker uses `network_mode: host` because Docker bridge has no IPv6 for readiness checks.
 - Dev web binds `${DEV_BIND_IP:-127.0.0.1}`; never publish dev on a public name.

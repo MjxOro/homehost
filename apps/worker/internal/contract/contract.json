@@ -3,7 +3,7 @@
     {
       "id": "container-small",
       "kind": "container",
-      "image": "images:ubuntu/24.04",
+      "image": "homehost/ubuntu-24.04/container",
       "cpu": 2,
       "memoryMb": 2048,
       "diskGb": 20,
@@ -12,7 +12,7 @@
     {
       "id": "vm-medium",
       "kind": "vm",
-      "image": "images:ubuntu/24.04/cloud",
+      "image": "homehost/ubuntu-24.04/vm",
       "cpu": 4,
       "memoryMb": 4096,
       "diskGb": 40,
@@ -21,7 +21,7 @@
     {
       "id": "vm-large",
       "kind": "vm",
-      "image": "images:ubuntu/24.04/cloud",
+      "image": "homehost/ubuntu-24.04/vm",
       "cpu": 8,
       "memoryMb": 8192,
       "diskGb": 80,
@@ -30,7 +30,7 @@
     {
       "id": "desktop-ubuntu",
       "kind": "vm",
-      "image": "images:ubuntu/24.04/cloud",
+      "image": "homehost/ubuntu-24.04/desktop-xfce",
       "cpu": 2,
       "memoryMb": 2048,
       "diskGb": 20,

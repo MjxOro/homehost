@@ -46,7 +46,8 @@ func yamlSingle(value string) string {
 // buildUserData is the VM cloud-config: a generated root password (one
 // dashboard read, then cleared) plus the owner's key when provided.
 // Passwords are base64url so the whole `user:pass` scalar survives YAML
-// single-quoting.
+// single-quoting. openssh-server is baked into the image, so first boot
+// runs no apt; the apt conf only serves later recipe installs.
 func buildUserData(sshPubkey, password string) string {
 	keys := ""
 	if sshPubkey != "" {
@@ -57,8 +58,6 @@ manage_etc_hosts: true
 apt:
   conf: |
     Acquire::ForceIPv4 "true";
-packages:
-  - openssh-server
 ` + keys + `chpasswd:
   list:
     - ` + yamlSingle("root:"+password) + `
@@ -74,8 +73,9 @@ runcmd:
 `
 }
 
-// containerSSHScript installs sshd in a running container (containers
-// ignore cloud-init), run fail-fast with `sh -euc`. The password is
+// containerSSHScript configures the baked sshd in a running container
+// (containers ignore cloud-init), run fail-fast with `sh -euc`. The image
+// ships without host keys, so each box generates its own here. The password is
 // base64url (shell-safe); the pubkey travels base64-encoded so key comments
 // can never break quoting. With containerIPv6 set, the static v6 is
 // configured in-guest: incusbr0 rejects a live NIC override.
@@ -91,5 +91,5 @@ func containerSSHScript(password, sshPubkey, containerIPv6, prefix string) strin
 		netplan := "network:\n  version: 2\n  ethernets:\n    eth0:\n      dhcp4: true\n      dhcp6: false\n      addresses: [" + containerIPv6 + "/64]\n      routes:\n        - to: \"::/0\"\n          via: \"" + gateway + "\"\n      nameservers:\n        addresses: [" + strings.Join(ipv6DNS, ", ") + "]\n"
 		v6Setup = "mkdir -p /etc/netplan\ncat > /etc/netplan/60-homehost-v6.yaml <<'HOMEHOST_EOF'\n" + netplan + "HOMEHOST_EOF\nif command -v netplan >/dev/null 2>&1; then netplan apply; else # No netplan: live-only addresses, lost on reboot.\nip -6 addr add " + containerIPv6 + "/64 dev eth0 2>/dev/null || true\nip -6 route add default via " + gateway + " dev eth0 2>/dev/null || true\nfi\n"
 	}
-	return "export DEBIAN_FRONTEND=noninteractive\napt-get update\napt-get install -y openssh-server\nmkdir -p /etc/ssh/sshd_config.d\nprintf 'PermitRootLogin yes\\nPasswordAuthentication yes\\n' > /etc/ssh/sshd_config.d/60-homehost.conf\n" + keySetup + v6Setup + "printf '%s\\n' 'root:" + password + "' | chpasswd\nsystemctl enable --now ssh\n"
+	return "ssh-keygen -A\nmkdir -p /etc/ssh/sshd_config.d\nprintf 'PermitRootLogin yes\\nPasswordAuthentication yes\\n' > /etc/ssh/sshd_config.d/60-homehost.conf\n" + keySetup + v6Setup + "printf '%s\\n' 'root:" + password + "' | chpasswd\nsystemctl enable --now ssh\n"
 }

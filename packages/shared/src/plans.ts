@@ -31,7 +31,9 @@ export interface Plan {
   unavailableReason?: "installer_unavailable";
   /** Tenant unit: shared-kernel container or full KVM virtual machine. */
   kind: "container" | "vm";
-  /** Incus image alias, e.g. images:ubuntu/24.04. */
+  /** Incus image alias the worker launches from: a homehost-baked image
+   * (infra/host/build-images.sh) in the default project, e.g.
+   * homehost/ubuntu-24.04/vm. Omarchy keeps its upstream alias (never launched). */
   image: string;
   /** Present only on GUI desktop plans; controls the KasmVNC bake. */
   desktop?: DesktopConfig;
@@ -47,7 +49,7 @@ export const PLANS: Plan[] = [
     technicalOnly: false,
     available: true,
     kind: "container",
-    image: "images:ubuntu/24.04",
+    image: "homehost/ubuntu-24.04/container",
   },
   {
     id: "vm-medium",
@@ -58,7 +60,7 @@ export const PLANS: Plan[] = [
     technicalOnly: true,
     available: true,
     kind: "vm",
-    image: "images:ubuntu/24.04/cloud",
+    image: "homehost/ubuntu-24.04/vm",
   },
   {
     id: "vm-large",
@@ -69,7 +71,7 @@ export const PLANS: Plan[] = [
     technicalOnly: true,
     available: true,
     kind: "vm",
-    image: "images:ubuntu/24.04/cloud",
+    image: "homehost/ubuntu-24.04/vm",
   },
   {
     id: "desktop-ubuntu",
@@ -80,7 +82,7 @@ export const PLANS: Plan[] = [
     technicalOnly: true,
     available: true,
     kind: "vm",
-    image: "images:ubuntu/24.04/cloud",
+    image: "homehost/ubuntu-24.04/desktop-xfce",
     desktop: {
       env: "ubuntu-xfce",
       user: "ubuntu",

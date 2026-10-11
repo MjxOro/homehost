@@ -31,6 +31,7 @@ The cross-process contract: API types, plans, provisioning math, readiness, stre
 - Changing a type here changes api and web at once: run root `typecheck`.
 - Plans, recipes, setup rules (`SETUP_*`), stream profiles or the helpers the worker ports (`ipv6ForInstance`, `toDesktopHostname`, `sameIpv6`, `dohHasAaaa`, `setupErrorOf`, `isTransientSetupFailure`, `gameAddressOf`): run `bun run worker:contract`, commit the regenerated files, and `bun run test:worker` (CI fails on a stale contract or a parity drift).
 - Plan ids are persisted (migration `0014_plan_ids`); never rename/reuse an id in `PLANS`.
+- A plan `image` is a baked alias (`homehost/...`) built by `infra/host/build-images.sh`; a new alias needs a build there before the plan can launch.
 
 ## ANTI-PATTERNS
 - Redeclaring API shapes inside apps instead of importing from here.

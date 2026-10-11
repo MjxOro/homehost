@@ -93,3 +93,37 @@ sudo systemctl reenable homehost-brnet.service homehost-brnet.timer
 sudo systemctl start homehost-brnet.timer homehost-brnet.service
 journalctl -u homehost-brnet -n 5   # "incusbr0: restored ..." after a repair
 ```
+
+## Baked plan images
+
+Plans launch from homehost-owned images in the `default` Incus project, not
+from `images:`: `homehost/ubuntu-24.04/container`, `homehost/ubuntu-24.04/vm`
+and `homehost/ubuntu-24.04/desktop-xfce` (the `image` field of each plan in
+`packages/shared/src/plans.ts`). They carry everything every box used to
+apt-install at first boot (`openssh-server`; on the desktop also XFCE and
+KasmVNC), so cloud-init only does per-box config: users, keys, passwords,
+the static v6, the KasmVNC user and TLS cert. Images ship without ssh host
+keys, machine-id, cloud-init state, apt lists or a snakeoil cert; each box
+generates its own.
+
+`build-images.sh` launches each image from `images:`, upgrades and installs,
+scrubs that per-box state, publishes it, moves the alias to the new build and
+deletes the previous one. It is idempotent; a rerun picks up security
+updates. The worker refuses (fails the job, no retry) a plan whose alias is
+missing; `bun run host:check` and `bun run dev:check` report missing aliases.
+
+Tenant projects have their own image store (`features.images`), so the
+worker copies the current build into a tenant project on its next launch
+there and deletes that project's older builds (see `ensureImage` in
+`apps/worker/internal/incus/incus.go`). The copy is a database record: the
+pool keeps one image volume per fingerprint. Build or rebuild by hand, and
+install the weekly rebuild:
+
+```bash
+bash infra/host/build-images.sh                 # all; or: container vm desktop
+sudo install -m 0755 infra/host/build-images.sh /usr/local/sbin/homehost-build-images
+sudo install -m 0644 infra/host/homehost-images.service infra/host/homehost-images.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now homehost-images.timer
+journalctl -u homehost-images -n 20               # "<alias> -> <fingerprint>" per image
+```

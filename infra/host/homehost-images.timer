@@ -1,0 +1,11 @@
+# Weekly rebuild so new boxes start from current security updates.
+[Unit]
+Description=Rebuild the Homehost baked Incus images weekly
+
+[Timer]
+OnCalendar=Sun 04:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

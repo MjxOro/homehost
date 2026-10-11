@@ -31,10 +31,12 @@ const callTimeout = 5 * time.Minute
 // outputTail is how much combined guest output Exec keeps.
 const outputTail = 8000
 
-// remotes maps the image remotes plan images use to simplestreams servers.
-var remotes = map[string]string{
-	"images": "https://images.linuxcontainers.org",
-}
+// imageProject holds the baked plan images (infra/host/build-images.sh).
+const imageProject = "default"
+
+// imageProperty tags every build of a baked image with its alias, in the
+// image project and in each tenant copy, so older builds can be found.
+const imageProperty = "homehost.image"
 
 // Client is a worker.Incus backed by the local Incus daemon.
 type Client struct {
@@ -116,11 +118,80 @@ func (c *Client) EnsureProject(ctx context.Context, project string) error {
 	return nil
 }
 
+// ensureImage makes the baked alias resolve to its current build inside
+// project. Tenant projects keep their own image store (features.images, and
+// projects holding instances cannot change it), so an alias in the image
+// project is invisible there: the current build is copied in by fingerprint.
+// Both projects share the pool's image volume, so the copy is a database
+// record, not a second download. Older builds left in the project are
+// deleted; instances created from them keep their own volumes.
+func (c *Client) ensureImage(ctx context.Context, project, alias string) error {
+	entry, _, err := c.in(imageProject).GetImageAlias(alias)
+	if api.StatusErrorCheck(err, http.StatusNotFound) {
+		return fmt.Errorf("image %s missing in project %s (build it with infra/host/build-images.sh): %w",
+			alias, imageProject, worker.ErrImageMissing)
+	}
+	if err != nil {
+		return fmt.Errorf("image alias %s: %w", alias, err)
+	}
+	if project == imageProject {
+		return nil
+	}
+	server := c.in(project)
+	current, _, err := server.GetImageAlias(alias)
+	switch {
+	case err == nil && current.Target == entry.Target:
+	case err == nil || api.StatusErrorCheck(err, http.StatusNotFound):
+		op, copyErr := server.CreateImage(api.ImagesPost{Source: &api.ImagesPostSource{
+			Type:        "image",
+			Mode:        "pull",
+			Fingerprint: entry.Target,
+			Project:     imageProject,
+			// The daemon records an image source for the copy and rejects an
+			// empty protocol.
+			ImageSource: api.ImageSource{Protocol: "incus"},
+		}}, nil)
+		if copyErr == nil {
+			copyErr = wait(ctx, op)
+		}
+		if copyErr != nil {
+			return fmt.Errorf("copy image %s into %s: %w", alias, project, copyErr)
+		}
+		if err == nil {
+			err = server.UpdateImageAlias(alias, api.ImageAliasesEntryPut{Target: entry.Target}, "")
+		} else {
+			err = server.CreateImageAlias(api.ImageAliasesPost{ImageAliasesEntry: api.ImageAliasesEntry{
+				Name: alias, Type: entry.Type, ImageAliasesEntryPut: api.ImageAliasesEntryPut{Target: entry.Target},
+			}})
+		}
+		if err != nil {
+			return fmt.Errorf("image alias %s in %s: %w", alias, project, err)
+		}
+	default:
+		return fmt.Errorf("image alias %s in %s: %w", alias, project, err)
+	}
+	images, err := server.GetImages()
+	if err != nil {
+		return fmt.Errorf("list images in %s: %w", project, err)
+	}
+	for _, image := range images {
+		if image.Properties[imageProperty] != alias || image.Fingerprint == entry.Target {
+			continue
+		}
+		op, err := server.DeleteImage(image.Fingerprint)
+		if err == nil {
+			err = wait(ctx, op)
+		}
+		if err != nil {
+			return fmt.Errorf("delete old image %s in %s: %w", alias, project, err)
+		}
+	}
+	return nil
+}
+
 func (c *Client) Launch(ctx context.Context, project, name string, spec worker.LaunchSpec) error {
-	remote, alias, ok := strings.Cut(spec.Image, ":")
-	serverURL := remotes[remote]
-	if !ok || serverURL == "" {
-		return fmt.Errorf("incus launch %s: unsupported image %q", name, spec.Image)
+	if err := c.ensureImage(ctx, project, spec.Image); err != nil {
+		return fmt.Errorf("incus launch %s: %w", name, err)
 	}
 	server := c.in(project)
 	// `-d root,size=` semantics: copy the root device the default profile
@@ -145,15 +216,13 @@ func (c *Client) Launch(ctx context.Context, project, name string, spec worker.L
 		Type:  instanceType,
 		Start: true,
 		Source: api.InstanceSource{
-			Type:     "image",
-			Mode:     "pull",
-			Server:   serverURL,
-			Protocol: "simplestreams",
-			Alias:    alias,
+			Type:  "image",
+			Alias: spec.Image,
 		},
 		InstancePut: api.InstancePut{
-			Config:  spec.Config,
-			Devices: map[string]map[string]string{"root": root},
+			Config:   spec.Config,
+			Devices:  map[string]map[string]string{"root": root},
+			Profiles: []string{"default"},
 		},
 	}
 	op, err := server.CreateInstance(req)

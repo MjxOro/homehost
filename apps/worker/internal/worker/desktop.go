@@ -2,8 +2,10 @@ package worker
 
 // GUI desktop bootstrap + Traefik route files for desktop VMs.
 //
-// Ubuntu-xfce path (live reference: desk2 proof box): cloud-init installs
-// xfce4 + KasmVNC, writes an xstartup running
+// Ubuntu-xfce path (live reference: desk2 proof box): xfce4 + KasmVNC are
+// baked into the desktop image (infra/host/build-images.sh); cloud-init
+// only does per-box config. It mints a fresh snakeoil TLS cert (the image
+// ships none, so no two boxes share a key), writes an xstartup running
 // `dbus-launch startxfce4 --compositor=off`, pre-answers both KasmVNC
 // first-run prompts non-interactively (a headless `kasmvncpasswd -u` user
 // with write permission, plus a pre-created `~/.vnc/.de-was-selected`
@@ -33,19 +35,6 @@ import (
 )
 
 const desktopService = "kasmvnc-desktop.service"
-
-const (
-	kasmVNCVersion = "1.3.3"
-	kasmVNCDeb     = "kasmvncserver_noble_" + kasmVNCVersion + "_amd64.deb"
-	// KasmVNC is not in the Ubuntu archives; the deb comes from GitHub releases.
-	kasmVNCDebURL = "https://github.com/kasmtech/KasmVNC/releases/download/v" + kasmVNCVersion + "/" + kasmVNCDeb
-)
-
-// desktopPackages are the APT packages for the ubuntu-xfce bake (xauth +
-// sudo are KasmVNC runtime needs).
-func desktopPackages() []string {
-	return []string{"xfce4", "tigervnc-standalone-server", "dbus-x11", "ssl-cert", "websockify", "xauth", "sudo"}
-}
 
 // omarchyPackages is the pacman base for the omarchy bake (behind the
 // fail-closed gate). The Hyprland stack belongs to the Omarchy installer;
@@ -117,10 +106,9 @@ WantedBy=multi-user.target
 }
 
 // desktopRunCommands are the cloud-init runcmd lines (as root, after
-// `packages:` and `write_files:`). `kasmvncpasswd` with an explicit file
+// `write_files:`). `kasmvncpasswd` with an explicit file
 // target writes headless from a 2-line pipe (proven on desk2); the
 // pre-created write user silences the permission picker at first start.
-// DEBIAN_FRONTEND is inline: each runcmd line runs in its own shell.
 func desktopRunCommands(username, password string) []string {
 	u := username
 	return []string{
@@ -128,7 +116,7 @@ func desktopRunCommands(username, password string) []string {
 		"chown -R " + u + ":" + u + " /home/" + u + " || true",
 		`printf '%s\n' '/var/log/syslog {' '  rotate 3' '  size 50M' '  missingok' '  notifempty' '  compress' '}' > /etc/logrotate.d/kasmvnc`,
 		"usermod -a -G ssl-cert " + u,
-		"curl -fsSL -o /tmp/" + kasmVNCDeb + " " + kasmVNCDebURL + " && DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/" + kasmVNCDeb + " && rm -f /tmp/" + kasmVNCDeb,
+		"make-ssl-cert generate-default-snakeoil --force-overwrite",
 		"mkdir -p /home/" + u + "/.vnc && chown " + u + ":" + u + " /home/" + u + "/.vnc",
 		`printf '%s\n%s\n' '` + password + `' '` + password + `' | sudo -u ` + u + " -H kasmvncpasswd -u " + u + " -w /home/" + u + "/.kasmpasswd && chown " + u + ":" + u + " /home/" + u + "/.kasmpasswd && chmod 0600 /home/" + u + "/.kasmpasswd",
 		"chown " + u + ":" + u + " /home/" + u + "/.vnc/xstartup && chmod 0755 /home/" + u + "/.vnc/xstartup",
@@ -168,29 +156,25 @@ func indentBlock(body string, spaces int) string {
 	return strings.Join(lines, "\n")
 }
 
-// appendDesktopToUserData splices the desktop bake into the VM user-data
-// from buildUserData: extra packages, the xstartup + systemd unit
-// write_files entries, and the bootstrap runcmd lines. A missing anchor is
-// an error so template drift fails the job closed instead of launching a
-// headless box on a desktop plan.
+// appendDesktopToUserData splices the per-box desktop config into the VM
+// user-data from buildUserData: the xstartup + systemd unit write_files
+// entries and the bootstrap runcmd lines (omarchy, whose packages are not
+// baked, also gets a packages list). A missing anchor is an error so
+// template drift fails the job closed instead of launching a headless box
+// on a desktop plan.
 func appendDesktopToUserData(base string, desktop contract.DesktopConfig, username, password string) (string, error) {
-	const pkgAnchor = "packages:\n  - openssh-server\n"
-	if !strings.Contains(base, pkgAnchor) {
-		return "", errors.New("desktop bake: packages anchor missing in user-data")
-	}
-	pkgs := desktopPackages()
-	if desktop.Env == "omarchy" {
-		pkgs = omarchyPackages()
-	}
-	var pkgLines strings.Builder
-	for _, p := range pkgs {
-		pkgLines.WriteString("  - " + p + "\n")
-	}
-	out := strings.Replace(base, pkgAnchor, pkgAnchor+pkgLines.String(), 1)
-
 	const filesAnchor = "runcmd:\n"
-	if !strings.Contains(out, filesAnchor) {
+	if !strings.Contains(base, filesAnchor) {
 		return "", errors.New("desktop bake: runcmd anchor missing in user-data")
+	}
+	out := base
+	if desktop.Env == "omarchy" {
+		var pkgLines strings.Builder
+		pkgLines.WriteString("packages:\n")
+		for _, p := range omarchyPackages() {
+			pkgLines.WriteString("  - " + p + "\n")
+		}
+		out = strings.Replace(out, "write_files:\n", pkgLines.String()+"write_files:\n", 1)
 	}
 	files := "  - path: /home/" + username + "/.vnc/xstartup\n" +
 		"    permissions: '0755'\n" +
