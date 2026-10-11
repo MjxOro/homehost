@@ -21,7 +21,7 @@ import { PLANS, type Plan } from "./plans.js";
 /** Shape of the `Suggestion` JSON. Bump on breaking contract changes. */
 export const CONCIERGE_SCHEMA_VERSION = 2;
 /** Bump whenever a rule, threshold, question or catalog change can alter a suggestion. */
-export const CONCIERGE_RULES_VERSION = "2026-10-01.3";
+export const CONCIERGE_RULES_VERSION = "2026-10-11.1";
 
 /** Extra Jev plan option meaning "nothing in PLANS fits". */
 export const PLAN_NONE = "none";
@@ -42,6 +42,8 @@ export const RECIPE_MIN = 0.5;
 export const GUI_MIN = 0.5;
 /** console_player at or above this adds `console_not_supported` for game recipes. */
 export const CONSOLE_MIN = 0.5;
+/** wants_containers at or above this gives a non-game, non-desktop workload Docker. */
+export const CONTAINERS_MIN = 0.5;
 
 const planId = z
   .string()
@@ -117,6 +119,8 @@ export interface ConciergeAnswers {
   plan: ChoiceAnswer<string>;
   recipe: ChoiceAnswer<RecipeId>;
   wants_gui: number;
+  /** The text asks for Docker/compose/containers or a container-image workload. */
+  wants_containers: number;
   console_player: number;
   abuse: number;
   scraping: number;
@@ -233,7 +237,9 @@ export function decideSuggestion(
   });
   if (useCase === "not_offered") return notOffered("unsupported_use_case");
 
-  // 3. Software: game probabilities matter only among game recipes.
+  // 3. Software: game probabilities matter only among game recipes. Other
+  // workloads get a plain box unless the text actually calls for containers;
+  // learners never get Docker.
   const recipe: RecipeId =
     useCase === "game_server"
       ? mostProbable(
@@ -241,9 +247,11 @@ export function decideSuggestion(
           answers.recipe,
           "minecraft_java",
         )
-      : useCase === "remote_desktop"
-        ? "none"
-        : "docker";
+      : useCase !== "remote_desktop" &&
+          useCase !== "learn_linux" &&
+          answers.wants_containers >= CONTAINERS_MIN
+        ? "docker"
+        : "none";
 
   // Remote desktops need a desktop plan; headless workloads must not get one.
   const fitsWorkload = (p: Plan) =>
@@ -269,8 +277,9 @@ export function decideSuggestion(
   }
 
   // 4. Keep a confident model plan, normalizing only when it does not fit.
+  // A learner just needs a machine to SSH into: always the smallest fit.
   let plan =
-    answers.plan.confidence >= PLAN_MIN
+    useCase !== "learn_linux" && answers.plan.confidence >= PLAN_MIN
       ? eligible.find((p) => p.id === answers.plan.choice)
       : undefined;
   if (plan && !fits(plan)) {

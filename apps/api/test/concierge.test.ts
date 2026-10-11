@@ -70,6 +70,7 @@ interface JevOverrides {
   recipeChoice?: RecipeId;
   recipeProbabilities?: Partial<Record<RecipeId, number>>;
   wantsGui?: number;
+  wantsContainers?: number;
   abuse?: number;
   cost?: number;
 }
@@ -108,6 +109,7 @@ function jevBody(o: JevOverrides = {}) {
         confidence: o.recipeConfidence ?? 0.9,
       },
       wants_gui: { type: "noul", noul: o.wantsGui ?? 0.02 },
+      wants_containers: { type: "noul", noul: o.wantsContainers ?? 0.02 },
       console_player: { type: "noul", noul: 0.03 },
       abuse: { type: "noul", noul: o.abuse ?? 0.01 },
       scraping: { type: "noul", noul: 0.02 },
@@ -692,24 +694,28 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
         outcome: "suggested",
         useCase: "website",
         planId: "container-small",
-        recipeId: "docker",
+        recipeId: "none",
       });
       expect(t.calls).toHaveLength(1);
     });
 
-    test("non-game helpers use Docker on the smallest fitting plan in both tiers", async () => {
+    test("non-game helpers get a plain box on the smallest fitting plan in both tiers, Docker only when asked", async () => {
       for (const tier of ["technical", "nontechnical"] as const) {
-        for (const useCaseChoice of [
-          "always_on",
-          "website",
-          "dev_box",
-          "learn_linux",
+        for (const [useCaseChoice, wantsContainers, recipeId] of [
+          ["always_on", 0.02, "none"],
+          ["website", 0.02, "none"],
+          ["dev_box", 0.02, "none"],
+          ["learn_linux", 0.02, "none"],
+          ["dev_box", 0.9, "docker"],
+          ["always_on", 0.9, "docker"],
+          ["learn_linux", 0.9, "none"],
         ] as const) {
           const t = fakeTransport([
             jevReply({
               useCaseChoice,
               planConfidence: 0.2,
-              recipeChoice: "python",
+              recipeChoice: "docker",
+              wantsContainers,
             }),
           ]);
           const res = await post(config(t.fetch), { text: "my app" }, tier);
@@ -718,10 +724,18 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
             outcome: "suggested",
             useCase: useCaseChoice,
             planId: "container-small",
-            recipeId: "docker",
+            recipeId,
           });
         }
       }
+    });
+
+    test("Jev is asked whether the text calls for containers", async () => {
+      const t = fakeTransport([jevReply()]);
+      await post(config(t.fetch), { text: "a linux command line lab" });
+      expect(JSON.parse(t.calls[0]!.body).questions.wants_containers.type).toBe(
+        "noul",
+      );
     });
 
     test("an unsure game uses only game probabilities and keeps coming-soon recipes", async () => {
@@ -775,7 +789,7 @@ describe.skipIf(!databaseUrl)("concierge suggest", () => {
       expect(Suggestion.parse(res.body)).toMatchObject({
         outcome: "suggested",
         planId: "vm-medium",
-        recipeId: "docker",
+        recipeId: "none",
       });
     });
 
