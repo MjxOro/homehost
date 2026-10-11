@@ -61,8 +61,8 @@ Errors use the usual `{ error, code }` shape:
 2. One Jev request (`typesafe/jev-1.13`, OpenRouter `POST /api/alpha/decisions`)
    asks everything at once: `use_case`, `plan`, `recipe` (choices built from
    `USE_CASES`, `RECIPES` and the plans this user's tier can create right
-   now), and the probabilities `wants_gui`, `console_player`, `abuse`,
-   `scraping`, `is_english`. Questions live in
+   now), and the probabilities `wants_gui`, `wants_containers`,
+   `console_player`, `abuse`, `scraping`, `is_english`. Questions live in
    `apps/api/src/domain/concierge.ts`.
 3. Translation fallback, at most once: when the text is not English
    (`is_english < ENGLISH_MIN`, 0.5) and either the use case is unsure or a
@@ -84,8 +84,11 @@ Errors use the usual `{ error, code }` shape:
      catalog order, including when all offered probabilities are absent.
    - software: `game_server` takes the most probable game recipe, ignoring
      all non-game probabilities and recipe confidence. If no game has a
-     positive probability, use `minecraft_java`. `remote_desktop` uses
-     `none`; every other offered use case uses `docker`. Non-installable
+     positive probability, use `minecraft_java`. `remote_desktop` and
+     `learn_linux` use `none`. `always_on`, `website` and `dev_box` use
+     `docker` only when `wants_containers >= CONTAINERS_MIN` (0.5: the text
+     asks for Docker, compose or containers, or a container-image workload)
+     and `none` (a plain box to SSH into) otherwise. Non-installable
      games keep the "coming soon" UI and create plain Ubuntu instead.
    - eligibility: only available plans the tier may create
      (`eligiblePlans`); `desktop-omarchy` is unavailable. A remote desktop
@@ -94,7 +97,7 @@ Errors use the usual `{ error, code }` shape:
      tier-locked one would, the outcome is `not_offered` `tier_locked`;
      otherwise it is `no_fitting_plan`.
    - plan: keep a confident (`confidence >= PLAN_MIN`, 0.5) eligible plan
-     that fits. Otherwise use the smallest eligible fitting plan, compared
+     that fits, except for `learn_linux`, which always gets the smallest fit. Otherwise use the smallest eligible fitting plan, compared
      by CPU, then memory, then disk; probabilities do not rank the fallback.
      A confident plan `none` remains terminal (`no_fitting_plan`): Jev judged
      the workload too large for the listed sizes.
@@ -118,13 +121,14 @@ bundle zod into the browser.
 
 ## Defaults
 
-| Use case                                                         | Software                                                                  | Plan when Jev is unsure                                                         |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `always_on` (apps and bots), `website`, `dev_box`, `learn_linux` | Docker                                                                    | Smallest eligible fitting plan; currently Container Small in either tier        |
-| `game_server`                                                    | Most probable game, or Minecraft Java without positive game probabilities | Smallest eligible fitting plan; currently Container Small for all catalog games |
-| `remote_desktop`                                                 | None (the desktop is built into its plan)                                 | Desktop Ubuntu for technical accounts; `tier_locked` for nontechnical accounts  |
+| Use case                                          | Software                                                                  | Plan when Jev is unsure                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `learn_linux`                                     | None (plain Ubuntu to SSH into), even if containers come up               | Always the smallest eligible fitting plan; currently Container Small in either tier |
+| `always_on` (apps and bots), `website`, `dev_box` | None, or Docker when `wants_containers >= CONTAINERS_MIN`                 | Smallest eligible fitting plan; currently Container Small in either tier            |
+| `game_server`                                     | Most probable game, or Minecraft Java without positive game probabilities | Smallest eligible fitting plan; currently Container Small for all catalog games     |
+| `remote_desktop`                                  | None (the desktop is built into its plan)                                 | Desktop Ubuntu for technical accounts; `tier_locked` for nontechnical accounts      |
 
-A confident fitting VM choice is kept. Node.js, Python and code-server remain
+A confident fitting VM choice is kept, except for Linux learners. Node.js, Python and code-server remain
 in the recipe catalog for manual selection; the helper does not suggest them.
 Docker is installed with the existing `docker.io` and `docker-compose-v2`
 recipe inside a nested Incus container or a VM (see [recipes.md](recipes.md)).

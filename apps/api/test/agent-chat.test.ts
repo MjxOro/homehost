@@ -76,6 +76,7 @@ function jev(): Reply {
         plan: choice("container-small"),
         recipe: choice("node"),
         wants_gui: { noul: 0.01 },
+        wants_containers: { noul: 0.01 },
         console_player: { noul: 0.01 },
         abuse: { noul: 0.01 },
         scraping: { noul: 0.01 },

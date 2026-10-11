@@ -96,7 +96,7 @@ copy, with no stack traces or provider error text.
 
 Apply migrations to the dev database, then open `http://192.168.1.16:5174`.
 Sign in as Bob through the showcase persona selector (Alice already has her
-one allowed server). Submit “a discord bot for my server”, inspect the
+one allowed server). Submit “a discord bot in Docker for my server”, inspect the
 Container Small / Docker card, click Create it, and approve the resulting
 request as the operator through `POST /api/requests/:id/decision` with
 `{ decision: "approve" }`. Leave the chat open through Docker setup and the

@@ -136,6 +136,11 @@ function jevQuestionSet(tier: TrustTier): JevQuestionSet {
       instructions:
         "Does the person want a graphical desktop (not just a terminal)?",
     },
+    wants_containers: {
+      type: "noul",
+      instructions:
+        "Does the person ask for Docker, Docker Compose or containers, or want to run software that is normally deployed as a container image? A plain Linux machine to learn on, code on or SSH into is not a container request.",
+    },
     console_player: {
       type: "noul",
       instructions:
@@ -184,6 +189,7 @@ const JevAnswersSchema = z.object({
   }),
   recipe: choiceAnswer(RECIPE_IDS),
   wants_gui: noulAnswer,
+  wants_containers: noulAnswer,
   console_player: noulAnswer,
   abuse: noulAnswer,
   scraping: noulAnswer,
@@ -437,6 +443,7 @@ function toAnswers(a: JevAnswers): ConciergeAnswers {
     plan: a.plan,
     recipe: a.recipe,
     wants_gui: a.wants_gui.noul,
+    wants_containers: a.wants_containers.noul,
     console_player: a.console_player.noul,
     abuse: a.abuse.noul,
     scraping: a.scraping.noul,

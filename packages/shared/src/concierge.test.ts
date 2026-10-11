@@ -5,6 +5,7 @@ import {
   CONCIERGE_RULES_VERSION,
   CONCIERGE_SCHEMA_VERSION,
   CONSOLE_MIN,
+  CONTAINERS_MIN,
   GUI_MIN,
   PLAN_MIN,
   RECIPE_MIN,
@@ -48,6 +49,7 @@ function answers(o: Overrides = {}): ConciergeAnswers {
       ...o.recipe,
     },
     wants_gui: o.wants_gui ?? 0.02,
+    wants_containers: o.wants_containers ?? 0.02,
     console_player: o.console_player ?? 0.05,
     abuse: o.abuse ?? 0.01,
     scraping: o.scraping ?? 0.01,
@@ -149,7 +151,7 @@ describe("decideSuggestion", () => {
       expect(suggested(d)).toMatchObject({
         useCase: "website",
         planId: "container-small",
-        recipeId: "docker",
+        recipeId: "none",
       });
     });
 
@@ -163,7 +165,7 @@ describe("decideSuggestion", () => {
             technical,
           ),
         ),
-      ).toMatchObject({ useCase: "dev_box", recipeId: "docker" });
+      ).toMatchObject({ useCase: "dev_box", recipeId: "none" });
     });
 
     test("only a confident not-offered use case is terminal", () => {
@@ -183,30 +185,91 @@ describe("decideSuggestion", () => {
       });
     });
 
-    test("bots, websites, dev boxes and Linux learners default to the smallest fitting Docker plan in either tier", () => {
+    test("a Linux learner gets a plain box on the smallest fitting plan, never Docker", () => {
       for (const tier of [technical, nontechnical]) {
-        for (const choice of [
-          "always_on",
-          "website",
-          "dev_box",
-          "learn_linux",
-        ] as const) {
+        for (const o of [
+          { plan: { choice: "vm-large", confidence: PLAN_MIN - 0.01 } },
+          { plan: { choice: "vm-large", confidence: 0.95 } },
+          { wants_containers: 1, recipe: { choice: "docker" } },
+        ] satisfies Overrides[]) {
           const d = decideSuggestion(
-            answers({
-              use_case: { choice },
-              plan: { choice: "vm-large", confidence: PLAN_MIN - 0.01 },
-              recipe: { choice: "python", confidence: 0.1 },
-            }),
+            answers({ use_case: { choice: "learn_linux" }, ...o }),
             tier,
           );
           expect(suggested(d)).toMatchObject({
-            useCase: choice,
-            recipeId: "docker",
+            useCase: "learn_linux",
+            recipeId: "none",
             planId: "container-small",
             warnings: [],
           });
         }
       }
+    });
+
+    test("bots, websites and dev boxes get a plain box unless the text calls for containers", () => {
+      for (const tier of [technical, nontechnical]) {
+        for (const choice of ["always_on", "website", "dev_box"] as const) {
+          const o = {
+            use_case: { choice },
+            plan: { choice: "vm-large", confidence: PLAN_MIN - 0.01 },
+            recipe: { choice: "docker", confidence: 0.9 },
+          } as const satisfies Overrides;
+          expect(
+            suggested(
+              decideSuggestion(
+                answers({ ...o, wants_containers: CONTAINERS_MIN - 0.01 }),
+                tier,
+              ),
+            ),
+          ).toMatchObject({ recipeId: "none", planId: "container-small" });
+          expect(
+            suggested(
+              decideSuggestion(
+                answers({ ...o, wants_containers: CONTAINERS_MIN }),
+                tier,
+              ),
+            ),
+          ).toMatchObject({ recipeId: "docker", planId: "container-small" });
+        }
+      }
+    });
+
+    test("a beginner dev box without containers is not Docker; one with compose is", () => {
+      const devBox = { use_case: { choice: "dev_box" } } as const;
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({ ...devBox, wants_containers: 0.05 }),
+            nontechnical,
+          ),
+        ).recipeId,
+      ).toBe("none");
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({ ...devBox, wants_containers: 0.92 }),
+            nontechnical,
+          ),
+        ).recipeId,
+      ).toBe("docker");
+    });
+
+    test("the container signal never changes games or desktops", () => {
+      expect(
+        suggested(decideSuggestion(answers({ wants_containers: 1 }), technical))
+          .recipeId,
+      ).toBe("minecraft_java");
+      expect(
+        suggested(
+          decideSuggestion(
+            answers({
+              use_case: { choice: "remote_desktop" },
+              wants_containers: 1,
+            }),
+            technical,
+          ),
+        ),
+      ).toMatchObject({ planId: "desktop-ubuntu", recipeId: "none" });
     });
 
     test("an unsure game uses the top game probability, ignoring non-games", () => {
@@ -305,7 +368,7 @@ describe("decideSuggestion", () => {
               technical,
             ),
           ),
-        ).toMatchObject({ planId: choice, recipeId: "docker", warnings: [] });
+        ).toMatchObject({ planId: choice, recipeId: "none", warnings: [] });
       }
     });
 
@@ -359,7 +422,7 @@ describe("decideSuggestion", () => {
       };
       expect(suggested(decideSuggestion(answers(o), technical))).toMatchObject({
         planId: "container-small",
-        recipeId: "docker",
+        recipeId: "none",
         warnings: [],
       });
       expect(
