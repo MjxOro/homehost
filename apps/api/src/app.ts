@@ -303,6 +303,7 @@ function toActivityEvent(e: EventRow): ActivityEvent {
     serverName: e.serverName,
     createdAt: e.createdAt.toISOString(),
     detail: e.detail,
+    buildMs: e.buildMs,
   };
 }
 

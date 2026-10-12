@@ -150,6 +150,8 @@ export const activityEvents = pgTable(
     action: text("action").notNull(),
     serverName: text("server_name").notNull(),
     detail: text("detail"),
+    // Migration 0019: set on the ready event that finished a build (worker).
+    buildMs: integer("build_ms"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
