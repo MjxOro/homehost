@@ -2,7 +2,7 @@ import { BUTTON_OUTLINE_SM } from "./primitives";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { ActivityEvent, ActivityPageResponse } from "@homehost/shared";
-import { formatDateTime, formatRelative } from "../lib/format";
+import { formatBuildTime, formatDateTime, formatRelative } from "../lib/format";
 import { recipeLabel, setupErrorCopy } from "../lib/concierge";
 import {
   CheckCircleIcon,
@@ -80,7 +80,7 @@ const SUPERSEDED_META: Partial<
 };
 
 /** Setup events carry ids and codes; show their plain-language form. */
-function detailText(event: ActivityEvent): string | null {
+function detailCopy(event: ActivityEvent): string | null {
   if (event.detail === null) return null;
   switch (event.action) {
     case "setup_started":
@@ -91,6 +91,18 @@ function detailText(event: ActivityEvent): string | null {
     default:
       return event.detail;
   }
+}
+
+/** The ready event that finished a build also says how long it took. */
+function detailText(event: ActivityEvent): string | null {
+  const built =
+    event.buildMs === null
+      ? null
+      : `Built in ${formatBuildTime(event.buildMs)}`;
+  const parts = [detailCopy(event), built].filter(
+    (part): part is string => part !== null,
+  );
+  return parts.length === 0 ? null : parts.join(" · ");
 }
 
 export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
