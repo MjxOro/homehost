@@ -46,7 +46,7 @@ func (w *Worker) handle(ctx context.Context, j *job) error {
 	case "setup":
 		return w.handleSetup(ctx, j)
 	}
-	return w.finishJob(ctx, j.id, "failed", new("unknown action "+j.action))
+	return w.finishJob(ctx, j, "failed", new("unknown action "+j.action))
 }
 
 // retryOrFail requeues a failed attempt, or records the terminal failure via
@@ -65,10 +65,10 @@ func (w *Worker) handleProvision(ctx context.Context, j *job) error {
 	}
 	if req == nil || req.status == "deleted" {
 		// Cancelled while queued: nothing to build.
-		return w.finishJob(ctx, j.id, "done", new("skipped: deleted"))
+		return w.finishJob(ctx, j, "done", new("skipped: deleted"))
 	}
 	if req.status != "approved" && req.status != "provisioning" {
-		return w.finishJob(ctx, j.id, "failed", new("unexpected status "+req.status))
+		return w.finishJob(ctx, j, "failed", new("unexpected status "+req.status))
 	}
 	plan := contract.PlanByID(req.planID)
 	if plan == nil {
@@ -182,13 +182,16 @@ func (w *Worker) provision(ctx context.Context, req *request, plan *contract.Pla
 			return err
 		}
 	}
+	j.timer.mark("prepare")
 	if err := w.incus.Launch(ctx, project, name, spec); err != nil {
 		return err
 	}
+	j.timer.mark("launch")
 	ipv4 := w.waitForAddress(ctx, project, name)
 	if ipv4 == "" {
 		return errors.New("timed out waiting for instance address")
 	}
+	j.timer.mark("boot")
 	if !isVM {
 		// Same password shape as the VM path; a nonzero guest exit fails the
 		// attempt so the attempts-capped requeue covers apt flakes. Containers
@@ -204,6 +207,7 @@ func (w *Worker) provision(ctx context.Context, req *request, plan *contract.Pla
 		if err := w.provisionContainerSSH(ctx, project, name, password, deref(req.sshPubkey), containerIPv6); err != nil {
 			return err
 		}
+		j.timer.mark("container_ssh")
 	}
 	// Direct IPv6 access for every plan: no leased ports, no NAT rules.
 	if ipv6 != "" {
@@ -217,9 +221,11 @@ func (w *Worker) provision(ctx context.Context, req *request, plan *contract.Pla
 		} else {
 			w.log.Print("CF_DNS_API_TOKEN unset: skipping AAAA")
 		}
-		if err := w.waitForReachable(ctx, req, ipv6); err != nil {
+		j.timer.mark("dns_publish")
+		if err := w.waitForReachable(ctx, req, ipv6, j.timer); err != nil {
 			return err
 		}
+		j.timer.mark("ready_gate")
 	}
 	if bakeDesktop && desktopHostname != "" {
 		// Backend is the guest IPv4 (the edge net has no v6). Desktop DNS is
@@ -243,7 +249,11 @@ func (w *Worker) provision(ctx context.Context, req *request, plan *contract.Pla
 	if err := w.enqueueSetupIfPending(ctx, req.id); err != nil {
 		return err
 	}
-	return w.finishJob(ctx, j.id, "done", nil)
+	j.timer.mark("finalize")
+	if err := w.markBuilt(ctx, req.id); err != nil {
+		return err
+	}
+	return w.finishJob(ctx, j, "done", nil)
 }
 
 // failProvision parks the request at approved: the reservation and the
@@ -255,7 +265,7 @@ func (w *Worker) failProvision(ctx context.Context, req *request, j *job, messag
 	if err := w.emit(ctx, req.id, workerActor, "provision_failed", req.name, &message); err != nil {
 		return err
 	}
-	return w.finishJob(ctx, j.id, "failed", &message)
+	return w.finishJob(ctx, j, "failed", &message)
 }
 
 func (w *Worker) provisionContainerSSH(ctx context.Context, project, name, password, sshPubkey, containerIPv6 string) error {
@@ -292,25 +302,45 @@ func (w *Worker) waitForAddress(ctx context.Context, project, name string) strin
 // waitForReachable gates "running" on the box answering at its public v6
 // address: catches a lost bridge gateway/route or a dead sshd, and a
 // record resolvers can't see yet.
-func (w *Worker) waitForReachable(ctx context.Context, req *request, ipv6 string) error {
+func (w *Worker) waitForReachable(ctx context.Context, req *request, ipv6 string, timer *phaseTimer) error {
 	if err := w.emit(ctx, req.id, workerActor, "provisioning", req.name, new("Checking network reachability")); err != nil {
 		return err
 	}
+	// Each check runs on its own goroutine and is never re-run once passed,
+	// so each writes only its own variable; pollChecks has returned before
+	// they are read.
+	gateStart := time.Now()
+	var sshAfter, dnsAfter time.Duration
 	checks := []readinessCheck{{
 		failure: fmt.Sprintf("box not reachable at [%s]:22 (check the incusbr0 gateway)", ipv6),
 		run: func(ctx context.Context) (bool, error) {
-			return w.probeTCP(ctx, ipv6, 22), nil
+			ok := w.probeTCP(ctx, ipv6, 22)
+			if ok {
+				sshAfter = time.Since(gateStart)
+			}
+			return ok, nil
 		},
 	}}
 	if w.dns != nil {
 		checks = append(checks, readinessCheck{
 			failure: "hostname not visible on public DNS yet",
 			run: func(ctx context.Context) (bool, error) {
-				return w.dns.Visible(ctx, req.subdomain, ipv6)
+				ok, err := w.dns.Visible(ctx, req.subdomain, ipv6)
+				if err == nil && ok {
+					dnsAfter = time.Since(gateStart)
+				}
+				return ok, err
 			},
 		})
 	}
-	return pollChecks(ctx, checks, w.cfg.ReadyTimeout, 2*time.Second)
+	if err := pollChecks(ctx, checks, w.cfg.ReadyTimeout, 2*time.Second); err != nil {
+		return err
+	}
+	timer.add("ready_gate.ssh", sshAfter)
+	if w.dns != nil {
+		timer.add("ready_gate.dns", dnsAfter)
+	}
+	return nil
 }
 
 func (w *Worker) handleTeardown(ctx context.Context, j *job) error {
@@ -323,11 +353,11 @@ func (w *Worker) handleTeardown(ctx context.Context, j *job) error {
 		if err := w.releaseIpv6(ctx, j.requestID); err != nil {
 			return err
 		}
-		return w.finishJob(ctx, j.id, "done", new("nothing to tear down"))
+		return w.finishJob(ctx, j, "done", new("nothing to tear down"))
 	}
 	if err := w.teardown(ctx, req, j); err != nil {
 		return w.retryOrFail(ctx, j, err, w.cfg.TeardownAttempts, func(msg string) error {
-			return w.finishJob(ctx, j.id, "failed", &msg)
+			return w.finishJob(ctx, j, "failed", &msg)
 		})
 	}
 	return nil
@@ -369,7 +399,7 @@ func (w *Worker) teardown(ctx context.Context, req *request, j *job) error {
 			w.log.Printf("desktop route remove failed: %v", err)
 		}
 	}
-	return w.finishJob(ctx, j.id, "done", nil)
+	return w.finishJob(ctx, j, "done", nil)
 }
 
 func (w *Worker) handlePower(ctx context.Context, j *job, verb, to string) error {
@@ -378,11 +408,11 @@ func (w *Worker) handlePower(ctx context.Context, j *job, verb, to string) error
 		return err
 	}
 	if req == nil || req.instanceName == nil {
-		return w.finishJob(ctx, j.id, "failed", new("request or instance missing"))
+		return w.finishJob(ctx, j, "failed", new("request or instance missing"))
 	}
 	if err := w.power(ctx, req, j, verb, to); err != nil {
 		return w.retryOrFail(ctx, j, err, w.cfg.PowerAttempts, func(msg string) error {
-			return w.finishJob(ctx, j.id, "failed", &msg)
+			return w.finishJob(ctx, j, "failed", &msg)
 		})
 	}
 	return nil
@@ -421,7 +451,7 @@ func (w *Worker) power(ctx context.Context, req *request, j *job, verb, to strin
 			return err
 		}
 	}
-	return w.finishJob(ctx, j.id, "done", nil)
+	return w.finishJob(ctx, j, "done", nil)
 }
 
 func (w *Worker) handleSetup(ctx context.Context, j *job) error {
@@ -430,7 +460,7 @@ func (w *Worker) handleSetup(ctx context.Context, j *job) error {
 		return err
 	}
 	if req == nil || req.status == "deleted" {
-		return w.finishJob(ctx, j.id, "done", new("skipped: deleted"))
+		return w.finishJob(ctx, j, "done", new("skipped: deleted"))
 	}
 	state, err := w.loadSetupState(ctx, req.id)
 	if err != nil {
@@ -441,14 +471,14 @@ func (w *Worker) handleSetup(ctx context.Context, j *job) error {
 		if state != nil {
 			status = state.setupStatus
 		}
-		return w.finishJob(ctx, j.id, "done", new("skipped: setup "+status))
+		return w.finishJob(ctx, j, "done", new("skipped: setup "+status))
 	}
 	if req.status != "running" || req.instanceName == nil {
 		// Stopped before setup ran: stays pending, the next start re-enqueues it.
 		if err := w.setSetup(ctx, req.id, "pending", nil, nil); err != nil {
 			return err
 		}
-		return w.finishJob(ctx, j.id, "done", new("skipped: status "+req.status))
+		return w.finishJob(ctx, j, "done", new("skipped: status "+req.status))
 	}
 	recipeID := *state.recipeID
 	var setup *contract.SetupPlan
@@ -472,6 +502,7 @@ func (w *Worker) handleSetup(ctx context.Context, j *job) error {
 	if err := w.emit(ctx, req.id, workerActor, "setup_started", req.name, &recipeID); err != nil {
 		return err
 	}
+	j.timer.mark("prepare")
 	for _, step := range setup.Steps {
 		if w.shuttingDown() {
 			// Re-leased on the next start; the scripts are safe to re-run.
@@ -514,6 +545,7 @@ func (w *Worker) handleSetup(ctx context.Context, j *job) error {
 				return w.failSetup(ctx, req, j, &step.ID, "not_ready", err.Error())
 			}
 		}
+		j.timer.mark("setup." + step.ID)
 	}
 	last := setup.Steps[len(setup.Steps)-1].ID
 	if err := w.setSetup(ctx, req.id, "done", &last, nil); err != nil {
@@ -526,7 +558,10 @@ func (w *Worker) handleSetup(ctx context.Context, j *job) error {
 	if err := w.emit(ctx, req.id, workerActor, "setup_done", req.name, &detail); err != nil {
 		return err
 	}
-	return w.finishJob(ctx, j.id, "done", nil)
+	if err := w.markBuilt(ctx, req.id); err != nil {
+		return err
+	}
+	return w.finishJob(ctx, j, "done", nil)
 }
 
 // failSetup leaves the box as it is: setup failures never reimage or relaunch.
@@ -542,5 +577,5 @@ func (w *Worker) failSetup(ctx context.Context, req *request, j *job, step *stri
 		msg += " at " + *step
 	}
 	msg += ": " + tail(detail, 2000)
-	return w.finishJob(ctx, j.id, "failed", &msg)
+	return w.finishJob(ctx, j, "failed", &msg)
 }
