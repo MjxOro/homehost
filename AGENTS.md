@@ -73,6 +73,7 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 - `bun run db:migrate` — ledger-tracked, advisory-locked, safe to re-run.
 - `bun run worker:contract` — regenerate the Go worker's contract + parity vectors from `@homehost/shared`; run after changing plans, recipes, setup rules or stream profiles, and commit the output (CI diffs it).
 - `bun run test:worker` — `go vet` + `go test` for the worker; DB suites run when `TEST_DATABASE_URL` is set.
+- `bun run bench:provision [--env prod|dev] [--days N] [--recent N] [--json]` — read-only provisioning benchmark: build time per plan, per-phase p50/p90 from `provision_jobs.timings`, recipe setup steps, recent builds, failure rate.
 - Also: `dev:check`, `dev:migrate`, `host:check`, `host:setup`, `prod:build|up|down|logs|deploy`, `worker`, `bench`, `test:reset`, `format`, `format:check`.
 
 ## Live vs showcase

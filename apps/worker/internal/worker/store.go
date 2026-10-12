@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -14,6 +15,7 @@ type job struct {
 	requestID string
 	action    string
 	attempts  int
+	timer     *phaseTimer
 }
 
 type request struct {
@@ -33,10 +35,13 @@ func (w *Worker) leaseJob(ctx context.Context) (*job, error) {
 	var j *job
 	err := pgx.BeginFunc(ctx, w.db, func(tx pgx.Tx) error {
 		var found job
+		var queuedMs int64
 		err := tx.QueryRow(ctx, `
-			SELECT id::text, request_id::text, action, attempts FROM provision_jobs
+			SELECT id::text, request_id::text, action, attempts,
+				(extract(epoch FROM clock_timestamp() - created_at) * 1000)::bigint
+			FROM provision_jobs
 			WHERE status = 'queued' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
-		`).Scan(&found.id, &found.requestID, &found.action, &found.attempts)
+		`).Scan(&found.id, &found.requestID, &found.action, &found.attempts, &queuedMs)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -44,6 +49,7 @@ func (w *Worker) leaseJob(ctx context.Context) (*job, error) {
 			return err
 		}
 		found.attempts++
+		found.timer = newPhaseTimer(time.Duration(queuedMs) * time.Millisecond)
 		if _, err := tx.Exec(ctx, `
 			UPDATE provision_jobs SET status = 'leased', attempts = $1, updated_at = now()
 			WHERE id = $2
@@ -205,10 +211,28 @@ func (w *Worker) emit(ctx context.Context, requestID, actorName, action, serverN
 	return err
 }
 
-func (w *Worker) finishJob(ctx context.Context, jobID, status string, lastError *string) error {
+func (w *Worker) finishJob(ctx context.Context, j *job, status string, lastError *string) error {
+	timings, err := j.timer.json(j.attempts)
+	if err != nil {
+		return err
+	}
+	_, err = w.db.Exec(ctx, `
+		UPDATE provision_jobs SET status = $2, last_error = $3, timings = $4, updated_at = now() WHERE id = $1
+	`, j.id, status, lastError, timings)
+	return err
+}
+
+// markBuilt stores how long the box took to become usable, measured from the
+// latest provision request (approval or retry): the web UI's "Built in ...".
+// A box with recipe setup still outstanding is not built yet: no-op.
+func (w *Worker) markBuilt(ctx context.Context, requestID string) error {
 	_, err := w.db.Exec(ctx, `
-		UPDATE provision_jobs SET status = $2, last_error = $3, updated_at = now() WHERE id = $1
-	`, jobID, status, lastError)
+		UPDATE server_requests r
+		SET build_ms = (extract(epoch FROM clock_timestamp() - s.started_at) * 1000)::int
+		FROM (SELECT max(created_at) AS started_at FROM provision_jobs
+			WHERE request_id = $1 AND action = 'provision') s
+		WHERE r.id = $1 AND s.started_at IS NOT NULL AND r.setup_status IN ('none', 'done')
+	`, requestID)
 	return err
 }
 

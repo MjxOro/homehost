@@ -98,6 +98,9 @@ export const serverRequests = pgTable(
     setupStep: text("setup_step"),
     setupError: text("setup_error"),
     eulaAcceptedAt: timestamp("eula_accepted_at", { withTimezone: true }),
+    // Migration 0018: latest provision request -> box ready, in ms. Written
+    // by the worker; null until built.
+    buildMs: integer("build_ms"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -189,6 +192,8 @@ export const provisionJobs = pgTable(
     status: text("status").notNull().default("queued"),
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
+    // Migration 0018: per-phase durations of the final attempt (worker).
+    timings: jsonb("timings"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
