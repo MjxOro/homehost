@@ -290,6 +290,7 @@ function toServerRequest(r: RequestRow): ServerRequest {
     setupStep: r.setupStep as ServerRequest["setupStep"],
     setupError: r.setupError,
     gameAddress: gameAddressOf(r),
+    buildMs: r.buildMs,
   };
 }
 

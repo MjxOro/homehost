@@ -11,7 +11,12 @@ import {
   queryKeys,
 } from "../lib/query";
 import { recipeLabel, setupChip } from "../lib/concierge";
-import { formatDateTime, formatMemory, formatRelative } from "../lib/format";
+import {
+  formatBuildTime,
+  formatDateTime,
+  formatMemory,
+  formatRelative,
+} from "../lib/format";
 import { CancelDialog } from "./CancelDialog";
 import {
   BUTTON_GHOST_SM,
@@ -558,6 +563,12 @@ export function RequestList({ requests, onAnnounce }: RequestListProps) {
                 <span>{planNames.get(request.planId) ?? request.planId}</span>
                 <span aria-hidden="true">·</span>
                 <span>{resourceLine(request)}</span>
+                {request.buildMs === null ? null : (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>Built in {formatBuildTime(request.buildMs)}</span>
+                  </>
+                )}
               </p>
               {request.status === "provisioning" ? null : (
                 <CopyCode value={request.subdomain} name="subdomain" />

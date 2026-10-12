@@ -8,7 +8,7 @@ import {
 } from "@homehost/shared";
 import { isApiError } from "../lib/api";
 import { recipeLabel, setupErrorCopy } from "../lib/concierge";
-import { formatPlanSpecs } from "../lib/format";
+import { formatBuildTime, formatPlanSpecs } from "../lib/format";
 import {
   isNetworkError,
   queryKeys,
@@ -125,6 +125,12 @@ function ProgressView({
               ? recipeLabel(request.recipeId ?? "none")
               : "Plain Ubuntu"}
           </span>
+          {request.buildMs === null ? null : (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>Built in {formatBuildTime(request.buildMs)}</span>
+            </>
+          )}
         </p>
       </div>
 

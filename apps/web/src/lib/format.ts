@@ -47,6 +47,22 @@ export function formatPlanSpecs(plan: {
   return `${plan.cpu} CPU · ${formatMemory(plan.memoryMb)} RAM · ${plan.diskGb} GB disk`;
 }
 
+/** Build time for "Built in ...": "18 seconds", "1 min 42 sec", "14 min", "2 h 5 min". */
+export function formatBuildTime(ms: number): string {
+  const total = Math.max(1, Math.round(ms / 1000));
+  if (total < 60) return `${total} second${total === 1 ? "" : "s"}`;
+  if (total < 600) {
+    const seconds = total % 60;
+    const minutes = `${Math.floor(total / 60)} min`;
+    return seconds === 0 ? minutes : `${minutes} ${seconds} sec`;
+  }
+  const minutes = Math.round(total / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const rest = minutes % 60;
+  const hours = `${Math.floor(minutes / 60)} h`;
+  return rest === 0 ? hours : `${hours} ${rest} min`;
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts

@@ -93,6 +93,12 @@ export interface ServerRequest {
    * default port needs no suffix). Null unless a game recipe finished setup.
    */
   gameAddress: string | null;
+  /**
+   * Milliseconds from the latest provision request (approval or retry) until
+   * the box was usable: running, or setup done when a recipe was chosen. Null
+   * until built.
+   */
+  buildMs: number | null;
 }
 
 /** Body of POST /api/requests. */
