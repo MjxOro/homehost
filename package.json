@@ -32,6 +32,7 @@
     "test:worker": "go -C apps/worker vet ./... && go -C apps/worker test ./...",
     "test": "bun test packages/shared packages/sites packages/bench",
     "bench": "bun packages/bench/src/cli.ts",
+    "bench:provision": "bun scripts/provision-bench.ts",
     "test:integration": "SHOWCASE_MODE=true DATABASE_URL=$TEST_DATABASE_URL bun test apps/api/test",
     "test:reset": "bun scripts/test-reset.ts",
     "format": "prettier --write apps packages docs README.md package.json tsconfig.base.json infra/compose.yml",
