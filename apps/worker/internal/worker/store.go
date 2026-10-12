@@ -225,13 +225,25 @@ func (w *Worker) finishJob(ctx context.Context, j *job, status string, lastError
 // markBuilt stores how long the box took to become usable, measured from the
 // latest provision request (approval or retry): the web UI's "Built in ...".
 // A box with recipe setup still outstanding is not built yet: no-op.
+// The ready event just emitted ('running' or 'setup_done') carries the same
+// duration for the activity feed.
 func (w *Worker) markBuilt(ctx context.Context, requestID string) error {
 	_, err := w.db.Exec(ctx, `
-		UPDATE server_requests r
-		SET build_ms = (extract(epoch FROM clock_timestamp() - s.started_at) * 1000)::int
-		FROM (SELECT max(created_at) AS started_at FROM provision_jobs
-			WHERE request_id = $1 AND action = 'provision') s
-		WHERE r.id = $1 AND s.started_at IS NOT NULL AND r.setup_status IN ('none', 'done')
+		WITH built AS (
+			UPDATE server_requests r
+			SET build_ms = (extract(epoch FROM clock_timestamp() - s.started_at) * 1000)::int
+			FROM (SELECT max(created_at) AS started_at FROM provision_jobs
+				WHERE request_id = $1 AND action = 'provision') s
+			WHERE r.id = $1 AND s.started_at IS NOT NULL AND r.setup_status IN ('none', 'done')
+			RETURNING r.id, r.build_ms
+		)
+		UPDATE activity_events e SET build_ms = built.build_ms
+		FROM built
+		WHERE e.id = (
+			SELECT id FROM activity_events
+			WHERE request_id = built.id AND action IN ('running', 'setup_done')
+			ORDER BY created_at DESC, id DESC LIMIT 1
+		)
 	`, requestID)
 	return err
 }

@@ -79,12 +79,14 @@ func TestProvisionRecordsPhaseTimingsAndBuildTime(t *testing.T) {
 		t.Fatalf("timings = attempt %d phases %v, want attempt 1 phases %v", got.Attempt, names, want)
 	}
 
-	var buildMs *int
-	if err := db.QueryRow(ctx, `SELECT build_ms FROM server_requests WHERE id = $1`, o.requestID).Scan(&buildMs); err != nil {
+	var buildMs, eventBuildMs *int
+	if err := db.QueryRow(ctx, `SELECT r.build_ms,
+		(SELECT build_ms FROM activity_events WHERE request_id = r.id AND action = 'running')
+		FROM server_requests r WHERE r.id = $1`, o.requestID).Scan(&buildMs, &eventBuildMs); err != nil {
 		t.Fatal(err)
 	}
-	if buildMs == nil || *buildMs < 0 {
-		t.Fatalf("build_ms = %v, want a non-negative duration", buildMs)
+	if buildMs == nil || *buildMs < 0 || eventBuildMs == nil || *eventBuildMs != *buildMs {
+		t.Fatalf("build_ms = %v, running event build_ms = %v; want the same non-negative duration on both", buildMs, eventBuildMs)
 	}
 }
 

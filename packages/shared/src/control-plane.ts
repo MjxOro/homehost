@@ -134,6 +134,8 @@ export interface ActivityEvent {
   serverName: string;
   createdAt: string;
   detail: string | null;
+  /** Build duration on the ready event that finished a build; null otherwise. */
+  buildMs: number | null;
 }
 
 export type ProvisionAction =
