@@ -86,6 +86,15 @@ describe("desktop plans", () => {
   });
 });
 
+describe("GPU plans", () => {
+  test("only containers share the GPU", () => {
+    const gpu = PLANS.filter((p) => p.gpu);
+    expect(gpu.map((p) => p.id)).toEqual(["container-gpu"]);
+    // A VM with the card attached would take it from the host and every box.
+    for (const plan of gpu) expect(plan.kind).toBe("container");
+  });
+});
+
 describe("tier quotas untouched", () => {
   test("quotas still match the frozen footprint", () => {
     expect(TIER_QUOTAS).toEqual({

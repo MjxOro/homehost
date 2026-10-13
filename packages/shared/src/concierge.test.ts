@@ -372,9 +372,12 @@ describe("decideSuggestion", () => {
       }
     });
 
-    test("unavailable and tier-locked plans are never suggested", () => {
+    test("unavailable, tier-locked and GPU plans are never suggested", () => {
       expect(eligiblePlans("technical").map((p) => p.id)).not.toContain(
         "desktop-omarchy",
+      );
+      expect(eligiblePlans("technical").map((p) => p.id)).not.toContain(
+        "container-gpu",
       );
       expect(eligiblePlans("nontechnical").map((p) => p.id)).toEqual([
         "container-small",

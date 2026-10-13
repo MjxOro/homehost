@@ -127,10 +127,11 @@ export interface ConciergeAnswers {
   is_english: number;
 }
 
-/** Plans this tier may create right now: available, and not tier-locked. */
+/** Plans the concierge may suggest to this tier: available, not tier-locked,
+ * and not GPU. The shared card is picked by hand, never by sizing. */
 export function eligiblePlans(tier: TrustTier): Plan[] {
   return PLANS.filter(
-    (p) => p.available && (!p.technicalOnly || tier === "technical"),
+    (p) => p.available && !p.gpu && (!p.technicalOnly || tier === "technical"),
   );
 }
 

@@ -43,6 +43,7 @@ const contract = {
     memoryMb: plan.memoryMb,
     diskGb: plan.diskGb,
     desktop: plan.desktop ?? null,
+    gpu: plan.gpu ?? false,
   })),
   recipes: Object.fromEntries(
     recipeIds.map((id) => [

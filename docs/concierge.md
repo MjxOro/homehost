@@ -91,7 +91,9 @@ Errors use the usual `{ error, code }` shape:
      and `none` (a plain box to SSH into) otherwise. Non-installable
      games keep the "coming soon" UI and create plain Ubuntu instead.
    - eligibility: only available plans the tier may create
-     (`eligiblePlans`); `desktop-omarchy` is unavailable. A remote desktop
+     (`eligiblePlans`); `desktop-omarchy` is unavailable, and GPU plans
+     (`container-gpu`) are never offered: the one shared card is picked by
+     hand on the request form, not by sizing. A remote desktop
      needs a desktop plan; a headless workload (`wants_gui < GUI_MIN`, 0.5)
      never gets one. When no eligible plan fits the workload and recipe but a
      tier-locked one would, the outcome is `not_offered` `tier_locked`;

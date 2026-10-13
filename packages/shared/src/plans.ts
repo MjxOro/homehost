@@ -37,6 +37,9 @@ export interface Plan {
   image: string;
   /** Present only on GUI desktop plans; controls the KasmVNC bake. */
   desktop?: DesktopConfig;
+  /** Shares the host's NVIDIA GPU, time-sliced with every other GPU box.
+   * Containers only: a VM would take the whole card from the host. */
+  gpu?: boolean;
 }
 
 export const PLANS: Plan[] = [
@@ -50,6 +53,18 @@ export const PLANS: Plan[] = [
     available: true,
     kind: "container",
     image: "homehost/ubuntu-24.04/container",
+  },
+  {
+    id: "container-gpu",
+    name: "Container GPU",
+    cpu: 4,
+    memoryMb: 4096,
+    diskGb: 40,
+    technicalOnly: true,
+    available: true,
+    kind: "container",
+    image: "homehost/ubuntu-24.04/container",
+    gpu: true,
   },
   {
     id: "vm-medium",
