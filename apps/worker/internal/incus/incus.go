@@ -209,7 +209,17 @@ func (c *Client) Launch(ctx context.Context, project, name string, spec worker.L
 
 	instanceType := api.InstanceTypeContainer
 	if spec.VM {
+		if spec.GPU {
+			return fmt.Errorf("incus launch %s: a VM cannot share the GPU", name)
+		}
 		instanceType = api.InstanceTypeVM
+	}
+	config := spec.Config
+	devices := map[string]map[string]string{"root": root}
+	if spec.GPU {
+		config = maps.Clone(spec.Config)
+		config["nvidia.runtime"] = "true"
+		devices["gpu"] = map[string]string{"type": "gpu", "gputype": "physical"}
 	}
 	req := api.InstancesPost{
 		Name:  name,
@@ -220,8 +230,8 @@ func (c *Client) Launch(ctx context.Context, project, name string, spec worker.L
 			Alias: spec.Image,
 		},
 		InstancePut: api.InstancePut{
-			Config:   spec.Config,
-			Devices:  map[string]map[string]string{"root": root},
+			Config:   config,
+			Devices:  devices,
 			Profiles: []string{"default"},
 		},
 	}

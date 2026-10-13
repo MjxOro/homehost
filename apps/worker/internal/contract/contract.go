@@ -33,6 +33,7 @@ type Plan struct {
 	MemoryMb int            `json:"memoryMb"`
 	DiskGb   int            `json:"diskGb"`
 	Desktop  *DesktopConfig `json:"desktop"`
+	GPU      bool           `json:"gpu"`
 }
 
 type Recipe struct {
