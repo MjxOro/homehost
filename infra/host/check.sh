@@ -37,6 +37,16 @@ if command -v incus >/dev/null 2>&1 && incus info >/dev/null 2>&1; then
       incus query "/1.0/images/aliases/$alias" >/dev/null 2>&1 \
         && ok "image $alias" || miss "image $alias missing (bash infra/host/build-images.sh)"
     done
+    # GPU plans: Incus needs the host NVIDIA driver and nvidia-container-cli
+    # (NVIDIA Container Toolkit) for nvidia.runtime.
+    if [ "$(jq '[.plans[] | select(.gpu)] | length' "$contract")" -gt 0 ]; then
+      nvidia-smi -L >/dev/null 2>&1 \
+        && ok "GPU $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null | head -1)" \
+        || miss "no usable NVIDIA GPU on the host (GPU plans fail to launch)"
+      command -v nvidia-container-cli >/dev/null 2>&1 \
+        && ok "nvidia-container-cli $(nvidia-container-cli --version 2>/dev/null | awk 'NR==1 {print $NF}')" \
+        || miss "nvidia-container-cli missing (install nvidia-container-toolkit for GPU plans)"
+    fi
   else
     miss "jq not installed (needed to check baked images)"
   fi
