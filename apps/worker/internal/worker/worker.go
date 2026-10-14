@@ -37,6 +37,9 @@ type Config struct {
 	BaseDomain string
 	// RoutesDir receives per-desktop-VM Traefik route files.
 	RoutesDir string
+	// ExecConcurrency is how many agent operations (machine_execs) run at
+	// once, beside the serial provisioning loop.
+	ExecConcurrency int
 }
 
 // Worker runs jobs one at a time.
@@ -54,6 +57,8 @@ type Worker struct {
 	// wake ends an idle wait early: the job listener pokes it on every
 	// provision_jobs notification.
 	wake chan struct{}
+	// execWake ends an exec loop's idle wait on a machine_execs notification.
+	execWake chan struct{}
 	// probeTCP reports whether host:port accepts a connection.
 	probeTCP func(ctx context.Context, host string, port int) bool
 }
@@ -67,6 +72,7 @@ func New(cfg Config, db *pgxpool.Pool, incus Incus, dns DNS, logger *log.Logger)
 		log:      logger,
 		stop:     make(chan struct{}),
 		wake:     make(chan struct{}, 1),
+		execWake: make(chan struct{}, 1),
 		probeTCP: tcpConnects,
 	}
 }
@@ -117,7 +123,10 @@ func (w *Worker) Run() error {
 	listening := make(chan struct{})
 	go func() {
 		defer close(listening)
-		w.listen(listenCtx)
+		var listeners sync.WaitGroup
+		listeners.Go(func() { w.listen(listenCtx, jobsChannel, w.poke) })
+		listeners.Go(func() { w.listen(listenCtx, execsChannel, w.pokeExec) })
+		listeners.Wait()
 	}()
 	defer func() {
 		stopListening()
@@ -133,6 +142,20 @@ func (w *Worker) Run() error {
 		return err
 	}
 	w.log.Printf("ip_assignments reconcile: inserted %d row(s)", reconciled)
+	restarted, expired, err := w.recoverExecs(ctx)
+	if err != nil {
+		return err
+	}
+	purged, err := w.purgeExecs(ctx)
+	if err != nil {
+		return err
+	}
+	w.log.Printf("machine_execs recovery: %d restarted, %d expired, %d purged", restarted, expired, purged)
+	execs := make(chan struct{})
+	go func() {
+		defer close(execs)
+		w.runExecs(ctx)
+	}()
 	w.log.Printf("worker up (%s): listening + polling provision_jobs", w.cfg.Env)
 	for !w.shuttingDown() {
 		if err := w.tick(ctx); err != nil {
@@ -140,6 +163,7 @@ func (w *Worker) Run() error {
 			w.sleep(w.cfg.PollInterval)
 		}
 	}
+	<-execs
 	w.log.Print("worker down")
 	return nil
 }
