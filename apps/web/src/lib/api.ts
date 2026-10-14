@@ -100,6 +100,10 @@ export const api = {
 
   getPlans: (): Promise<Plan[]> => request("/api/plans"),
 
+  /** Build the server is deploying now (static file, not an API route). */
+  getDeployedVersion: (): Promise<{ version: string }> =>
+    request("/version.json", { cache: "no-store" }),
+
   getDashboard: (): Promise<DashboardResponse> => request("/api/dashboard"),
 
   createRequest: (input: CreateRequestInput): Promise<ServerRequest> =>

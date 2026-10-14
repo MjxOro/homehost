@@ -21,6 +21,7 @@ export const queryKeys = {
   dashboard: ["dashboard"] as const,
   approvals: ["approvals"] as const,
   instances: ["instances"] as const,
+  deployedVersion: ["deployed-version"] as const,
 };
 
 /** Transport-level failure (fetch threw). HTTP 4xx/5xx are NOT network errors. */
@@ -66,6 +67,27 @@ export function useSession() {
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });
+}
+
+const BUILD_SHA = import.meta.env.VITE_BUILD_SHA ?? "";
+
+/**
+ * The newer build the server deploys while this tab still runs an older one,
+ * else null. Checked on focus (at most once a minute) and every five minutes;
+ * dev builds carry no SHA and never check.
+ */
+export function useNewerDeploy(): string | null {
+  const { data } = useQuery({
+    queryKey: queryKeys.deployedVersion,
+    queryFn: api.getDeployedVersion,
+    enabled: BUILD_SHA !== "",
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  const deployed = data?.version;
+  return deployed && deployed !== BUILD_SHA ? deployed : null;
 }
 
 /** Public catalog endpoint — safe to call signed out. */
