@@ -397,4 +397,30 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
     ).json<DashboardResponse>();
     expect(dashboard.usage.servers).toBe(2);
   });
+
+  test("health reports the build and turns 503 while draining", async () => {
+    const live = await app.inject({ url: "/api/health" });
+    expect(live.statusCode).toBe(200);
+    expect(live.json()).toMatchObject({ ok: true, draining: false });
+
+    const previous = process.env.BUILD_SHA;
+    process.env.BUILD_SHA = "abc1234";
+    const drainingApp = buildApp({
+      db: drizzle(client, { schema }),
+      draining: () => true,
+    });
+    if (previous === undefined) delete process.env.BUILD_SHA;
+    else process.env.BUILD_SHA = previous;
+    try {
+      const drained = await drainingApp.inject({ url: "/api/health" });
+      expect(drained.statusCode).toBe(503);
+      expect(drained.json()).toMatchObject({
+        ok: false,
+        version: "abc1234",
+        draining: true,
+      });
+    } finally {
+      await drainingApp.close();
+    }
+  });
 });

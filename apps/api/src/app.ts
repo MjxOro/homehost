@@ -210,6 +210,8 @@ export interface BuildAppOptions {
   agentChat?: AgentChatConfig | null;
   desktopTickets?: ReturnType<typeof createDesktopTickets>;
   desktopFetch?: typeof globalThis.fetch;
+  /** True once shutdown began: /api/health answers 503 so the edge drains this replica. */
+  draining?: () => boolean;
 }
 
 interface Session {
@@ -638,10 +640,16 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
     return sendErr(reply, status, message, "invalid");
   });
 
-  app.get("/api/health", async () => ({
-    ok: true,
-    mode: env.showcase ? "showcase" : "live",
-  }));
+  // Polled every few seconds by Traefik and Docker; request logs stay quiet.
+  app.get("/api/health", { logLevel: "warn" }, async (_req, reply) => {
+    const draining = opts?.draining?.() ?? false;
+    return reply.code(draining ? 503 : 200).send({
+      ok: !draining,
+      mode: env.showcase ? "showcase" : "live",
+      version: env.buildSha,
+      draining,
+    });
+  });
 
   app.get("/api/session", async (req): Promise<SessionResponse> => {
     const session = await resolveSession(req);

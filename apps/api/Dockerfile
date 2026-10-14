@@ -20,4 +20,7 @@ COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages/shared ./packages/shared
 COPY infra/prod/api-entrypoint.sh ./infra/prod/api-entrypoint.sh
 ENV HOST=0.0.0.0 PORT=3000
+# Reported by /api/health so a rolling deploy can see which build answers.
+ARG BUILD_SHA=
+ENV BUILD_SHA=$BUILD_SHA
 ENTRYPOINT ["bash", "infra/prod/api-entrypoint.sh"]
