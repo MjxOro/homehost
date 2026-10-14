@@ -33,6 +33,8 @@
     "worker": "set -a && . ./.env && set +a && go -C apps/worker run .",
     "worker:contract": "bun packages/shared/scripts/worker-contract.ts",
     "test:worker": "go -C apps/worker vet ./... && go -C apps/worker test ./...",
+    "test:cli": "go -C apps/cli vet ./... && go -C apps/cli test ./...",
+    "cli:build": "GOOS=darwin GOARCH=arm64 go -C apps/cli build -o bin/hh-darwin-arm64 . && GOOS=linux GOARCH=amd64 go -C apps/cli build -o bin/hh-linux-amd64 .",
     "test": "bun test packages/shared packages/sites packages/bench",
     "bench": "bun packages/bench/src/cli.ts",
     "bench:provision": "bun scripts/provision-bench.ts",
