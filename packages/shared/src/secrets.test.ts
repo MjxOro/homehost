@@ -12,6 +12,7 @@ describe("secret guard", () => {
       `sk-or-v1-${randomBytes(32).toString("hex")}`,
       `ghp_${random(30)}`,
       `github_pat_${random(60)}`,
+      `hht_${random(32)}`,
       `AKIA${randomBytes(8).toString("hex").toUpperCase()}`,
       `-----BEGIN PRIVATE KEY-----\n${random(60)}\n-----END PRIVATE KEY-----`,
       [
