@@ -86,7 +86,7 @@ removed from worker env + compose + `.env.dev`).
 
 - Worker writes `infra/traefik/routes/gui-<instanceName>.yml` at provision,
   removes it at teardown (missing file after teardown = success).
-- `panel.yml` stays checked in and is never touched by the worker.
+- Hand-written route files (e.g. `banff.yml`) are never touched by the worker.
 - stop/start = no route churn (file stays; stopped VM reads as Traefik 502,
   rows show the existing `running`/`stopped` state honestly — no new
   `RequestStatus`).
@@ -144,7 +144,7 @@ http:
       insecureSkipVerify: true
 ```
 
-Follows the `panel.yml`/`dev.yml` pattern (per-file redirect middleware,
+Follows the `banff.yml` pattern (per-file redirect middleware,
 `letsencrypt` resolver). No edge-network fix needed: guest IPv4 on
 incusbr0 is directly dialable from the Traefik container (verified above).
 

@@ -93,11 +93,3 @@ TAG=<tag> bash infra/prod/rollout.sh
 
 The override resets the Postgres host port, swaps `prod.env` for a scratch
 env file, and points the `edge` network at the rehearsal Traefik's network.
-
-## First rolling deploy (cutover)
-
-`panel.yml` keeps the old file routes at priority 1 so the panel stays on
-the old container until the label routes exist. The first deploy after this
-change recreates Traefik once (`prod:edge`, a few seconds for every edge
-route), then rolls api and web onto label routing. Afterwards delete
-`infra/traefik/routes/panel.yml` in a follow-up change.
