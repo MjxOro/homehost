@@ -158,7 +158,7 @@ async function main(): Promise<void> {
     "-d",
     "homehost",
     "-c",
-    "TRUNCATE provision_jobs, activity_events, server_requests;",
+    "TRUNCATE machine_execs, provision_jobs, activity_events, server_requests;",
   ]);
   console.log(`  database lifecycle tables: ${db.ok ? "truncated" : "FAILED"}`);
   if (!db.ok) throw new Error("database truncate failed");

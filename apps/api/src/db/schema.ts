@@ -1,7 +1,9 @@
 import {
   bigint,
+  boolean,
   char,
   check,
+  customType,
   index,
   inet,
   integer,
@@ -438,5 +440,86 @@ export const agentMessages = pgTable(
       t.dedupeKey,
     ),
     index("agent_messages_request_idx").on(t.requestId),
+  ],
+);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+// Migration 0020: agent bearer tokens. Only the sha256 of the secret is stored.
+export const accessTokens = pgTable(
+  "access_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    tokenHint: text("token_hint").notNull(),
+    scopes: text("scopes").array().notNull(),
+    machineIds: uuid("machine_ids").array(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("access_tokens_user_created_idx").on(t.userId, t.createdAt)],
+);
+
+// Migration 0020: agent operations the host worker runs once through Incus.
+export const machineExecs = pgTable(
+  "machine_execs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => serverRequests.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenId: uuid("token_id").references(() => accessTokens.id, {
+      onDelete: "set null",
+    }),
+    op: text("op").notNull(),
+    command: text("command"),
+    cwd: text("cwd"),
+    path: text("path"),
+    input: bytea("input"),
+    fileMode: integer("file_mode"),
+    maxBytes: integer("max_bytes").notNull(),
+    timeoutMs: integer("timeout_ms").notNull(),
+    status: text("status").notNull().default("queued"),
+    exitCode: integer("exit_code"),
+    timedOut: boolean("timed_out").notNull().default(false),
+    stdout: bytea("stdout"),
+    stderr: bytea("stderr"),
+    stdoutTruncated: boolean("stdout_truncated").notNull().default(false),
+    stderrTruncated: boolean("stderr_truncated").notNull().default(false),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    check(
+      "machine_execs_op_check",
+      sql`${t.op} IN ('command','read_file','write_file')`,
+    ),
+    check(
+      "machine_execs_status_check",
+      sql`${t.status} IN ('queued','running','done','failed')`,
+    ),
+    index("machine_execs_active_idx")
+      .on(t.createdAt)
+      .where(sql`${t.status} IN ('queued','running')`),
+    index("machine_execs_token_active_idx")
+      .on(t.tokenId)
+      .where(sql`${t.status} IN ('queued','running')`),
   ],
 );

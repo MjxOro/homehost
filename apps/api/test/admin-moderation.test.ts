@@ -121,7 +121,7 @@ describe.skipIf(!databaseUrl)("admin user moderation", () => {
 
   afterEach(async () => {
     if (client) {
-      await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests, moderation_actions`;
+      await client`TRUNCATE machine_execs, agent_messages, agent_conversations, provision_jobs, activity_events, server_requests, moderation_actions`;
       if (fixtures.length > 0) {
         await client`DELETE FROM users WHERE id = ANY(${fixtures})`;
         fixtures = [];
