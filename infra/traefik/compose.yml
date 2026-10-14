@@ -12,9 +12,22 @@ services:
       - ../private/traefik.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - socket-proxy
+    depends_on:
+      - socket-proxy
     command:
       - --providers.file.directory=/etc/traefik/routes
       - --providers.file.watch=true
+      # Prod api/web route themselves through container labels, so a rolling
+      # deploy (infra/prod/rollout.sh) adds and drops servers as containers
+      # come and go; Traefik skips containers that are not healthy yet.
+      # Only the prod compose project is ever routed from labels.
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=homehost-edge_default
+      - --providers.docker.constraints=Label(`com.docker.compose.project`,`homehost-prod`)
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
@@ -25,3 +38,22 @@ services:
     volumes:
       - ./routes:/etc/traefik/routes:ro
       - ./letsencrypt:/letsencrypt
+
+  # Read-only Docker API for the label provider: container list/inspect and
+  # events only, so Traefik never holds the raw socket. Every other section
+  # and every write (POST/DELETE) answers 403. Reachable only on the
+  # internal network below.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket-proxy
+
+networks:
+  socket-proxy:
+    internal: true
