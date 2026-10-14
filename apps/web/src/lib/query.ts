@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import type {
   AgentConversation,
+  CreateAccessTokenInput,
   DashboardResponse,
   PortalUser,
   ServerRequest,
@@ -22,6 +23,7 @@ export const queryKeys = {
   approvals: ["approvals"] as const,
   instances: ["instances"] as const,
   deployedVersion: ["deployed-version"] as const,
+  accessTokens: ["access-tokens"] as const,
 };
 
 /** Transport-level failure (fetch threw). HTTP 4xx/5xx are NOT network errors. */
@@ -58,6 +60,7 @@ async function clearTenantData(queryClient: QueryClient) {
   queryClient.removeQueries({ queryKey: queryKeys.approvals });
   queryClient.removeQueries({ queryKey: queryKeys.conversations });
   queryClient.removeQueries({ queryKey: queryKeys.conversation });
+  queryClient.removeQueries({ queryKey: queryKeys.accessTokens });
 }
 
 export function useSession() {
@@ -125,6 +128,40 @@ export function useApprovals(user: PortalUser | null | undefined) {
     queryFn: api.getApprovals,
     enabled: isOperator,
     refetchInterval: isOperator ? 15_000 : false,
+  });
+}
+
+/** The signed-in user's agent access tokens, keyed by user id. */
+export function useAccessTokens(userId: string | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.accessTokens, userId ?? "none"],
+    queryFn: api.listAccessTokens,
+    enabled: typeof userId === "string" && userId.length > 0,
+  });
+}
+
+/**
+ * Mints a token. The secret comes back only in the mutation result, which the
+ * page holds in local state and drops on dismiss; it is never written to the
+ * query cache. Success refreshes the list only.
+ */
+export function useCreateAccessToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateAccessTokenInput) => api.createAccessToken(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.accessTokens });
+    },
+  });
+}
+
+export function useRevokeAccessToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.revokeAccessToken(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.accessTokens });
+    },
   });
 }
 

@@ -6,6 +6,7 @@ import {
   DashboardIcon,
   InboxIcon,
   InfoIcon,
+  LockIcon,
   LogoutIcon,
   PlusIcon,
   ServerIcon,
@@ -149,6 +150,16 @@ function SidebarNav({
       >
         <SparklesIcon className="size-[18px] shrink-0" />
         <span>Agent</span>
+      </Link>
+      <Link
+        to="/tokens"
+        className={
+          pathname.startsWith("/tokens") ? NAV_ITEM_ACTIVE : NAV_ITEM_IDLE
+        }
+        onClick={onNavigate}
+      >
+        <LockIcon className="size-[18px] shrink-0" />
+        <span>Agent access</span>
       </Link>
       <Link
         to="/new"
