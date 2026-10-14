@@ -8,8 +8,8 @@ Compose stacks, host prep scripts and systemd units for dev, prod and the edge. 
 infra/
 ├── compose.yml        # legacy host-dev Postgres (127.0.0.1:55432) for `db:up`
 ├── dev/               # containerized dev stack: pg :55433, api :3001, web :5174, worker (Go image, host network)
-├── prod/              # prod stack: pg 127.0.0.1:55434, homehost-api/web images tagged by git sha, web 127.0.0.1:5180
-├── traefik/           # edge: :80/:443, DNS-01 ACME, file routes in routes/
+├── prod/              # prod stack: pg 127.0.0.1:55434, homehost-api/web images tagged by git sha, routed by Traefik labels; rollout.sh
+├── traefik/           # edge: :80/:443, DNS-01 ACME, file routes in routes/, label routes via a read-only socket proxy
 ├── host/              # Incus + ZFS host setup, readiness probe, bridge-net unit/timer, baked image build + weekly timer
 ├── worker/            # homehost-worker.service (prod worker binary, host systemd) + restart.sh (build, sync unit, restart)
 └── private/           # gitignored secrets: prod.env, worker.env, traefik.env
@@ -23,9 +23,9 @@ infra/
 | Baked plan images | `host/build-images.sh`, `host/homehost-images.{service,timer}` | aliases in `default`; `host:check`/`dev:check` report missing ones |
 | Tenant bridge networking | `host/homehost-brnet.{sh,service,timer}` | re-applied periodically |
 | Host procedures | `host/README.md` | DNS records, CF token, worker drop-in, FORWARD rules |
-| Prod deploy | `prod/compose.yml`, `prod/api-entrypoint.sh` | `bun run prod:deploy` (pull, build with `TAG`, up) |
+| Prod deploy | `prod/compose.yml`, `prod/rollout.sh`, `prod/api-entrypoint.sh` | `bun run prod:deploy` (pull, build with `TAG`, edge up, rolling update); see `docs/deploy.md` |
 | Dev stack | `dev/compose.yml`, `dev/api-entrypoint.sh`, `dev/check.sh` | `bun run dev:check` |
-| Edge routes | `traefik/routes/panel.yml` | HTTP only (no TCP routes, per V6-only policy) |
+| Edge routes | `prod/compose.yml` labels (panel), `traefik/routes/` (desktops, other sites) | HTTP only (no TCP routes, per V6-only policy); label routes only for compose project `homehost-prod` |
 
 ## GOTCHAS
 - The worker unit runs a binary built from the checkout, not an image; `prod:deploy` ends with `bun run prod:worker` (`worker/restart.sh`) to build it, install the unit if it changed, restart, and confirm `worker up`. Keep that step if you touch the deploy chain; the runner needs `go` on its PATH.
@@ -36,6 +36,7 @@ infra/
 - Tenant bridges have no IPv6 route for egress: guest installs force IPv4 (`Acquire::ForceIPv4`) in cloud-init.
 - Dev worker uses `network_mode: host` because Docker bridge has no IPv6 for readiness checks.
 - Dev web binds `${DEV_BIND_IP:-127.0.0.1}`; never publish dev on a public name.
+- Prod api/web run two replicas during every deploy: no `container_name`, no host `ports:`, and migrations must keep the previous release working (`docs/deploy.md`).
 
 ## ANTI-PATTERNS
 - Adding secrets to any tracked compose/unit file; use `infra/private/*.env`.
