@@ -38,8 +38,8 @@ list `<IPV6_PREFIX>::ffff/64`.
 
 Panel edge: Traefik serves the panel hostname with Let's Encrypt DNS-01
 (`CF_DNS_API_TOKEN`, `ACME_EMAIL` in `infra/private/traefik.env`, never
-committed; see `infra/traefik/compose.yml`). `infra/traefik/routes/panel.yml`
-is the only hand-checked route file. The worker never writes
+committed; see `infra/traefik/compose.yml`). The panel routes from labels on
+the prod api/web containers (`infra/prod/compose.yml`). The worker never writes
 per-server SSH route files: boxes are reached directly over IPv6, never
 proxied through Traefik. Desktop GUI VMs are the single exception (see
 below): the worker owns per-desktop `gui-<instanceName>.yml` files only.
@@ -100,8 +100,7 @@ SSH stays direct-v6 (above). Desktop hostnames resolve via wildcard DNS
 (`*.dev.<base>` + `*.homehost.risktozero.sh` A/AAAA at the edge host — no
 per-VM desktop record). Traefik serves each `<label>-vnc.<base>` with the
 same LE wildcard DNS-01 cert (flat names stay one level).
-`infra/traefik/routes/panel.yml` stays checked in; the worker owns
-per-desktop `infra/traefik/routes/gui-<instanceName>.yml` (written at
+The worker owns per-desktop `infra/traefik/routes/gui-<instanceName>.yml` (written at
 provision, removed at teardown; dev VMs mint `dev-req-*` instances so
 their files/routers are `gui-dev-req-*`). Traefik proxies to KasmVNC over
 HTTPS with `insecureSkipVerify` (KasmVNC self-signed backend cert).

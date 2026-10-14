@@ -28,7 +28,8 @@ infra/
 | Edge routes | `prod/compose.yml` labels (panel), `traefik/routes/` (desktops, other sites) | HTTP only (no TCP routes, per V6-only policy); label routes only for compose project `homehost-prod` |
 
 ## GOTCHAS
-- The worker unit runs a binary built from the checkout, not an image; `prod:deploy` ends with `bun run prod:worker` (`worker/restart.sh`) to build it, install the unit if it changed, restart, and confirm `worker up`. Keep that step if you touch the deploy chain; the runner needs `go` on its PATH.
+- `prod:deploy` only pulls, then runs `prod:release`: a fresh `bun run` that reads the pulled `package.json`. Deploy steps belong in `prod:release`; anything added to `prod:deploy` itself runs one deploy late.
+- The worker unit runs a binary built from the checkout, not an image; `prod:release` ends with `bun run prod:worker` (`worker/restart.sh`) to build it, install the unit if it changed, restart, and confirm `worker up`. Keep that step if you touch the deploy chain; the runner needs `go` on its PATH.
 - Worker prod env comes from `infra/private/worker.env` via drop-in `/etc/systemd/system/homehost-worker.service.d/env.conf`; the repo `.env` is the host dev loop and must never point at prod.
 - DB ports: 55432 = retired showcase/host-dev, 55433 = dev, 55434 = prod. Everything binds 127.0.0.1.
 - Docker sets FORWARD policy DROP, killing tenant egress; `iptables -I FORWARD -i/-o incusbr0 -j ACCEPT` + `netfilter-persistent save` after Docker restarts.

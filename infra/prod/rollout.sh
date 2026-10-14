@@ -25,7 +25,7 @@ health_timeout=${ROLLOUT_HEALTH_TIMEOUT:-180}
 route_timeout=${ROLLOUT_ROUTE_TIMEOUT:-60}
 drain_seconds=${ROLLOUT_DRAIN_SECONDS:-5}
 
-log() { printf 'rollout: %s\n' "$*"; }
+log() { printf 'rollout: %s %s\n' "$(date -u +%T.%3N)" "$*"; }
 
 # Both answer {"version":"<build>",...} from the container that served them.
 probe_path() {

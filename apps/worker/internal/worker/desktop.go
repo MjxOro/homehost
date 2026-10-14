@@ -215,7 +215,7 @@ func desktopRouteFileName(instanceName string) string {
 	return "gui-" + instanceName + ".yml"
 }
 
-// buildDesktopRouteYaml mirrors the panel.yml pattern: a websecure router
+// buildDesktopRouteYaml mirrors the hand-written route files (banff.yml): a websecure router
 // with the LE wildcard cert plus a web router redirecting to https; the
 // backend is https to the guest's self-signed KasmVNC, so the transport
 // skips verify. Quoted verbatim in docs/desktop-gui.md.
