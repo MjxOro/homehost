@@ -3,15 +3,18 @@
 Every merge to `main` runs `bun run prod:deploy` on the prod box
 (`.github/workflows/deploy.yml`, self-hosted runner, one deploy at a time):
 
-1. `git pull --ff-only`, `bun install`
-2. `prod:build` — `homehost-api:<sha>` and `homehost-web:<sha>`, with the
+1. `git pull --ff-only`, then `bun run prod:release` for the rest. That is a
+   fresh `bun run`, so it reads the `package.json` just pulled and a change
+   to steps 2-6 applies to the same deploy
+2. `bun install`
+3. `prod:build` — `homehost-api:<sha>` and `homehost-web:<sha>`, with the
    short SHA baked in as `BUILD_SHA`
-3. `prod:edge` — `docker compose up -d` for the edge Traefik and its socket
+4. `prod:edge` — `docker compose up -d` for the edge Traefik and its socket
    proxy; a no-op unless `infra/traefik/compose.yml` changed
-4. `prod:rollout` — `infra/prod/rollout.sh`, below
-5. `prod:worker` — rebuild and restart the host worker (`infra/worker/restart.sh`)
+5. `prod:rollout` — `infra/prod/rollout.sh`, below
+6. `prod:worker` — rebuild and restart the host worker (`infra/worker/restart.sh`)
 
-The panel stays up through step 4. The worker restart in step 5 pauses
+The panel stays up through step 5. The worker restart in step 6 pauses
 provisioning for a few seconds; leased jobs resume.
 
 ## Rolling update
