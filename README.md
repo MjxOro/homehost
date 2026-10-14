@@ -72,7 +72,7 @@ Three stacks, three port sets, no overlap:
 
 | Stack | Postgres | API | Web | Command |
 |---|---|---|---|---|
-| Prod (live traffic) | internal only | internal `:3000` | `127.0.0.1:5180` | `bun run prod:up` |
+| Prod (live traffic) | internal only | internal `:3000` | via Traefik only | `bun run prod:deploy` |
 | Dev (containers) | `127.0.0.1:55433` | `127.0.0.1:3001` | `127.0.0.1:5174` | `bun run dev:up` |
 | Host (legacy manual) | `127.0.0.1:55432` | `127.0.0.1:3000` | `127.0.0.1:5173` | `bun run dev` |
 
@@ -92,9 +92,9 @@ bun run dev:check
 `READY` means the stack should boot; `MISS` lines say exactly what to fix
 (`dev:reset` only wipes the dev database, never host state).
 
-Prod: built images tagged by git SHA (`TAG=$(git rev-parse --short HEAD)`). Secrets live in `infra/private/prod.env` (gitignored): `GITHUB_CLIENT_ID/SECRET`, `OPERATOR_EMAILS`, `APP_ORIGIN=https://homehost.risktozero.sh`, `BASE_DOMAIN=homehost.risktozero.sh`, `IPV6_PREFIX`. `bun run prod:build && bun run prod:up` (`--wait` on the api healthcheck, so a bad image fails loud instead of 502ing). Caddy serves the static web app and reverse-proxies `/api` to the api container, so cookies stay first-party. Cutover: point `infra/traefik/routes/panel.yml` at `http://host.docker.internal:5180`.
+Prod: built images tagged by git SHA (`TAG=$(git rev-parse --short HEAD)`). Secrets live in `infra/private/prod.env` (gitignored): `GITHUB_CLIENT_ID/SECRET`, `OPERATOR_EMAILS`, `APP_ORIGIN=https://homehost.risktozero.sh`, `BASE_DOMAIN=homehost.risktozero.sh`, `IPV6_PREFIX`. `bun run prod:build && bun run prod:up` cold-starts the stack; `bun run prod:deploy` rolls a running one with no downtime (`docs/deploy.md`). Traefik routes `/api/*` to the api replicas and everything else to the Caddy web container from container labels, so the browser sees one origin and cookies stay first-party.
 
-The dev stack is LAN-only staging: it provisions real boxes and showcase mode lets anyone pick the operator persona, so its ports bind to loopback (or the LAN address via `DEV_BIND_IP`) and it has no public hostname. CI (`.github/workflows/ci.yml`) runs on every push: typecheck, shared tests, integration tests against a Postgres service, web build, both image builds. CD (`deploy.yml`) runs `bun run prod:deploy` (checkout main → pull → build → migrate → up) on push to `main`, and needs one self-hosted runner on the prod host:
+The dev stack is LAN-only staging: it provisions real boxes and showcase mode lets anyone pick the operator persona, so its ports bind to loopback (or the LAN address via `DEV_BIND_IP`) and it has no public hostname. CI (`.github/workflows/ci.yml`) runs on every push: typecheck, shared tests, integration tests against a Postgres service, web build, both image builds. CD (`deploy.yml`) runs `bun run prod:deploy` (checkout main → pull → build → edge up → rolling update → worker) on push to `main`, and needs one self-hosted runner on the prod host:
 
 ```bash
 # on the prod host, as the deploy user, in /opt/homehost-runner

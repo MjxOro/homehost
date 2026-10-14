@@ -1,16 +1,25 @@
-# Same-origin static + /api reverse proxy. Traefik points at :80; the browser
-# never talks to the api container directly, so session cookies stay first-party.
+# Static SPA only. Traefik routes /api/* straight to the health-checked api
+# containers (labels in infra/prod/compose.yml), so the browser still sees one
+# origin and session cookies stay first-party. Prod image only.
 :80 {
-	# Panel only: tenant subdomains may serve plain HTTP. Prod image only.
+	# Panel only: tenant subdomains may serve plain HTTP.
 	header Strict-Transport-Security "max-age=31536000"
-	handle /api/* {
-		reverse_proxy homehost-prod-api-1:3000
+	# Traefik's health check. infra/prod/rollout.sh creates /tmp/draining
+	# before stopping this replica, so Traefik drops it while it still serves;
+	# a replica that is already gone would stall requests until the dial fails.
+	handle /healthz {
+		@draining file {
+			root /tmp
+			try_files /draining
+		}
+		respond @draining 503
+		respond 200
 	}
 	handle {
 		root * /srv
 		# Vite fingerprints /assets/*, so they never change under a name. Every
-		# other path (index.html via the SPA fallback) must revalidate, or a
-		# browser keeps running the previous deploy's bundle.
+		# other path (index.html via the SPA fallback, version.json) must
+		# revalidate, or a browser keeps running the previous deploy's bundle.
 		@hashed path /assets/*
 		header @hashed Cache-Control "public, max-age=31536000, immutable"
 		@unhashed not path /assets/*

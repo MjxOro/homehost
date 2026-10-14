@@ -2,8 +2,12 @@ name: homehost-prod
 
 # Production stack: built images, no mounts, no published db port.
 # Secrets in infra/private/prod.env (gitignored, never committed).
-#   bun run prod:build && bun run prod:up
-# Traefik cutover: point infra/traefik/routes/panel.yml at 127.0.0.1:5180.
+#   bun run prod:build && bun run prod:up      (cold start)
+#   bun run prod:deploy                         (rolling update, see docs/deploy.md)
+# The edge Traefik routes the panel from the labels on api and web: /api/* to
+# the api containers, everything else to web. Both are health-checked, so
+# infra/prod/rollout.sh can run old and new side by side; never pin a
+# container_name or publish a host port on them, or two replicas collide.
 # Worker env note: prod provisioning stays on the host systemd worker
 # (WORKER_ENV=prod, empty WORKER_BASE_DOMAIN = no filtering); do NOT add a
 # prod worker service here.
@@ -33,10 +37,15 @@ services:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
+      args:
+        BUILD_SHA: ${TAG:-}
     image: homehost-api:${TAG:-latest}
     environment:
       DATABASE_URL: postgres://homehost:homehost@postgres:5432/homehost
       SHOWCASE_MODE: "false"
+      # On SIGTERM /api/health turns 503 so Traefik drops this replica, and
+      # requests keep being served this long before the server closes.
+      SHUTDOWN_DRAIN_MS: "5000"
     env_file:
       - path: ../private/prod.env
         required: true
@@ -48,21 +57,70 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+      start_period: 120s
+      start_interval: 1s
+    stop_grace_period: 30s
+    networks:
+      - default
+      - edge
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.panel-api.rule: Host(`homehost.risktozero.sh`) && PathPrefix(`/api/`)
+      traefik.http.routers.panel-api.entrypoints: websecure
+      traefik.http.routers.panel-api.tls.certresolver: letsencrypt
+      traefik.http.routers.panel-api.service: panel-api
+      # Capability paths are credentials. API logs redact them separately.
+      traefik.http.routers.panel-desktop.rule: Host(`homehost.risktozero.sh`) && PathPrefix(`/api/desktop/t/`)
+      traefik.http.routers.panel-desktop.entrypoints: websecure
+      traefik.http.routers.panel-desktop.tls.certresolver: letsencrypt
+      traefik.http.routers.panel-desktop.service: panel-api
+      traefik.http.routers.panel-desktop.observability.accesslogs: "false"
+      traefik.http.services.panel-api.loadbalancer.server.port: "3000"
+      traefik.http.services.panel-api.loadbalancer.healthcheck.path: /api/health
+      traefik.http.services.panel-api.loadbalancer.healthcheck.interval: 2s
+      traefik.http.services.panel-api.loadbalancer.healthcheck.timeout: 1s
     restart: unless-stopped
 
   web:
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
+      args:
+        BUILD_SHA: ${TAG:-}
     image: homehost-web:${TAG:-latest}
-    ports:
-      - "127.0.0.1:5180:80"
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
     networks:
       - default
       - edge
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.panel.rule: Host(`homehost.risktozero.sh`)
+      traefik.http.routers.panel.entrypoints: websecure
+      traefik.http.routers.panel.tls.certresolver: letsencrypt
+      traefik.http.routers.panel.service: panel-web
+      # Static GETs only, so retrying a replica that just stopped is safe.
+      traefik.http.routers.panel.middlewares: panel-retry
+      traefik.http.routers.panel-http.rule: Host(`homehost.risktozero.sh`)
+      traefik.http.routers.panel-http.entrypoints: web
+      traefik.http.routers.panel-http.service: panel-web
+      traefik.http.routers.panel-http.middlewares: panel-https
+      traefik.http.middlewares.panel-https.redirectscheme.scheme: https
+      traefik.http.middlewares.panel-https.redirectscheme.permanent: "true"
+      traefik.http.middlewares.panel-retry.retry.attempts: "3"
+      traefik.http.middlewares.panel-retry.retry.initialinterval: 100ms
+      traefik.http.services.panel-web.loadbalancer.server.port: "80"
+      traefik.http.services.panel-web.loadbalancer.healthcheck.path: /healthz
+      traefik.http.services.panel-web.loadbalancer.healthcheck.interval: 2s
+      traefik.http.services.panel-web.loadbalancer.healthcheck.timeout: 1s
     restart: unless-stopped
 
 networks:

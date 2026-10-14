@@ -67,6 +67,13 @@ export interface ApiEnv {
   agentChatDailyTurns: number;
   /** Persistent HMAC signing key; ephemeral only in showcase development. */
   desktopTicketSecret: string;
+  /** Commit this build came from (prod images); null in dev. */
+  buildSha: string | null;
+  /**
+   * How long a SIGTERM'd server keeps serving while /api/health reports
+   * draining, so the edge stops routing here first. 0 (dev) closes at once.
+   */
+  shutdownDrainMs: number;
 }
 
 function httpOrigin(raw: string, name: string): string {
@@ -138,7 +145,16 @@ export function getEnv(): ApiEnv {
     throw new Error("DESKTOP_TICKET_SECRET must be at least 32 characters");
   if (!showcase && !desktopTicketSecret)
     throw new Error("DESKTOP_TICKET_SECRET is required in live mode");
+  const shutdownDrainMs = Number(process.env.SHUTDOWN_DRAIN_MS ?? 0);
+  if (
+    !Number.isInteger(shutdownDrainMs) ||
+    shutdownDrainMs < 0 ||
+    shutdownDrainMs > 60_000
+  )
+    throw new Error("SHUTDOWN_DRAIN_MS must be an integer from 0 to 60000");
   return {
+    buildSha: process.env.BUILD_SHA || null,
+    shutdownDrainMs,
     desktopTicketSecret: desktopTicketSecret ?? devDesktopTicketSecret,
     databaseUrl,
     baseDomain: process.env.BASE_DOMAIN ?? "lab.example.test",

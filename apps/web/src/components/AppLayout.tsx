@@ -18,6 +18,7 @@ import {
 import { useScrollLock } from "../lib/useScrollLock";
 import { PersonaMenu } from "./PersonaMenu";
 import { BUTTON_GHOST_SM, ErrorState, PageLoading } from "./primitives";
+import { UpdateBanner } from "./UpdateBanner";
 
 const NAV_ITEM_BASE =
   "flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-[14.5px] font-medium no-underline transition-colors duration-(--duration-fast) ease-out-quint hover:bg-ink-2";
@@ -387,6 +388,7 @@ export function AppLayout() {
             <PersonaMenu />
           </div>
         </header>
+        <UpdateBanner />
         {live ? null : (
           <div className="flex items-start gap-2.5 border-b border-accent-line bg-accent-dim px-[clamp(16px,4vw,44px)] py-2.5 text-[13.5px] text-text-2">
             <InfoIcon className="mt-px size-[18px] shrink-0 text-accent" />
