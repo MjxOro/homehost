@@ -41,7 +41,7 @@ func loadConfig(path string) (config, error) {
 	}
 	var c config
 	if err := json.Unmarshal(raw, &c); err != nil {
-		return config{}, failure("config", "config file is not valid JSON; run hh logout")
+		return config{}, failure("config", "config file is not valid JSON; run homehost logout")
 	}
 	return c, nil
 }
@@ -100,7 +100,7 @@ func (a *app) credentials() (string, string, error) {
 		return "", "", err
 	}
 	if c.URL == "" || c.Token == "" {
-		return "", "", failure("not_logged_in", "not logged in; run hh login")
+		return "", "", failure("not_logged_in", "not logged in; run homehost login")
 	}
 	base, err := normalizeURL(c.URL)
 	if err != nil {

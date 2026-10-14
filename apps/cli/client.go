@@ -80,7 +80,7 @@ type client struct {
 }
 
 func (a *app) newClient(base, token string) *client {
-	return &client{base: base, token: token, ua: "hh/" + a.version}
+	return &client{base: base, token: token, ua: "homehost/" + a.version}
 }
 
 func (a *app) apiClient() (*client, error) {

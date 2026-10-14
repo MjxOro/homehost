@@ -93,7 +93,7 @@ func TestMachinesTable(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer "+tok {
 			t.Errorf("authorization header = %q", got)
 		}
-		if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "hh/") {
+		if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "homehost/") {
 			t.Errorf("user agent = %q", got)
 		}
 		respond(w, http.StatusOK, `{"machines":[{"id":"1","name":"web-1","kind":"container","planId":"p","status":"running","hostname":"web-1.h.example","capabilities":["exec"]}]}`)
@@ -123,7 +123,7 @@ func TestExecPropagatesExitCodes(t *testing.T) {
 		{"success", 200, `{"exitCode":0,"timedOut":false,"stdout":"out\n","stderr":""}`, 0, "out\n", ""},
 		{"remote exit 3", 200, `{"exitCode":3,"timedOut":false,"stdout":"","stderr":"boom\n"}`, 3, "", "boom\n"},
 		{"timeout", 200, `{"exitCode":null,"timedOut":true,"stdout":"","stderr":""}`, 124, "", ""},
-		{"api error", 409, `{"error":"machine is not running","code":"machine_not_running"}`, 1, "", "hh: machine is not running (machine_not_running)\n"},
+		{"api error", 409, `{"error":"machine is not running","code":"machine_not_running"}`, 1, "", "homehost: machine is not running (machine_not_running)\n"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestAPIErrorsSurfaceCode(t *testing.T) {
 	if code := h.run("status", "ghost"); code != 1 {
 		t.Errorf("exit = %d, want 1", code)
 	}
-	if got := h.stderr.String(); got != "hh: no such machine (not_found)\n" {
+	if got := h.stderr.String(); got != "homehost: no such machine (not_found)\n" {
 		t.Errorf("stderr = %q", got)
 	}
 }

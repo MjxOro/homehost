@@ -25,7 +25,7 @@ const (
 )
 
 func (a *app) flagSet(name string) *flag.FlagSet {
-	fl := flag.NewFlagSet("hh "+name, flag.ContinueOnError)
+	fl := flag.NewFlagSet("homehost "+name, flag.ContinueOnError)
 	fl.SetOutput(a.stderr)
 	return fl
 }
@@ -106,7 +106,7 @@ func (a *app) cmdLogout(args []string) (int, error) {
 	if err := parseFlags(fl, args); err != nil {
 		return 0, err
 	}
-	if err := checkArgs(fl, 0, "hh logout"); err != nil {
+	if err := checkArgs(fl, 0, "homehost logout"); err != nil {
 		return 0, err
 	}
 	err := os.Remove(a.configPath)
@@ -126,7 +126,7 @@ func (a *app) cmdMachines(args []string) (int, error) {
 	if err := parseFlags(fl, args); err != nil {
 		return 0, err
 	}
-	if err := checkArgs(fl, 0, "hh machines"); err != nil {
+	if err := checkArgs(fl, 0, "homehost machines"); err != nil {
 		return 0, err
 	}
 	cl, err := a.apiClient()
@@ -150,7 +150,7 @@ func (a *app) cmdStatus(args []string) (int, error) {
 	if err := parseFlags(fl, args); err != nil {
 		return 0, err
 	}
-	if err := checkArgs(fl, 1, "hh status <machine>"); err != nil {
+	if err := checkArgs(fl, 1, "homehost status <machine>"); err != nil {
 		return 0, err
 	}
 	cl, err := a.apiClient()
@@ -174,7 +174,7 @@ func (a *app) cmdExec(args []string) (int, error) {
 		return 0, err
 	}
 	rest := fl.Args()
-	const usage = "hh exec [--cwd DIR] [--timeout SEC] <machine> -- <command...>"
+	const usage = "homehost exec [--cwd DIR] [--timeout SEC] <machine> -- <command...>"
 	if len(rest) < 3 || rest[1] != "--" {
 		return 0, usageErr("usage: " + usage)
 	}
@@ -197,10 +197,10 @@ func (a *app) cmdExec(args []string) (int, error) {
 		return 0, err
 	}
 	if res.StdoutTruncated {
-		fmt.Fprintln(a.stderr, "hh: warning: stdout truncated by the server")
+		fmt.Fprintln(a.stderr, "homehost: warning: stdout truncated by the server")
 	}
 	if res.StderrTruncated {
-		fmt.Fprintln(a.stderr, "hh: warning: stderr truncated by the server")
+		fmt.Fprintln(a.stderr, "homehost: warning: stderr truncated by the server")
 	}
 	switch {
 	case res.TimedOut:
@@ -217,7 +217,7 @@ func (a *app) cmdCat(args []string) (int, error) {
 	if err := parseFlags(fl, args); err != nil {
 		return 0, err
 	}
-	if err := checkArgs(fl, 2, "hh cat <machine> <path>"); err != nil {
+	if err := checkArgs(fl, 2, "homehost cat <machine> <path>"); err != nil {
 		return 0, err
 	}
 	cl, err := a.apiClient()
@@ -236,7 +236,7 @@ func (a *app) cmdCat(args []string) (int, error) {
 		return 0, err
 	}
 	if res.Truncated {
-		fmt.Fprintf(a.stderr, "hh: warning: %s truncated at %d bytes\n", res.Path, fileMaxBytes)
+		fmt.Fprintf(a.stderr, "homehost: warning: %s truncated at %d bytes\n", res.Path, fileMaxBytes)
 	}
 	return 0, nil
 }
@@ -262,7 +262,7 @@ func (a *app) cmdPut(args []string) (int, error) {
 	if err := parseFlags(fl, args); err != nil {
 		return 0, err
 	}
-	if err := checkArgs(fl, 3, "hh put [--mode 0644] <machine> <local-file|-> <path>"); err != nil {
+	if err := checkArgs(fl, 3, "homehost put [--mode 0644] <machine> <local-file|-> <path>"); err != nil {
 		return 0, err
 	}
 	perm, err := strconv.ParseUint(*mode, 8, 32)
@@ -316,7 +316,7 @@ func (a *app) cmdPower(action string, args []string) (int, error) {
 	if err := parseFlags(fl, args); err != nil {
 		return 0, err
 	}
-	if err := checkArgs(fl, 1, "hh "+action+" <machine>"); err != nil {
+	if err := checkArgs(fl, 1, "homehost "+action+" <machine>"); err != nil {
 		return 0, err
 	}
 	cl, err := a.apiClient()
@@ -348,7 +348,7 @@ func (a *app) cmdMCPConfig(args []string) (int, error) {
 	if err := parseFlags(fl, args); err != nil {
 		return 0, err
 	}
-	if err := checkArgs(fl, 0, "hh mcp-config"); err != nil {
+	if err := checkArgs(fl, 0, "homehost mcp-config"); err != nil {
 		return 0, err
 	}
 	c, err := a.settings()
@@ -356,7 +356,7 @@ func (a *app) cmdMCPConfig(args []string) (int, error) {
 		return 0, err
 	}
 	if c.URL == "" {
-		return 0, failure("not_configured", "no panel URL; run hh login --url https://<panel>")
+		return 0, failure("not_configured", "no panel URL; run homehost login --url https://<panel>")
 	}
 	base, err := normalizeURL(c.URL)
 	if err != nil {

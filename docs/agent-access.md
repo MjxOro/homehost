@@ -4,7 +4,7 @@ Agents (Claude Code, Codex, scripts) work on a user's homehost machines
 without a GUI. The same token unlocks three entry points:
 
 - the remote **MCP server** at `POST /api/mcp`,
-- the **`hh` CLI** (`apps/cli`, a static Go binary),
+- the **`homehost` CLI** (`apps/cli`, a static Go binary),
 - the token **REST API** under `/api/machines`, which both of them use.
 
 Commands run through the host worker and the Incus API (`incus exec` and
@@ -155,24 +155,24 @@ claude mcp add --transport http homehost https://<panel>/api/mcp \
   --header "Authorization: Bearer $HOMEHOST_TOKEN"
 ```
 
-## `hh` CLI
+## `homehost` CLI
 
 `apps/cli` is a stdlib-only Go module. Build it with `bun run cli:build`,
-which produces `apps/cli/bin/hh-darwin-arm64` and `hh-linux-amd64`.
+which produces `apps/cli/bin/homehost-darwin-arm64` and `homehost-linux-amd64`.
 
 ```text
-hh login [--url https://<panel>]     # reads the token from stdin, checks it, saves ~/.config/homehost/cli.json (0600)
-hh logout
-hh machines                          # table: name, kind, status, hostname
-hh status <machine>
-hh exec [--cwd DIR] [--timeout SEC] <machine> -- <command...>
-hh cat <machine> <path>              # file bytes to stdout
-hh put [--mode 0644] <machine> <local-file|-> <path>
-hh start|stop <machine>
-hh mcp-config                        # prints the MCP client snippet for this URL
+homehost login [--url https://<panel>]     # reads the token from stdin, checks it, saves ~/.config/homehost/cli.json (0600)
+homehost logout
+homehost machines                          # table: name, kind, status, hostname
+homehost status <machine>
+homehost exec [--cwd DIR] [--timeout SEC] <machine> -- <command...>
+homehost cat <machine> <path>              # file bytes to stdout
+homehost put [--mode 0644] <machine> <local-file|-> <path>
+homehost start|stop <machine>
+homehost mcp-config                        # prints the MCP client snippet for this URL
 ```
 
-`HOMEHOST_URL` and `HOMEHOST_TOKEN` override the saved config. `hh exec`
+`HOMEHOST_URL` and `HOMEHOST_TOKEN` override the saved config. `homehost exec`
 prints stdout and stderr to the matching streams and exits with the remote
 exit code (`124` on timeout, `1` on API errors).
 
@@ -180,4 +180,4 @@ exit code (`124` on timeout, `1` on API errors).
 
 An emulator will be one more `MachineKind`, with extra capabilities such as
 `screen`/`input`, watched through the existing desktop-ticket VNC proxy.
-The token model, the exec pipeline, MCP and `hh` stay as they are.
+The token model, the exec pipeline, MCP and `homehost` stay as they are.

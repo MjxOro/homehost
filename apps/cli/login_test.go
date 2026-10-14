@@ -45,7 +45,7 @@ func TestLoginVerifiesAndSavesToken(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer "+tok {
 			t.Errorf("authorization header = %q", got)
 		}
-		if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "hh/") {
+		if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "homehost/") {
 			t.Errorf("user agent = %q", got)
 		}
 		respond(w, http.StatusOK, `{"machines":[]}`)

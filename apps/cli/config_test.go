@@ -104,7 +104,7 @@ func TestSettingsPrecedence(t *testing.T) {
 
 func TestCredentialsRequireLogin(t *testing.T) {
 	a := &app{configPath: filepath.Join(t.TempDir(), "missing.json"), getenv: envFunc(nil)}
-	if _, _, err := a.credentials(); err == nil || err.Error() != "not logged in; run hh login" {
+	if _, _, err := a.credentials(); err == nil || err.Error() != "not logged in; run homehost login" {
 		t.Errorf("err = %v, want not-logged-in", err)
 	}
 }
