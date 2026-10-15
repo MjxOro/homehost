@@ -22,7 +22,7 @@ func TestQueuedJobInsertWakesIdleWorker(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		w.listen(ctx)
+		w.listen(ctx, jobsChannel, w.poke)
 	}()
 	t.Cleanup(func() {
 		cancel()

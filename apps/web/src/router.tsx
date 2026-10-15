@@ -12,6 +12,7 @@ import { DesktopLoginPage } from "./routes/desktop-login";
 import { NewRequestPage } from "./routes/new-request";
 import { NotFoundPage } from "./routes/not-found";
 import { ServerProgressPage } from "./routes/server-progress";
+import { TokensPage } from "./routes/tokens";
 const rootRoute = createRootRoute({
   component: AppLayout,
   notFoundComponent: NotFoundPage,
@@ -60,6 +61,11 @@ const chatRoute = createRoute({
   path: "/chat/$id",
   component: AgentChatPage,
 });
+const tokensRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tokens",
+  component: TokensPage,
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   agentRoute,
@@ -69,6 +75,7 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   desktopRoute,
   serverProgressRoute,
+  tokensRoute,
 ]);
 
 export const router = createRouter({

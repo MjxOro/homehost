@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net/http"
 	"slices"
@@ -297,18 +298,21 @@ func (c *Client) SetPower(ctx context.Context, project, name, action string) err
 	return classify(err, "incus %s %s", action, name)
 }
 
-// tailBuffer keeps the last outputTail bytes written by stdout and stderr.
+// tailBuffer keeps the last limit bytes written to it.
 type tailBuffer struct {
-	mu  sync.Mutex
-	buf []byte
+	mu        sync.Mutex
+	limit     int
+	buf       []byte
+	truncated bool
 }
 
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.buf = append(t.buf, p...)
-	if over := len(t.buf) - outputTail; over > 0 {
+	if over := len(t.buf) - t.limit; over > 0 {
 		t.buf = slices.Clone(t.buf[over:])
+		t.truncated = true
 	}
 	return len(p), nil
 }
@@ -319,8 +323,14 @@ func (t *tailBuffer) String() string {
 	return string(t.buf)
 }
 
+func (t *tailBuffer) snapshot() ([]byte, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return slices.Clone(t.buf), t.truncated
+}
+
 func (c *Client) Exec(ctx context.Context, project, name string, argv []string, timeout time.Duration) worker.ExecResult {
-	output := &tailBuffer{}
+	output := &tailBuffer{limit: outputTail}
 	dataDone := make(chan bool)
 	control := make(chan *websocket.Conn, 1)
 	op, err := c.in(project).ExecInstance(name, api.InstanceExecPost{
@@ -365,4 +375,104 @@ func (c *Client) Exec(ctx context.Context, project, name string, argv []string, 
 	}
 	exit := int(code)
 	return worker.ExecResult{ExitCode: &exit, Output: output.String()}
+}
+
+// Run executes one agent command, keeping the tail of stdout and stderr.
+func (c *Client) Run(ctx context.Context, project, name string, spec worker.RunSpec) worker.RunResult {
+	stdout := &tailBuffer{limit: spec.MaxBytes}
+	stderr := &tailBuffer{limit: spec.MaxBytes}
+	dataDone := make(chan bool)
+	control := make(chan *websocket.Conn, 1)
+	op, err := c.in(project).ExecInstance(name, api.InstanceExecPost{
+		Command:   spec.Argv,
+		Cwd:       spec.Cwd,
+		WaitForWS: true,
+	}, &incusclient.InstanceExecArgs{
+		Stdin:    bytes.NewReader(nil),
+		Stdout:   stdout,
+		Stderr:   stderr,
+		Control:  func(conn *websocket.Conn) { control <- conn },
+		DataDone: dataDone,
+	})
+	if err != nil {
+		return worker.RunResult{Err: fmt.Errorf("incus exec %s: %w", name, err)}
+	}
+
+	result := func() worker.RunResult {
+		out, outTruncated := stdout.snapshot()
+		errOut, errTruncated := stderr.snapshot()
+		return worker.RunResult{
+			Stdout: out, Stderr: errOut,
+			StdoutTruncated: outTruncated, StderrTruncated: errTruncated,
+		}
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, spec.Timeout)
+	defer cancel()
+	err = op.WaitContext(waitCtx)
+	if errors.Is(err, context.DeadlineExceeded) {
+		// Kill the guest process; the operation then completes on its own.
+		select {
+		case conn := <-control:
+			_ = conn.WriteJSON(api.InstanceExecControl{Command: "signal", Signal: int(syscall.SIGKILL)})
+		default:
+		}
+		res := result()
+		res.TimedOut = true
+		return res
+	}
+	if err != nil {
+		res := result()
+		res.Err = fmt.Errorf("incus exec %s: %w", name, err)
+		return res
+	}
+	// Output streams finish after the operation; wait so the buffers are complete.
+	select {
+	case <-dataDone:
+	case <-time.After(10 * time.Second):
+	}
+	res := result()
+	code, ok := op.Get().Metadata["return"].(float64)
+	if !ok {
+		res.Err = fmt.Errorf("incus exec %s: no exit code", name)
+		return res
+	}
+	exit := int(code)
+	res.ExitCode = &exit
+	return res
+}
+
+// ReadFile returns up to maxBytes of the guest file at path, keeping its head.
+func (c *Client) ReadFile(ctx context.Context, project, name, path string, maxBytes int) ([]byte, bool, error) {
+	body, resp, err := c.in(project).GetInstanceFile(name, path)
+	if err != nil {
+		return nil, false, classify(err, "incus read %s %s", name, path)
+	}
+	defer body.Close()
+	if resp.Type == "directory" {
+		return nil, false, fmt.Errorf("incus read %s %s: %w", name, path, worker.ErrIsDirectory)
+	}
+	// One byte past the limit tells a truncated read from an exact fit.
+	data, err := io.ReadAll(io.LimitReader(body, int64(maxBytes)+1))
+	if err != nil {
+		return nil, false, fmt.Errorf("incus read %s %s: %w", name, path, err)
+	}
+	if len(data) > maxBytes {
+		return data[:maxBytes], true, nil
+	}
+	return data, false, nil
+}
+
+// WriteFile replaces the guest file at path, owned by root. A zero mode means 0644.
+func (c *Client) WriteFile(ctx context.Context, project, name, path string, content []byte, mode int) error {
+	if mode == 0 {
+		mode = 0o644
+	}
+	err := c.in(project).CreateInstanceFile(name, path, incusclient.InstanceFileArgs{
+		Content:   bytes.NewReader(content),
+		Mode:      mode,
+		Type:      "file",
+		WriteMode: "overwrite",
+	})
+	return classify(err, "incus write %s %s", name, path)
 }

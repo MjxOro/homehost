@@ -10,6 +10,10 @@ import (
 // as the desired end state.
 var ErrNotFound = errors.New("not found")
 
+// ErrIsDirectory marks a guest path that is a directory where a file was
+// expected.
+var ErrIsDirectory = errors.New("is a directory")
+
 // ErrImageMissing marks a plan image that was never baked on this host
 // (infra/host/build-images.sh). Retrying cannot help, so provisioning fails
 // the job at once instead of falling back to a slow upstream image.
@@ -42,6 +46,28 @@ type ExecResult struct {
 	Output   string
 }
 
+// RunSpec is one guest command for Incus.Run. Argv runs with stdin closed
+// and killed after Timeout; Cwd is empty for the guest default; each stream
+// keeps at most MaxBytes.
+type RunSpec struct {
+	Argv     []string
+	Cwd      string
+	Timeout  time.Duration
+	MaxBytes int
+}
+
+// RunResult is the outcome of Incus.Run. Err is set only on a transport
+// failure, when no exit status was observed. Both streams keep their tail.
+type RunResult struct {
+	ExitCode        *int
+	TimedOut        bool
+	Stdout          []byte
+	Stderr          []byte
+	StdoutTruncated bool
+	StderrTruncated bool
+	Err             error
+}
+
 // Incus is the slice of the Incus API the worker drives. Every call is
 // scoped to one tenant project.
 type Incus interface {
@@ -60,6 +86,15 @@ type Incus interface {
 	SetPower(ctx context.Context, project, name, action string) error
 	// Exec runs argv in the guest with stdin closed, killing it after timeout.
 	Exec(ctx context.Context, project, name string, argv []string, timeout time.Duration) ExecResult
+	// Run executes one agent command (machine_execs) with bounded output.
+	Run(ctx context.Context, project, name string, spec RunSpec) RunResult
+	// ReadFile returns up to maxBytes of the guest file at path, keeping its
+	// head; truncated reports more data. Wraps ErrNotFound for a missing path
+	// and ErrIsDirectory for a directory.
+	ReadFile(ctx context.Context, project, name, path string, maxBytes int) (data []byte, truncated bool, err error)
+	// WriteFile replaces the guest file at path (uid/gid 0). A zero mode
+	// means 0644.
+	WriteFile(ctx context.Context, project, name, path string, content []byte, mode int) error
 }
 
 // DNS manages per-box public AAAA records.

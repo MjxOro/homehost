@@ -228,7 +228,7 @@ describe.skipIf(!url)("desktop proxy security", () => {
     now = Date.now();
     fail = false;
     upstreamRequests.length = 0;
-    await client`TRUNCATE agent_messages, agent_conversations, provision_jobs, activity_events, server_requests`;
+    await client`TRUNCATE machine_execs, agent_messages, agent_conversations, provision_jobs, activity_events, server_requests`;
   });
   afterAll(async () => {
     await app?.close();

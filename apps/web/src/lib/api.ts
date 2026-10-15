@@ -1,7 +1,11 @@
 import type {
+  AccessTokenListResponse,
   AgentConversation,
   AgentConversationSummary,
   ApprovalResponse,
+  AccessToken,
+  CreatedAccessToken,
+  CreateAccessTokenInput,
   CreateRequestInput,
   CredentialsResponse,
   DashboardResponse,
@@ -105,6 +109,23 @@ export const api = {
     request("/version.json", { cache: "no-store" }),
 
   getDashboard: (): Promise<DashboardResponse> => request("/api/dashboard"),
+
+  listAccessTokens: (): Promise<AccessTokenListResponse> =>
+    request("/api/access-tokens"),
+
+  createAccessToken: (
+    input: CreateAccessTokenInput,
+  ): Promise<CreatedAccessToken> =>
+    request("/api/access-tokens", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(input),
+    }),
+
+  revokeAccessToken: (id: string): Promise<AccessToken> =>
+    request(`/api/access-tokens/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
 
   createRequest: (input: CreateRequestInput): Promise<ServerRequest> =>
     request("/api/requests", {

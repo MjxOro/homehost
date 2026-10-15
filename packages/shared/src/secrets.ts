@@ -5,6 +5,7 @@ const TOKEN_PATTERNS = [
   /\b\d{5,20}:[A-Za-z0-9_-]{30,}\b/,
   /\bsk-(?:or-)?[A-Za-z0-9_-]{16,}\b/,
   /\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}\b/,
+  /\bhht_[A-Za-z0-9_-]{20,}/,
   /\bAKIA[A-Z0-9]{16}\b/,
   /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/,
   /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/,

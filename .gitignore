@@ -16,6 +16,8 @@ test-results/
 infra/traefik/routes/gui-*.yml
 # Prod worker binary, built by infra/worker/restart.sh on deploy.
 apps/worker/bin/
+# homehost CLI binaries, built by `bun run cli:build`.
+apps/cli/bin/
 # Foreign site route (banff-trip project, served from disk) and case-study
 # notes containing live creds: never track either.
 infra/traefik/routes/banff.yml

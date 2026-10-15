@@ -49,8 +49,9 @@ jobs:
         with:
           go-version-file: apps/worker/go.mod
           cache-dependency-path: apps/worker/go.sum
-      - run: test -z "$(gofmt -l apps/worker)"
+      - run: test -z "$(gofmt -l apps/worker apps/cli)"
       - run: bun run test:worker
+      - run: bun run test:cli
 
   secrets:
     runs-on: ubuntu-latest

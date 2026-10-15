@@ -17,11 +17,12 @@ homehost/
 ├── apps/api/          # control plane; routes in src/app.ts (OAuth in src/auth/oauth.ts), domain in src/domain, SQL in migrations/
 ├── apps/web/          # SPA (TanStack Router/Query, Tailwind v4)
 ├── apps/worker/       # Go provisioning loop; binary built from the checkout, run by host systemd (dev stack: image)
+├── apps/cli/          # `homehost` Go CLI (stdlib only) for agent access tokens; `bun run cli:build`, `bun run test:cli`
 ├── packages/shared/   # @homehost/shared cross-process contract; no build step, consumed from src
 ├── packages/sites/    # @homehost/sites: JSON site spec -> static site, LLM generation via OpenRouter
-├── packages/bench/    # hh-bench replay-cached grading harness for sites generation (README covers it)
+├── packages/bench/    # homehost-bench replay-cached grading harness for sites generation (README covers it)
 ├── infra/             # dev/prod/traefik compose, host Incus prep + baked plan images, worker unit; private/ is gitignored
-├── docs/              # design notes (networking, ledger, concierge, recipes, roadmap)
+├── docs/              # design notes (networking, ledger, concierge, recipes, agent access, roadmap)
 ├── scripts/test-reset.ts  # clean-room instance/request/DNS wipe
 └── .github/workflows/ # ci.yml (typecheck+unit, worker contract freshness, integration + Go tests on pg service, gitleaks, images), deploy.yml
 ```
@@ -38,6 +39,7 @@ Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md
 | Shared API types / plans | `packages/shared/src/control-plane.ts`, `plans.ts` | contract for api + web; worker reads it via generated `apps/worker/internal/contract/contract.json` |
 | Web data fetching | `apps/web/src/lib/api.ts`, `lib/query.ts` | entry `src/main.tsx` -> `router.tsx` |
 | Provisioning behaviour | `apps/worker/internal/worker/jobs.go` | Incus adapter `internal/incus`; prod unit `infra/worker/homehost-worker.service` |
+| Agent access (tokens, MCP, `homehost`) | `apps/api/src/agent-access.ts`, `apps/worker/internal/worker/execs.go`, `apps/cli` | spec `docs/agent-access.md`; exec queue `machine_execs` |
 | Site generation | `packages/sites/src/index.ts`, `cli.ts` | graded by `packages/bench/src/cli.ts` |
 | Plan images (what boxes boot from) | `infra/host/build-images.sh` | aliases in `plans.ts`; weekly `homehost-images.timer` |
 | Ports / compose stacks | `infra/` | |

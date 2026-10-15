@@ -87,6 +87,7 @@ import {
 import { lookupAddress } from "./domain/ipAssignments.js";
 
 import { createCookiePolicy, SESSION_MAX_AGE_S } from "./auth/cookies.js";
+import { createExecWaiter, registerAgentAccess } from "./agent-access.js";
 import { registerOAuth } from "./auth/oauth.js";
 
 const DEMO_PERSONAS: DemoPersona[] = [
@@ -717,6 +718,19 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   });
 
   registerOAuth(app, db, env, cookies);
+
+  const execWaiter = createExecWaiter(
+    opts?.databaseUrl ?? env.databaseUrl,
+    (err) => app.log.error({ err }, "machine_exec_done listener failed"),
+  );
+  registerAgentAccess(app, {
+    runtime,
+    resolveUser: async (req) => (await resolveSession(req))?.user ?? null,
+    requireApprovedUser,
+    requireJsonBody,
+    waiter: execWaiter,
+    version: env.buildSha ?? "dev",
+  });
 
   app.post("/api/invites", async (req, reply) => {
     const session = await resolveSession(req);
@@ -1696,6 +1710,7 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
   });
 
   app.addHook("onClose", async () => {
+    await execWaiter.close();
     await runtime.dispose();
     if (handle) await handle.sql.end();
   });

@@ -59,6 +59,7 @@ func run(logger *log.Logger) error {
 		"WORKER_BOOT_TIMEOUT_MS":    240000,
 		"WORKER_READY_TIMEOUT_MS":   120000,
 		"WORKER_SETUP_ATTEMPTS":     3,
+		"WORKER_EXEC_CONCURRENCY":   8,
 	}
 	for name, fallback := range ints {
 		n, err := envInt(name, fallback)
@@ -83,7 +84,8 @@ func run(logger *log.Logger) error {
 		Env:               envOr("WORKER_ENV", "prod"),
 		BaseDomain:        os.Getenv("WORKER_BASE_DOMAIN"),
 		// Route files live in the checkout: the worker's cwd is the repo root.
-		RoutesDir: filepath.Join(cwd, "infra", "traefik", "routes"),
+		RoutesDir:       filepath.Join(cwd, "infra", "traefik", "routes"),
+		ExecConcurrency: ints["WORKER_EXEC_CONCURRENCY"],
 	}
 
 	poolCfg, err := pgxpool.ParseConfig(databaseURL)
