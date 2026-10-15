@@ -157,8 +157,51 @@ claude mcp add --transport http homehost https://<panel>/api/mcp \
 
 ## `homehost` CLI
 
-`apps/cli` is a stdlib-only Go module. Build it with `bun run cli:build`,
-which produces `apps/cli/bin/homehost-darwin-arm64` and `homehost-linux-amd64`.
+`apps/cli` is a stdlib-only Go module.
+
+### Install and update
+
+```sh
+curl -fsSL https://homehost.risktozero.sh/install.sh | sh
+```
+
+The panel serves `install.sh` (`apps/web/public/install.sh`). The script:
+
+1. picks the newest `cli-v*` GitHub release (`HOMEHOST_VERSION=v1.2.3` pins one);
+2. downloads the build for this OS and CPU (darwin or linux, arm64 or amd64);
+3. checks it against the release's `checksums.txt` and runs it once;
+4. installs it to `~/.local/bin/homehost` (`HOMEHOST_INSTALL_DIR` overrides).
+
+Re-running the script upgrades in place. curl does not add the macOS
+quarantine flag, so the unsigned binary runs without a Gatekeeper prompt.
+
+After that, nobody needs the curl line again:
+
+- `homehost update` installs the newest release over the running binary.
+  It follows the same steps: checksum, a test run, then one rename.
+- `homehost update --check` only reports.
+- At a terminal, any command checks for a new release at most once a day,
+  in the background with a 3-second limit, and prints a one-line notice on
+  stderr. Scripts and agents (stderr not a TTY) never trigger the check or
+  see the notice. `HOMEHOST_NO_UPDATE_CHECK=1` turns it off. The cache is
+  `update-check.json` next to `cli.json`.
+
+### Releasing
+
+Push a tag `cli-vX.Y.Z` (for example `git tag cli-v0.1.0 && git push origin cli-v0.1.0`).
+`.github/workflows/cli-release.yml` then:
+
+- runs the CLI tests;
+- builds the four binaries with the version stamped in;
+- writes `checksums.txt`;
+- publishes a GitHub release with `--latest=false`, so the panel's own
+  release stays the repo's "latest".
+
+Installed copies see the new version within a day. For local builds,
+`bun run cli:build` writes `apps/cli/bin/homehost-darwin-arm64` and
+`homehost-linux-amd64` (version `dev`, which never shows the notice).
+
+### Commands
 
 ```text
 homehost login [--url https://<panel>]     # reads the token from stdin, checks it, saves ~/.config/homehost/cli.json (0600)
@@ -170,6 +213,7 @@ homehost cat <machine> <path>              # file bytes to stdout
 homehost put [--mode 0644] <machine> <local-file|-> <path>
 homehost start|stop <machine>
 homehost mcp-config                        # prints the MCP client snippet for this URL
+homehost update [--check]                  # install the newest release in place
 ```
 
 `HOMEHOST_URL` and `HOMEHOST_TOKEN` override the saved config. `homehost exec`
