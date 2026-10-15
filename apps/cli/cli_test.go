@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newToken builds a random token at test time so no secret-shaped literal lives in the repo.
@@ -79,6 +80,8 @@ func newHarness(t *testing.T, env map[string]string) *harness {
 		getenv:     envFunc(env),
 		configPath: h.configPath,
 		version:    "test",
+		now:        time.Now,
+		noticeWait: 10 * time.Second,
 	}
 	return h
 }

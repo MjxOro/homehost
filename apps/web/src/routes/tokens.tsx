@@ -409,7 +409,14 @@ export function TokensPage() {
                 <code className="block break-all rounded-control bg-ink-1 px-3 py-2 font-mono text-[12.5px]">
                   {`claude mcp add --transport http homehost ${origin}/api/mcp --header "Authorization: Bearer ${revealed}"`}
                 </code>
-                <p className="m-0">Or sign in with the CLI:</p>
+                <p className="m-0">
+                  Or use the CLI. Install it once;{" "}
+                  <code className="font-mono">homehost update</code> keeps it
+                  current:
+                </p>
+                <code className="block break-all rounded-control bg-ink-1 px-3 py-2 font-mono text-[12.5px]">
+                  {`curl -fsSL ${origin}/install.sh | sh`}
+                </code>
                 <code className="block break-all rounded-control bg-ink-1 px-3 py-2 font-mono text-[12.5px]">
                   {`echo ${revealed} | homehost login --url ${origin}`}
                 </code>

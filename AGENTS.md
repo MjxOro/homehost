@@ -17,14 +17,14 @@ homehost/
 ├── apps/api/          # control plane; routes in src/app.ts (OAuth in src/auth/oauth.ts), domain in src/domain, SQL in migrations/
 ├── apps/web/          # SPA (TanStack Router/Query, Tailwind v4)
 ├── apps/worker/       # Go provisioning loop; binary built from the checkout, run by host systemd (dev stack: image)
-├── apps/cli/          # `homehost` Go CLI (stdlib only) for agent access tokens; `bun run cli:build`, `bun run test:cli`
+├── apps/cli/          # `homehost` Go CLI (stdlib only) for agent access tokens; `bun run cli:build`, `bun run test:cli`; released by tag `cli-vX.Y.Z`, installed via the panel's `/install.sh`
 ├── packages/shared/   # @homehost/shared cross-process contract; no build step, consumed from src
 ├── packages/sites/    # @homehost/sites: JSON site spec -> static site, LLM generation via OpenRouter
 ├── packages/bench/    # homehost-bench replay-cached grading harness for sites generation (README covers it)
 ├── infra/             # dev/prod/traefik compose, host Incus prep + baked plan images, worker unit; private/ is gitignored
 ├── docs/              # design notes (networking, ledger, concierge, recipes, agent access, roadmap)
 ├── scripts/test-reset.ts  # clean-room instance/request/DNS wipe
-└── .github/workflows/ # ci.yml (typecheck+unit, worker contract freshness, integration + Go tests on pg service, gitleaks, images), deploy.yml
+└── .github/workflows/ # ci.yml (typecheck+unit, worker contract freshness, integration + Go tests on pg service, gitleaks, images), deploy.yml, cli-release.yml (on `cli-v*` tags)
 ```
 
 Child guides: `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`, `packages/shared/AGENTS.md`, `packages/sites/AGENTS.md`, `infra/AGENTS.md`.
