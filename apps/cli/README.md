@@ -2,6 +2,12 @@
 
 Command-line client for the homehost agent API. Standard library only.
 
+## Install
+
+    curl -fsSL https://homehost.risktozero.sh/install.sh | sh
+
+After that, `homehost update` installs new releases in place, and at a terminal the CLI mentions a new release once a day (`HOMEHOST_NO_UPDATE_CHECK=1` turns that off). Releases come from pushing a `cli-vX.Y.Z` tag; see `docs/agent-access.md`.
+
 ## Build
 
     go -C apps/cli build -o bin/homehost .
@@ -29,6 +35,7 @@ The token is checked against `GET /api/machines` and saved to `$XDG_CONFIG_HOME/
     homehost start <machine>
     homehost stop <machine>
     homehost mcp-config
+    homehost update [--check]
     homehost version
 
 `exec` joins the arguments after `--` with spaces and runs the result with `/bin/sh -c` on the machine. The exit code is the remote exit code, `124` on timeout, and `1` on API or transport errors. `cat` and `put` are limited to 4 MiB.

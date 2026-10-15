@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 )
 
 var version = "dev"
@@ -26,11 +27,14 @@ Usage:
   homehost start <machine>                         start a stopped machine
   homehost stop <machine>                          stop a running machine
   homehost mcp-config                              print MCP client setup for this panel
+  homehost update [--check]                        install the latest release in place
   homehost version
 
 exec runs its command with /bin/sh -c on the machine.
 
 Environment: HOMEHOST_URL and HOMEHOST_TOKEN override the saved config.
+At a terminal, homehost checks for a new release once a day and says so;
+set HOMEHOST_NO_UPDATE_CHECK=1 to turn that off.
 Config: $XDG_CONFIG_HOME/homehost/cli.json, or ~/.config/homehost/cli.json (mode 0600).
 `
 
@@ -41,6 +45,11 @@ type app struct {
 	getenv     func(string) string
 	configPath string
 	version    string
+	// stderrIsTerminal gates the daily update notice to interactive use.
+	stderrIsTerminal bool
+	noticeWait       time.Duration
+	now              func() time.Time
+	executable       func() (string, error)
 }
 
 type cliError struct {
@@ -62,12 +71,16 @@ func main() {
 		os.Exit(1)
 	}
 	a := &app{
-		stdin:      os.Stdin,
-		stdout:     os.Stdout,
-		stderr:     os.Stderr,
-		getenv:     os.Getenv,
-		configPath: path,
-		version:    version,
+		stdin:            os.Stdin,
+		stdout:           os.Stdout,
+		stderr:           os.Stderr,
+		getenv:           os.Getenv,
+		configPath:       path,
+		version:          version,
+		stderrIsTerminal: isTerminal(os.Stderr),
+		noticeWait:       defaultNoticeWait,
+		now:              time.Now,
+		executable:       runningExecutable,
 	}
 	os.Exit(a.run(os.Args[1:]))
 }
@@ -81,6 +94,11 @@ func (a *app) run(args []string) int {
 		code int
 		err  error
 	)
+	switch args[0] {
+	case "help", "-h", "--help", "version", "--version", "update":
+	default:
+		defer a.startUpdateNotice()()
+	}
 	switch cmd, rest := args[0], args[1:]; cmd {
 	case "help", "-h", "--help":
 		fmt.Fprint(a.stdout, usageText)
@@ -108,6 +126,8 @@ func (a *app) run(args []string) int {
 		code, err = a.cmdPower("stop", rest)
 	case "mcp-config":
 		code, err = a.cmdMCPConfig(rest)
+	case "update":
+		code, err = a.cmdUpdate(rest)
 	default:
 		err = usageErr(fmt.Sprintf("unknown command %q; run homehost help", cmd))
 	}
@@ -118,6 +138,11 @@ func (a *app) run(args []string) int {
 		return a.report(err)
 	}
 	return code
+}
+
+func isTerminal(f *os.File) bool {
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
 func (a *app) report(err error) int {
