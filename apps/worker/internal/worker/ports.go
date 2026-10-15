@@ -28,6 +28,10 @@ type LaunchSpec struct {
 	Config map[string]string
 	// RootSizeGiB overrides the size of the profile's root disk.
 	RootSizeGiB int
+	// GPU shares the host's NVIDIA GPU with a container: the gpu device plus
+	// the host's driver userspace (nvidia.runtime). Launch refuses it for VMs,
+	// where the device would pass the whole card through.
+	GPU bool
 }
 
 // InstanceState is the live status ("Running", "Stopped", ...) and the

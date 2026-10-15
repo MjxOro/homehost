@@ -7,7 +7,18 @@
       "cpu": 2,
       "memoryMb": 2048,
       "diskGb": 20,
-      "desktop": null
+      "desktop": null,
+      "gpu": false
+    },
+    {
+      "id": "container-gpu",
+      "kind": "container",
+      "image": "homehost/ubuntu-24.04/container",
+      "cpu": 4,
+      "memoryMb": 4096,
+      "diskGb": 40,
+      "desktop": null,
+      "gpu": true
     },
     {
       "id": "vm-medium",
@@ -16,7 +27,8 @@
       "cpu": 4,
       "memoryMb": 4096,
       "diskGb": 40,
-      "desktop": null
+      "desktop": null,
+      "gpu": false
     },
     {
       "id": "vm-large",
@@ -25,7 +37,8 @@
       "cpu": 8,
       "memoryMb": 8192,
       "diskGb": 80,
-      "desktop": null
+      "desktop": null,
+      "gpu": false
     },
     {
       "id": "desktop-ubuntu",
@@ -41,7 +54,8 @@
         "kasmPort": 6090,
         "vncPort": 5905,
         "webPort": 6090
-      }
+      },
+      "gpu": false
     },
     {
       "id": "desktop-omarchy",
@@ -57,7 +71,8 @@
         "kasmPort": 6090,
         "vncPort": 5905,
         "webPort": 6090
-      }
+      },
+      "gpu": false
     }
   ],
   "recipes": {
@@ -97,6 +112,7 @@
   "setupPlans": {
     "none": {
       "container-small": null,
+      "container-gpu": null,
       "vm-medium": null,
       "vm-large": null,
       "desktop-ubuntu": null,
@@ -104,6 +120,19 @@
     },
     "node": {
       "container-small": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_node",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
+      "container-gpu": {
         "steps": [
           {
             "id": "update_packages",
@@ -183,6 +212,19 @@
         ],
         "heapMb": null
       },
+      "container-gpu": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_python",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
       "vm-medium": {
         "steps": [
           {
@@ -250,6 +292,19 @@
         ],
         "heapMb": null
       },
+      "container-gpu": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_docker",
+            "timeoutMs": 900000
+          }
+        ],
+        "heapMb": null
+      },
       "vm-medium": {
         "steps": [
           {
@@ -305,6 +360,7 @@
     },
     "code_server": {
       "container-small": null,
+      "container-gpu": null,
       "vm-medium": null,
       "vm-large": null,
       "desktop-ubuntu": null,
@@ -339,6 +395,35 @@
           }
         ],
         "heapMb": 1536
+      },
+      "container-gpu": {
+        "steps": [
+          {
+            "id": "update_packages",
+            "timeoutMs": 1200000
+          },
+          {
+            "id": "install_java",
+            "timeoutMs": 900000
+          },
+          {
+            "id": "download_minecraft",
+            "timeoutMs": 600000
+          },
+          {
+            "id": "configure_minecraft",
+            "timeoutMs": 120000
+          },
+          {
+            "id": "start_service",
+            "timeoutMs": 180000
+          },
+          {
+            "id": "wait_ready",
+            "timeoutMs": 420000
+          }
+        ],
+        "heapMb": 3584
       },
       "vm-medium": {
         "steps": [
@@ -459,6 +544,7 @@
     },
     "minecraft_bedrock": {
       "container-small": null,
+      "container-gpu": null,
       "vm-medium": null,
       "vm-large": null,
       "desktop-ubuntu": null,
@@ -466,6 +552,7 @@
     },
     "valheim": {
       "container-small": null,
+      "container-gpu": null,
       "vm-medium": null,
       "vm-large": null,
       "desktop-ubuntu": null,

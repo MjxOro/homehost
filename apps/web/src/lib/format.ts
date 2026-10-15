@@ -38,13 +38,16 @@ export function formatMemory(mb: number): string {
   return `${(mb / 1024).toLocaleString("en", { maximumFractionDigits: 1 })} GB`;
 }
 
-/** One-line plan size, e.g. "2 CPU · 2 GB RAM · 20 GB disk". */
+/** One-line plan size, e.g. "2 CPU · 2 GB RAM · 20 GB disk" (plus
+ * "· shared GPU" on GPU plans). */
 export function formatPlanSpecs(plan: {
   cpu: number;
   memoryMb: number;
   diskGb: number;
+  gpu?: boolean;
 }): string {
-  return `${plan.cpu} CPU · ${formatMemory(plan.memoryMb)} RAM · ${plan.diskGb} GB disk`;
+  const size = `${plan.cpu} CPU · ${formatMemory(plan.memoryMb)} RAM · ${plan.diskGb} GB disk`;
+  return plan.gpu ? `${size} · shared GPU` : size;
 }
 
 /** Build time for "Built in ...": "18 seconds", "1 min 42 sec", "14 min", "2 h 5 min". */

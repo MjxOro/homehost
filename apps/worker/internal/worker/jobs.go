@@ -123,6 +123,7 @@ func (w *Worker) provision(ctx context.Context, req *request, plan *contract.Pla
 			"limits.memory": fmt.Sprintf("%dMiB", plan.MemoryMb),
 		},
 		RootSizeGiB: plan.DiskGb,
+		GPU:         plan.GPU,
 	}
 	if !isVM {
 		spec.Config["security.nesting"] = "true"

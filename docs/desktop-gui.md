@@ -210,23 +210,27 @@ jobs. Flip = remove the
 gate + take the arch user-data path. KasmVNC AUR package name and build
 flags are unverified — see the `omarchyRunCommands` comments.
 
-## GPU sharing limits (single GTX 1070)
+## GPU sharing (single GTX 1070)
 
-- Host PCI: `42:00.0 GP104 [10de:1b81]` + `42:00.1` audio — one card, PCI
-  1:1 passthrough cannot serve multiple tenants (same verdict as
-  `docs/gui-desktop-notes.md`: guest glxgears 2778fps vs 518fps llvmpipe,
-  zero VNC-feel change, keep the card for CUDA/transcode, not VNC).
-- `nvidia-smi` on the host fails (`No supported GPUs were found` — no
-  NVML driver bound), so no host-side encode path exists today.
-- desk2 KasmVNC uses virtio DRI, not the NVIDIA card:
-  `-drinode /dev/dri/renderD128` where
-  `pci-0000:04:00.0-render -> ../renderD128` (virtio), while
-  `pci-0000:07:00.0` owns the second render node. Per-app NVIDIA offload
-  stays available inside XFCE via the `__GLX_VENDOR_LIBRARY_NAME=nvidia` /
-  `__NV_PRIME_RENDER_OFFLOAD=1` env in xstartup — PRIME offload, not
-  passthrough.
-- Sell accordingly: default tier = usable desktop/apps (software encode),
-  premium = single-GPU box, one tenant per card.
+- Host PCI: `42:00.0 GP104 [10de:1b81]` + `42:00.1` audio — one card.
+- Since 2026-10-13 the card stays on the host driver (`nvidia` 580.178,
+  `nvidia-smi` works) instead of `vfio-pci` passthrough to desk2
+  (`/etc/modprobe.d/vfio-gpu.conf` removed; backup and desk2's old config in
+  `~/gpu-backup/`). Shared, time-sliced, by everything that runs on the host:
+  - Docker: `--gpus all` or `--device nvidia.com/gpu=all` (NVIDIA Container
+    Toolkit + CDI spec in `/var/run/cdi/nvidia.yaml`).
+  - Incus containers: `nvidia.runtime=true` + a `gpu` device; many
+    containers can hold it at once. Tenant boxes get it through the
+    `container-gpu` plan (worker `LaunchSpec.GPU`); the concierge never
+    suggests it, owners pick it by hand.
+- Incus VMs cannot share it: PCI passthrough is 1:1 and binds the whole card
+  away from the host and every container; GeForce has no vGPU/SR-IOV.
+- desk2 KasmVNC never used the card for VNC (virtio DRI,
+  `-drinode /dev/dri/renderD128`); passthrough measured guest glxgears
+  2778fps vs 518fps llvmpipe with zero VNC-feel change
+  (`docs/gui-desktop-notes.md`).
+- Sell accordingly: GPU workloads (CUDA/transcode) run as containers;
+  desktops stay software-rendered.
 
 ## Networking problems found (2026-09-17, with evidence)
 

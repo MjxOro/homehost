@@ -8,6 +8,7 @@ import "./landing.css";
 function planKind(plan: Plan) {
   if (plan.desktop) return { label: "Desktop", Icon: CursorIcon };
   if (plan.kind === "vm") return { label: "VM", Icon: DashboardIcon };
+  if (plan.gpu) return { label: "GPU container", Icon: ServerIcon };
   return { label: "Container", Icon: ServerIcon };
 }
 

@@ -41,6 +41,20 @@ sudo netfilter-persistent save
 Tenant bridges also have no IPv6 route: guest package installs must force
 IPv4 (`Acquire::ForceIPv4 "true"` in cloud-init) until the host routes v6.
 
+## GPU plans
+
+`container-gpu` boxes share the host's NVIDIA card: the worker launches them
+with `nvidia.runtime=true` and a `gpu` device, so the card must stay on the
+host driver (not bound to `vfio-pci` for VM passthrough) and Incus needs
+`nvidia-container-cli`. `check.sh` reports both while a GPU plan exists.
+
+```bash
+sudo apt install nvidia-driver-580    # or the current ubuntu-drivers pick
+# NVIDIA Container Toolkit (apt repo: https://nvidia.github.io/libnvidia-container)
+sudo apt install nvidia-container-toolkit
+nvidia-smi -L && nvidia-container-cli --version
+```
+
 ## Prod worker service
 
 `homehost-worker.service` (host systemd, `WORKER_ENV=prod`) reads its

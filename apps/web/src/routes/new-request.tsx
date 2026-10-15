@@ -117,7 +117,9 @@ function PlanCards({
                     ? "Locked for your tier — technical friends can request this plan."
                     : env
                       ? "GUI desktop in the browser — opens from the dashboard once running."
-                      : "Resources reserve against your per-tier quota while pending or approved."}
+                      : plan.gpu
+                        ? "Shares the host's NVIDIA GPU with other GPU boxes — nvidia-smi works inside."
+                        : "Resources reserve against your per-tier quota while pending or approved."}
                 </span>
               </label>
             </div>
