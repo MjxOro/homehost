@@ -421,6 +421,10 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
     expect(race.map((r) => r.statusCode).sort()).toEqual([201, 429]);
     const refused = race.find((r) => r.statusCode === 429)!;
     expect(refused.json<{ code: string }>().code).toBe("gpu_capacity");
+    const full = (
+      await app.inject({ url: "/api/dashboard", headers: { cookie: alice } })
+    ).json<DashboardResponse>();
+    expect(full.gpu).toEqual({ used: 4, limit: 4 });
     await client`UPDATE server_requests SET status = 'deleted' WHERE id = ${moved[0]!.json<ServerRequest>().id}`;
     const loser = race.indexOf(refused) === 0 ? bob : operator;
     expect((await create(loser, "Gpu after delete")).statusCode).toBe(201);

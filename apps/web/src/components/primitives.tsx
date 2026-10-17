@@ -262,10 +262,13 @@ export function QuotaCard({
   quota,
   usage,
   tier,
+  gpu,
 }: {
   quota: Quota;
   usage: Quota;
   tier: string;
+  /** Host-wide GPU slots; omitted when no GPU plan is open to the tier. */
+  gpu?: { used: number; limit: number };
 }) {
   return (
     <section className={CARD} aria-labelledby="quota-heading">
@@ -291,6 +294,16 @@ export function QuotaCard({
           />
         ))}
       </div>
+      {gpu ? (
+        <div className="mt-[18px] grid grid-cols-1 gap-[18px] border-t border-line pt-[18px] sm:grid-cols-2 lg:grid-cols-4">
+          <QuotaBar label="GPU servers" used={gpu.used} max={gpu.limit} />
+          <p className="m-0 self-end text-[13px] leading-[1.5] text-text-3 lg:col-span-3">
+            {gpu.used >= gpu.limit
+              ? "Every GPU slot on the host is taken. A new GPU request opens up once one is deleted."
+              : `${gpu.limit - gpu.used} of ${gpu.limit} GPU slots free. Counted across every member: all GPU servers share the host's one card.`}
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -157,6 +157,8 @@ export interface DashboardResponse {
   user: PortalUser;
   quota: Quota;
   usage: Quota;
+  /** GPU servers held host-wide by every owner, against GPU_SERVER_LIMIT. */
+  gpu: { used: number; limit: number };
   requests: ServerRequest[];
   activity: ActivityEvent[];
 }

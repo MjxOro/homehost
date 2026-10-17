@@ -10,10 +10,11 @@ import Fastify, {
 } from "fastify";
 import { createHash, randomBytes } from "node:crypto";
 import * as tls from "node:tls";
-import { and, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   DESKTOP_CSP,
+  GPU_SERVER_LIMIT,
   PLANS,
   QUOTA_HOLDING_STATUSES,
   RECIPES,
@@ -47,6 +48,7 @@ import {
   cancelRequest,
   createRequest,
   decideRequest,
+  GPU_HOLDING,
   readDesktopSession,
   readInstancePassword,
   retryProvision,
@@ -1132,13 +1134,18 @@ export function buildApp(opts?: BuildAppOptions): FastifyInstance {
         usage.diskGb += r.diskGb;
       }
     }
+    const [gpuHeld] = await db
+      .select({ n: count() })
+      .from(schema.serverRequests)
+      .where(GPU_HOLDING);
     return {
       user: session.user,
       quota: { ...TIER_QUOTAS[session.user.tier] },
       usage,
+      gpu: { used: gpuHeld?.n ?? 0, limit: GPU_SERVER_LIMIT },
       requests: requests.map(toServerRequest),
       activity: events.map(toActivityEvent),
-    };
+    } satisfies DashboardResponse;
   });
   app.get("/api/activity", async (req, reply) => {
     const session = await resolveSession(req);
