@@ -245,6 +245,8 @@ function sendDomainError(reply: FastifyReply, e: DomainError) {
   switch (e._tag) {
     case "QuotaExceeded":
       return sendErr(reply, 429, "quota exceeded", "quota");
+    case "GpuCapacityExhausted":
+      return sendErr(reply, 429, "gpu capacity exhausted", "gpu_capacity");
     case "SubdomainTaken":
       return sendErr(reply, 409, "subdomain already taken", "conflict");
     case "RequestNotFound":

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import {
+  GPU_SERVER_LIMIT,
   PLANS,
   QUOTA_HOLDING_STATUSES,
   TIER_QUOTAS,
@@ -19,6 +20,7 @@ import { appendMessagesInTx } from "./agent-storage.js";
 import { DatabaseTag } from "./Database.js";
 import {
   DbFailure,
+  GpuCapacityExhausted,
   InvalidTransition,
   QuotaExceeded,
   RequestNotFound,
@@ -27,6 +29,15 @@ import {
 } from "./errors.js";
 
 export type RequestRow = typeof schema.serverRequests.$inferSelect;
+
+// Serializes GPU admission across every owner (taken after the owner lock).
+const GPU_ADMISSION_LOCK_KEY = 721915;
+const GPU_PLAN_IDS = PLANS.filter((p) => p.gpu).map((p) => p.id);
+/** Rows that take a host-wide GPU slot, whoever owns them. */
+export const GPU_HOLDING = and(
+  inArray(schema.serverRequests.planId, GPU_PLAN_IDS),
+  inArray(schema.serverRequests.status, [...QUOTA_HOLDING_STATUSES]),
+);
 
 // Drizzle wraps driver errors in DrizzleQueryError; the Postgres code sits on
 // its `cause`, so walk a few levels down.
@@ -54,13 +65,18 @@ export interface CreateInput {
 }
 
 type CreateOutcome =
-  { ok: true; row: RequestRow } | { ok: false; reason: "quota" | "proposal" };
+  | { ok: true; row: RequestRow }
+  | { ok: false; reason: "quota" | "gpu" | "proposal" };
 
 export const createRequest = (
   input: CreateInput,
 ): Effect.Effect<
   RequestRow,
-  QuotaExceeded | SubdomainTaken | RequestNotFound | DbFailure,
+  | QuotaExceeded
+  | GpuCapacityExhausted
+  | SubdomainTaken
+  | RequestNotFound
+  | DbFailure,
   DatabaseTag
 > =>
   Effect.gen(function* () {
@@ -149,6 +165,17 @@ export const createRequest = (
           ) {
             return { ok: false as const, reason: "quota" as const };
           }
+          if (input.plan.gpu) {
+            await tx.execute(
+              sql`SELECT pg_advisory_xact_lock(${GPU_ADMISSION_LOCK_KEY})`,
+            );
+            const [gpuHeld] = await tx
+              .select({ n: count() })
+              .from(schema.serverRequests)
+              .where(GPU_HOLDING);
+            if ((gpuHeld?.n ?? 0) >= GPU_SERVER_LIMIT)
+              return { ok: false as const, reason: "gpu" as const };
+          }
           const id = randomUUID();
           const now = new Date();
           const subdomain = toSubdomain(
@@ -215,7 +242,9 @@ export const createRequest = (
     if (!outcome.ok)
       return yield* outcome.reason === "proposal"
         ? new RequestNotFound()
-        : new QuotaExceeded();
+        : outcome.reason === "gpu"
+          ? new GpuCapacityExhausted()
+          : new QuotaExceeded();
     return outcome.row;
   });
 

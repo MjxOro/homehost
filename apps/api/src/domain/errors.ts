@@ -6,6 +6,10 @@ export class DbFailure extends Data.TaggedError("DbFailure")<{
 
 export class QuotaExceeded extends Data.TaggedError("QuotaExceeded")<{}> {}
 
+export class GpuCapacityExhausted extends Data.TaggedError(
+  "GpuCapacityExhausted",
+)<{}> {}
+
 export class SubdomainTaken extends Data.TaggedError("SubdomainTaken")<{}> {}
 
 export class RequestNotFound extends Data.TaggedError("RequestNotFound")<{}> {}
@@ -21,6 +25,7 @@ export class InvalidTransition extends Data.TaggedError("InvalidTransition")<{
 export type DomainError =
   | DbFailure
   | QuotaExceeded
+  | GpuCapacityExhausted
   | SubdomainTaken
   | RequestNotFound
   | TransitionConflict

@@ -73,7 +73,9 @@ export function recipePlanError(
 export function createErrorCopy(error: unknown): string {
   if (isApiError(error)) {
     if (error.status === 429)
-      return "This would go over your server quota. Delete a server you no longer need, or ask the operator for more room.";
+      return error.code === "gpu_capacity"
+        ? "Every GPU slot on the host is taken right now. Try again once one frees up, or ask the operator."
+        : "This would go over your server quota. Delete a server you no longer need, or ask the operator for more room.";
     if (error.status === 403)
       return error.code === "AccountPending"
         ? "Your account is still waiting for approval. You can create servers once an operator approves it."
