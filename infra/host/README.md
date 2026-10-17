@@ -47,6 +47,8 @@ IPv4 (`Acquire::ForceIPv4 "true"` in cloud-init) until the host routes v6.
 with `nvidia.runtime=true` and a `gpu` device, so the card must stay on the
 host driver (not bound to `vfio-pci` for VM passthrough) and Incus needs
 `nvidia-container-cli`. `check.sh` reports both while a GPU plan exists.
+The API caps GPU boxes host-wide at `GPU_SERVER_LIMIT`
+(`packages/shared/src/control-plane.ts`, counted from request until teardown).
 
 ```bash
 sudo apt install nvidia-driver-580    # or the current ubuntu-drivers pick

@@ -398,6 +398,38 @@ describe.skipIf(!databaseUrl)("request lifecycle transactions", () => {
     expect(dashboard.usage.servers).toBe(2);
   });
 
+  test("GPU servers are capped host-wide across owners, racing included", async () => {
+    const create = (cookie: string, name: string) =>
+      app.inject({
+        method: "POST",
+        url: "/api/requests",
+        headers: { cookie },
+        payload: { name, planId: "container-gpu" },
+      });
+    // Two of bob's boxes move to alice so bob keeps tier room while the host
+    // fills: 2 (alice) + 1 (operator) held, one slot left.
+    const moved = [await create(bob, "Gpu a"), await create(bob, "Gpu b")];
+    for (const r of moved) {
+      expect(r.statusCode).toBe(201);
+      await client`UPDATE server_requests SET owner_id = 'alice', status = 'running' WHERE id = ${r.json<ServerRequest>().id}`;
+    }
+    expect((await create(operator, "Gpu c")).statusCode).toBe(201);
+    const race = await Promise.all([
+      create(bob, "Gpu race bob"),
+      create(operator, "Gpu race operator"),
+    ]);
+    expect(race.map((r) => r.statusCode).sort()).toEqual([201, 429]);
+    const refused = race.find((r) => r.statusCode === 429)!;
+    expect(refused.json<{ code: string }>().code).toBe("gpu_capacity");
+    const full = (
+      await app.inject({ url: "/api/dashboard", headers: { cookie: alice } })
+    ).json<DashboardResponse>();
+    expect(full.gpu).toEqual({ used: 4, limit: 4 });
+    await client`UPDATE server_requests SET status = 'deleted' WHERE id = ${moved[0]!.json<ServerRequest>().id}`;
+    const loser = race.indexOf(refused) === 0 ? bob : operator;
+    expect((await create(loser, "Gpu after delete")).statusCode).toBe(201);
+  });
+
   test("health reports the build and turns 503 while draining", async () => {
     const live = await app.inject({ url: "/api/health" });
     expect(live.statusCode).toBe(200);

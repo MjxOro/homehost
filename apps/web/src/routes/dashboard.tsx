@@ -167,6 +167,7 @@ function SignedOutHome() {
 
 function SignedInDashboard({ user }: { user: PortalUser }) {
   const dashboard = useDashboard(user.id);
+  const plans = usePlans();
   const queryClient = useQueryClient();
   const [liveMessage, setLiveMessage] = useState<string | null>(null);
 
@@ -224,7 +225,11 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
     );
   }
 
-  const { quota, usage, requests, activity } = dashboard.data;
+  const { quota, usage, gpu, requests, activity } = dashboard.data;
+  const gpuOpen = (plans.data ?? []).some(
+    (p) =>
+      p.gpu && p.available && !(p.technicalOnly && user.tier !== "technical"),
+  );
   return (
     <div className="flex flex-col gap-5">
       <div className="pb-2">
@@ -247,7 +252,12 @@ function SignedInDashboard({ user }: { user: PortalUser }) {
         </Link>
       </div>
 
-      <QuotaCard quota={quota} usage={usage} tier={user.tier} />
+      <QuotaCard
+        quota={quota}
+        usage={usage}
+        tier={user.tier}
+        gpu={gpuOpen ? gpu : undefined}
+      />
 
       <section className={CARD} aria-labelledby="requests-heading">
         <div className={CARD_HEAD}>

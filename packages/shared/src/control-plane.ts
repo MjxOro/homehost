@@ -157,6 +157,8 @@ export interface DashboardResponse {
   user: PortalUser;
   quota: Quota;
   usage: Quota;
+  /** GPU servers held host-wide by every owner, against GPU_SERVER_LIMIT. */
+  gpu: { used: number; limit: number };
   requests: ServerRequest[];
   activity: ActivityEvent[];
 }
@@ -210,3 +212,7 @@ export const TIER_QUOTAS: Record<TrustTier, Quota> = {
   /** IRL technical friends: generous but bounded. Nobody is billed. */
   technical: { servers: 3, cpu: 8, memoryMb: 8192, diskGb: 100 },
 };
+
+/** Host-wide ceiling on GPU servers across every owner: they all time-slice
+ * the one NVIDIA card. Held by QUOTA_HOLDING_STATUSES, like tier quota. */
+export const GPU_SERVER_LIMIT = 4;
